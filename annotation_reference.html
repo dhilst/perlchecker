@@ -336,6 +336,75 @@ also reference function parameters.</p>
 </pre></div>
 </div>
 </section>
+<section id="extern-external-function-contracts">
+<h2><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">extern:</span></code> — External Function Contracts<a class="headerlink" href="#extern-external-function-contracts" title="Link to this heading">¶</a></h2>
+<p>Declares the type signature and contract of a function defined outside the
+verified file. Place these as standalone comment lines anywhere in the file
+(they do not need to be attached to a <code class="docutils literal notranslate"><span class="pre">sub</span></code>).</p>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># extern: NAME (Type1, Type2, ...) -&gt; ReturnType pre: EXPR post: EXPR</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">pre:</span></code> and <code class="docutils literal notranslate"><span class="pre">post:</span></code> clauses are optional (default to <code class="docutils literal notranslate"><span class="pre">true</span></code>).
+Parameters are referenced positionally as <code class="docutils literal notranslate"><span class="pre">$a</span></code>, <code class="docutils literal notranslate"><span class="pre">$b</span></code>, <code class="docutils literal notranslate"><span class="pre">$c</span></code>, etc. in
+pre/postconditions. Use <code class="docutils literal notranslate"><span class="pre">$result</span></code> in the postcondition to refer to the
+return value.</p>
+<p>Examples:</p>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># extern: abs_val (Int) -&gt; Int post: $result &gt;= 0</span>
+<span class="c1"># extern: clamp (Int, Int, Int) -&gt; Int pre: $b &lt;= $c post: $result &gt;= $b &amp;&amp; $result &lt;= $c</span>
+<span class="c1"># extern: lookup (Hash&lt;Str, Int&gt;, Str) -&gt; Int</span>
+</pre></div>
+</div>
+<p>When a verified function calls an extern, perlchecker:</p>
+<ol class="arabic simple">
+<li><p><strong>Checks</strong> the precondition is satisfied at the call site (given the
+caller’s path condition)</p></li>
+<li><p><strong>Assumes</strong> the postcondition holds for the fresh symbolic return value</p></li>
+<li><p>Continues verification with those assumptions</p></li>
+</ol>
+<p>If the precondition or postcondition expression cannot be evaluated (e.g.,
+references an undefined variable), verification fails with an error rather
+than silently assuming the contract is satisfied.</p>
+</section>
+<section id="ghost-ghost-variables">
+<h2><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">ghost:</span></code> — Ghost Variables<a class="headerlink" href="#ghost-ghost-variables" title="Link to this heading">¶</a></h2>
+<p>Ghost variables are specification-only variables that exist for verification
+purposes but produce no runtime code. They let you capture intermediate
+values and write assertions about relationships between program states.</p>
+<p>Place ghost annotations as comments inside the function body:</p>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># ghost: $varname = EXPR</span>
+</pre></div>
+</div>
+<p>The variable name must start with <code class="docutils literal notranslate"><span class="pre">$</span></code>. The expression can reference any
+in-scope variable (parameters or previously declared locals). Ghost variables
+are visible to subsequent <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">assert:</span></code> annotations and to other ghost
+assignments.</p>
+<p>Examples:</p>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int, Int) -&gt; Int</span>
+<span class="c1"># post: $result == $x + $y</span>
+<span class="k">sub</span><span class="w"> </span><span class="nf">add_with_ghost</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">,</span><span class="w"> </span><span class="nv">$y</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
+<span class="w">    </span><span class="c1"># ghost: $expected = $x + $y</span>
+<span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="nv">$sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">$y</span><span class="p">;</span>
+<span class="w">    </span><span class="c1"># assert: $sum == $expected</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nv">$sum</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1"># sig: (Int) -&gt; Int</span>
+<span class="c1"># pre: $n &gt;= 0</span>
+<span class="c1"># post: $result &gt;= $n</span>
+<span class="k">sub</span><span class="w"> </span><span class="nf">double_ghost</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$n</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
+<span class="w">    </span><span class="c1"># ghost: $original = $n</span>
+<span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="nv">$result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$n</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">    </span><span class="c1"># assert: $result &gt;= $original</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nv">$result</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Ghost variables are lowered to regular SSA assignments in the IR and
+participate in symbolic execution like any other variable, but they have no
+effect on the program’s runtime behavior.</p>
+</section>
 <section id="common-patterns">
 <h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper colwidths-given docutils container">
@@ -375,6 +444,7 @@ also reference function parameters.</p>
 <section id="validation-rules">
 <h2>Validation Rules<a class="headerlink" href="#validation-rules" title="Link to this heading">¶</a></h2>
 <p>The tool rejects annotations that violate these rules:</p>
+<p><strong>Function annotations (sig/pre/post):</strong></p>
 <ul class="simple">
 <li><p>Missing <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">sig:</span></code> → error</p></li>
 <li><p>Missing <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">post:</span></code> (or <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">pos:</span></code>) → error</p></li>
@@ -384,6 +454,20 @@ also reference function parameters.</p>
 <li><p>Precondition or postcondition references an unknown variable → error</p></li>
 <li><p>Postcondition does not reference <code class="docutils literal notranslate"><span class="pre">$result</span></code> → allowed but likely a mistake</p></li>
 <li><p>Blank line between annotation block and <code class="docutils literal notranslate"><span class="pre">sub</span></code> → extraction error</p></li>
+</ul>
+<p><strong>Extern declarations:</strong></p>
+<ul class="simple">
+<li><p>Missing <code class="docutils literal notranslate"><span class="pre">-&gt;</span></code> in the type signature → error</p></li>
+<li><p>Unsupported type in parameter list or return type → error</p></li>
+<li><p>Invalid expression in <code class="docutils literal notranslate"><span class="pre">pre:</span></code> or <code class="docutils literal notranslate"><span class="pre">post:</span></code> clause → error</p></li>
+<li><p>Precondition/postcondition that fails to evaluate at call site → error</p></li>
+</ul>
+<p><strong>Ghost annotations:</strong></p>
+<ul class="simple">
+<li><p>Must start with <code class="docutils literal notranslate"><span class="pre">$variable_name</span></code> → error if missing</p></li>
+<li><p>Must contain <code class="docutils literal notranslate"><span class="pre">=</span></code> separating variable from expression → error</p></li>
+<li><p>Expression must be syntactically valid → error if it cannot be parsed</p></li>
+<li><p>Ghost variable is type-checked like any other assignment</p></li>
 </ul>
 </section>
 </section>
@@ -447,6 +531,8 @@ also reference function parameters.</p>
 <li><a class="reference internal" href="#sig-type-signature"><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">sig:</span></code> — Type Signature</a></li>
 <li><a class="reference internal" href="#pre-precondition"><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">pre:</span></code> — Precondition</a></li>
 <li><a class="reference internal" href="#post-postcondition"><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">post:</span></code> — Postcondition</a></li>
+<li><a class="reference internal" href="#extern-external-function-contracts"><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">extern:</span></code> — External Function Contracts</a></li>
+<li><a class="reference internal" href="#ghost-ghost-variables"><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">ghost:</span></code> — Ghost Variables</a></li>
 <li><a class="reference internal" href="#common-patterns">Common Patterns</a></li>
 <li><a class="reference internal" href="#validation-rules">Validation Rules</a></li>
 </ul>
