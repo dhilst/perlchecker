@@ -130,8 +130,6 @@ pub enum IrError {
         "function `{function}` references unsupported variable `{variable}` during SSA lowering"
     )]
     UnknownVariable { function: String, variable: String },
-    #[error("function `{function}` uses an unsupported nested call position during SSA lowering")]
-    UnsupportedCallPosition { function: String },
 }
 
 pub fn lower_to_ssa(function: &FunctionAst) -> std::result::Result<SsaFunction, IrError> {
@@ -175,45 +173,6 @@ fn base_name(ssa_name: &str) -> &str {
         .unwrap_or(ssa_name)
 }
 
-fn rewrite_expr(
-    expr: &Expr,
-    env: &BTreeMap<String, String>,
-) -> std::result::Result<SsaExpr, String> {
-    Ok(match expr {
-        Expr::Int(value) => SsaExpr::Int(*value),
-        Expr::Bool(value) => SsaExpr::Bool(*value),
-        Expr::String(value) => SsaExpr::String(value.clone()),
-        Expr::Variable(name) => SsaExpr::Var(env.get(name).cloned().ok_or_else(|| name.clone())?),
-        Expr::Unary { op, expr } => SsaExpr::Unary {
-            op: *op,
-            expr: Box::new(rewrite_expr(expr, env)?),
-        },
-        Expr::Binary { left, op, right } => SsaExpr::Binary {
-            left: Box::new(rewrite_expr(left, env)?),
-            op: *op,
-            right: Box::new(rewrite_expr(right, env)?),
-        },
-        Expr::Access {
-            kind,
-            collection,
-            index,
-        } => SsaExpr::Access {
-            kind: *kind,
-            collection: Box::new(SsaExpr::Var(
-                env.get(collection).cloned().ok_or_else(|| collection.clone())?,
-            )),
-            index: Box::new(rewrite_expr(index, env)?),
-        },
-        Expr::Call { .. } => return Err("__call_position__".to_string()),
-        Expr::Builtin { function, args } => SsaExpr::Builtin {
-            function: *function,
-            args: args
-                .iter()
-                .map(|arg| rewrite_expr(arg, env))
-                .collect::<std::result::Result<Vec<_>, _>>()?,
-        },
-    })
-}
 
 struct SsaBuilder<'a> {
     function: &'a str,
@@ -235,6 +194,71 @@ impl<'a> SsaBuilder<'a> {
         name
     }
 
+    fn rewrite_expr(
+        &mut self,
+        expr: &Expr,
+        env: &mut BTreeMap<String, String>,
+        prefix: &mut Vec<SsaStmt>,
+    ) -> std::result::Result<SsaExpr, IrError> {
+        Ok(match expr {
+            Expr::Int(value) => SsaExpr::Int(*value),
+            Expr::Bool(value) => SsaExpr::Bool(*value),
+            Expr::String(value) => SsaExpr::String(value.clone()),
+            Expr::Variable(name) => {
+                SsaExpr::Var(env.get(name).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: name.clone(),
+                })?)
+            }
+            Expr::Unary { op, expr } => SsaExpr::Unary {
+                op: *op,
+                expr: Box::new(self.rewrite_expr(expr, env, prefix)?),
+            },
+            Expr::Binary { left, op, right } => SsaExpr::Binary {
+                left: Box::new(self.rewrite_expr(left, env, prefix)?),
+                op: *op,
+                right: Box::new(self.rewrite_expr(right, env, prefix)?),
+            },
+            Expr::Access {
+                kind,
+                collection,
+                index,
+            } => SsaExpr::Access {
+                kind: *kind,
+                collection: Box::new(SsaExpr::Var(
+                    env.get(collection).cloned().ok_or_else(|| IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: collection.clone(),
+                    })?,
+                )),
+                index: Box::new(self.rewrite_expr(index, env, prefix)?),
+            },
+            Expr::Call {
+                function: callee,
+                args,
+            } => {
+                let lowered_args = args
+                    .iter()
+                    .map(|arg| self.rewrite_expr(arg, env, prefix))
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                let temp = self.fresh_name("__call_result");
+                prefix.push(SsaStmt::CallAssign {
+                    name: temp.clone(),
+                    callee: callee.clone(),
+                    args: lowered_args,
+                });
+                SsaExpr::Var(temp)
+            }
+            Expr::Builtin { function, args } => SsaExpr::Builtin {
+                function: *function,
+                args: args
+                    .iter()
+                    .map(|arg| self.rewrite_expr(arg, env, prefix))
+                    .collect::<std::result::Result<Vec<_>, _>>()?,
+            },
+        })
+    }
+
     fn lower_stmts(
         &mut self,
         stmts: &[crate::ast::Stmt],
@@ -248,37 +272,9 @@ impl<'a> SsaBuilder<'a> {
                 crate::ast::Stmt::Declare { .. } => {}
                 crate::ast::Stmt::LoopBoundExceeded => lowered.push(SsaStmt::LoopBoundExceeded),
                 crate::ast::Stmt::Assign { name, expr, .. } => {
-                    if let crate::ast::Expr::Call { function: callee, args } = expr {
-                        let args = args
-                            .iter()
-                            .map(|arg| rewrite_expr(arg, &env))
-                            .collect::<std::result::Result<Vec<_>, _>>()
-                            .map_err(|variable| {
-                                if variable == "__call_position__" {
-                                    IrError::UnsupportedCallPosition {
-                                        function: self.function.to_string(),
-                                    }
-                                } else {
-                                    IrError::UnknownVariable {
-                                        function: self.function.to_string(),
-                                        variable,
-                                    }
-                                }
-                            })?;
-                        let ssa_name = self.fresh_name(name);
-                        env.insert(name.clone(), ssa_name.clone());
-                        lowered.push(SsaStmt::CallAssign {
-                            name: ssa_name,
-                            callee: callee.clone(),
-                            args,
-                        });
-                        continue;
-                    }
-                    let rhs =
-                        rewrite_expr(expr, &env).map_err(|variable| IrError::UnknownVariable {
-                            function: self.function.to_string(),
-                            variable,
-                        })?;
+                    let mut prefix = Vec::new();
+                    let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
                     let ssa_name = self.fresh_name(name);
                     env.insert(name.clone(), ssa_name.clone());
                     lowered.push(SsaStmt::Assign(ssa_name, rhs));
@@ -291,21 +287,15 @@ impl<'a> SsaBuilder<'a> {
                             function: self.function.to_string(),
                             variable: name.clone(),
                         })?;
+                    let mut prefix = Vec::new();
+                    let index_expr = self.rewrite_expr(index, &mut env, &mut prefix)?;
+                    let value_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
                     let store = SsaExpr::Store {
                         kind: AccessKind::Array,
                         collection: Box::new(SsaExpr::Var(collection_name)),
-                        index: Box::new(rewrite_expr(index, &env).map_err(|variable| {
-                            IrError::UnknownVariable {
-                                function: self.function.to_string(),
-                                variable,
-                            }
-                        })?),
-                        value: Box::new(rewrite_expr(expr, &env).map_err(|variable| {
-                            IrError::UnknownVariable {
-                                function: self.function.to_string(),
-                                variable,
-                            }
-                        })?),
+                        index: Box::new(index_expr),
+                        value: Box::new(value_expr),
                     };
                     let ssa_name = self.fresh_name(name);
                     env.insert(name.clone(), ssa_name.clone());
@@ -319,21 +309,15 @@ impl<'a> SsaBuilder<'a> {
                             function: self.function.to_string(),
                             variable: name.clone(),
                         })?;
+                    let mut prefix = Vec::new();
+                    let key_expr = self.rewrite_expr(key, &mut env, &mut prefix)?;
+                    let value_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
                     let store = SsaExpr::Store {
                         kind: AccessKind::Hash,
                         collection: Box::new(SsaExpr::Var(collection_name)),
-                        index: Box::new(rewrite_expr(key, &env).map_err(|variable| {
-                            IrError::UnknownVariable {
-                                function: self.function.to_string(),
-                                variable,
-                            }
-                        })?),
-                        value: Box::new(rewrite_expr(expr, &env).map_err(|variable| {
-                            IrError::UnknownVariable {
-                                function: self.function.to_string(),
-                                variable,
-                            }
-                        })?),
+                        index: Box::new(key_expr),
+                        value: Box::new(value_expr),
                     };
                     let ssa_name = self.fresh_name(name);
                     env.insert(name.clone(), ssa_name.clone());
@@ -344,12 +328,9 @@ impl<'a> SsaBuilder<'a> {
                     then_branch,
                     else_branch,
                 } => {
-                    let condition = rewrite_expr(condition, &env).map_err(|variable| {
-                        IrError::UnknownVariable {
-                            function: self.function.to_string(),
-                            variable,
-                        }
-                    })?;
+                    let mut prefix = Vec::new();
+                    let condition = self.rewrite_expr(condition, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
                     let (then_branch, then_env) = self.lower_stmts(then_branch, &env)?;
                     let (else_branch, else_env) = self.lower_stmts(else_branch, &env)?;
                     let mut merges = Vec::new();
@@ -390,38 +371,9 @@ impl<'a> SsaBuilder<'a> {
                     env = next_env;
                 }
                 crate::ast::Stmt::Return(expr) => {
-                    if let crate::ast::Expr::Call { function: callee, args } = expr {
-                        let args = args
-                            .iter()
-                            .map(|arg| rewrite_expr(arg, &env))
-                            .collect::<std::result::Result<Vec<_>, _>>()
-                            .map_err(|variable| {
-                                if variable == "__call_position__" {
-                                    IrError::UnsupportedCallPosition {
-                                        function: self.function.to_string(),
-                                    }
-                                } else {
-                                    IrError::UnknownVariable {
-                                        function: self.function.to_string(),
-                                        variable,
-                                    }
-                                }
-                            })?;
-                        let temp_name = self.fresh_name("__call_result");
-                        env.insert("__call_result".to_string(), temp_name.clone());
-                        lowered.push(SsaStmt::CallAssign {
-                            name: temp_name.clone(),
-                            callee: callee.clone(),
-                            args,
-                        });
-                        lowered.push(SsaStmt::Return(SsaExpr::Var(temp_name)));
-                        continue;
-                    }
-                    let value =
-                        rewrite_expr(expr, &env).map_err(|variable| IrError::UnknownVariable {
-                            function: self.function.to_string(),
-                            variable,
-                        })?;
+                    let mut prefix = Vec::new();
+                    let value = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
                     lowered.push(SsaStmt::Return(value));
                 }
             }
@@ -772,5 +724,108 @@ mod tests {
         let ssa = lower_to_ssa(&function).unwrap();
         assert_eq!(ssa.body.len(), 2);
         assert!(matches!(ssa.body[0], super::SsaStmt::Assign(_, _)));
+    }
+
+    #[test]
+    fn call_in_binary_expression_is_lifted() {
+        let function = FunctionAst {
+            name: "foo".to_string(),
+            params: vec!["x".to_string()],
+            body: vec![
+                Stmt::Assign {
+                    name: "z".to_string(),
+                    declaration: true,
+                    expr: Expr::Binary {
+                        left: Box::new(Expr::Call {
+                            function: "inc".to_string(),
+                            args: vec![Expr::Variable("x".to_string())],
+                        }),
+                        op: BinaryOp::Add,
+                        right: Box::new(Expr::Int(1)),
+                    },
+                },
+                Stmt::Return(Expr::Variable("z".to_string())),
+            ],
+        };
+
+        let ssa = lower_to_ssa(&function).unwrap();
+        assert!(matches!(ssa.body[0], super::SsaStmt::CallAssign { ref callee, .. } if callee == "inc"));
+        assert!(matches!(ssa.body[1], super::SsaStmt::Assign(_, super::SsaExpr::Binary { .. })));
+    }
+
+    #[test]
+    fn nested_calls_in_arguments_are_lifted_in_order() {
+        let function = FunctionAst {
+            name: "foo".to_string(),
+            params: vec!["x".to_string()],
+            body: vec![Stmt::Return(Expr::Call {
+                function: "outer".to_string(),
+                args: vec![Expr::Call {
+                    function: "inner".to_string(),
+                    args: vec![Expr::Variable("x".to_string())],
+                }],
+            })],
+        };
+
+        let ssa = lower_to_ssa(&function).unwrap();
+        assert!(matches!(ssa.body[0], super::SsaStmt::CallAssign { ref callee, .. } if callee == "inner"));
+        assert!(matches!(ssa.body[1], super::SsaStmt::CallAssign { ref callee, .. } if callee == "outer"));
+    }
+
+    #[test]
+    fn call_in_condition_is_lifted_before_if() {
+        let function = FunctionAst {
+            name: "foo".to_string(),
+            params: vec!["x".to_string()],
+            body: vec![
+                Stmt::If {
+                    condition: Expr::Binary {
+                        left: Box::new(Expr::Call {
+                            function: "check".to_string(),
+                            args: vec![Expr::Variable("x".to_string())],
+                        }),
+                        op: BinaryOp::Gt,
+                        right: Box::new(Expr::Int(0)),
+                    },
+                    then_branch: vec![Stmt::Return(Expr::Int(1))],
+                    else_branch: vec![Stmt::Return(Expr::Int(0))],
+                },
+            ],
+        };
+
+        let ssa = lower_to_ssa(&function).unwrap();
+        assert!(matches!(ssa.body[0], super::SsaStmt::CallAssign { ref callee, .. } if callee == "check"));
+        assert!(matches!(ssa.body[1], super::SsaStmt::If { .. }));
+    }
+
+    #[test]
+    fn multiple_calls_in_expression_are_lifted() {
+        let function = FunctionAst {
+            name: "foo".to_string(),
+            params: vec!["x".to_string(), "y".to_string()],
+            body: vec![
+                Stmt::Assign {
+                    name: "z".to_string(),
+                    declaration: true,
+                    expr: Expr::Binary {
+                        left: Box::new(Expr::Call {
+                            function: "f".to_string(),
+                            args: vec![Expr::Variable("x".to_string())],
+                        }),
+                        op: BinaryOp::Add,
+                        right: Box::new(Expr::Call {
+                            function: "g".to_string(),
+                            args: vec![Expr::Variable("y".to_string())],
+                        }),
+                    },
+                },
+                Stmt::Return(Expr::Variable("z".to_string())),
+            ],
+        };
+
+        let ssa = lower_to_ssa(&function).unwrap();
+        assert!(matches!(ssa.body[0], super::SsaStmt::CallAssign { ref callee, .. } if callee == "f"));
+        assert!(matches!(ssa.body[1], super::SsaStmt::CallAssign { ref callee, .. } if callee == "g"));
+        assert!(matches!(ssa.body[2], super::SsaStmt::Assign(_, super::SsaExpr::Binary { .. })));
     }
 }

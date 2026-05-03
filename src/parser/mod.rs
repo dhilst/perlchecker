@@ -241,7 +241,7 @@ fn parse_while(pair: Pair<'_, Rule>) -> Vec<Stmt> {
 }
 
 fn parse_for(pair: Pair<'_, Rule>) -> Vec<Stmt> {
-    let mut inner = pair.into_inner();
+    let inner = pair.into_inner();
     let mut init = Vec::new();
     let mut condition = None;
     let mut step = Vec::new();
@@ -732,7 +732,7 @@ mod tests {
 
         let ast = parse_function_ast(&function).unwrap();
         assert!(matches!(ast.body[1], Stmt::If { .. }));
-        assert!(matches!(ast.body[2], Stmt::If { .. }));
+        assert!(matches!(ast.body[3], Stmt::If { .. }));
     }
 
     #[test]

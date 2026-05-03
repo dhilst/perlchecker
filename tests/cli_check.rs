@@ -597,3 +597,69 @@ sub too_many_paths {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(predicate::str::contains("maximum number of symbolic paths").eval(&stderr));
 }
+
+#[test]
+fn check_command_supports_calls_in_arbitrary_expression_positions() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("call_positions.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# post: $result == $x + 1
+sub inc {
+    my ($x) = @_;
+    return $x + 1;
+}
+
+# sig: (Int) -> Int
+# post: $result == $x + 2
+sub call_in_binary {
+    my ($x) = @_;
+    my $z = inc($x) + 1;
+    return $z;
+}
+
+# sig: (Int) -> Int
+# post: $result == $x + 2
+sub nested_calls {
+    my ($x) = @_;
+    return inc(inc($x));
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result >= 1
+sub call_in_condition {
+    my ($x) = @_;
+    if (inc($x) > 5) {
+        return inc($x);
+    }
+    return 1;
+}
+
+# sig: (Int, Int) -> Int
+# post: $result == $x + $y + 2
+sub multiple_calls_in_expr {
+    my ($x, $y) = @_;
+    my $z = inc($x) + inc($y);
+    return $z;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ inc: verified"));
+    assert!(stdout.contains("✔ call_in_binary: verified"));
+    assert!(stdout.contains("✔ nested_calls: verified"));
+    assert!(stdout.contains("✔ call_in_condition: verified"));
+    assert!(stdout.contains("✔ multiple_calls_in_expr: verified"));
+}
