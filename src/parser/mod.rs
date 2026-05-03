@@ -1189,6 +1189,14 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
 fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
     PrattParser::new()
         .op(pest::pratt_parser::Op::infix(
+            Rule::op_low_or,
+            pest::pratt_parser::Assoc::Left,
+        ))
+        .op(pest::pratt_parser::Op::infix(
+            Rule::op_low_and,
+            pest::pratt_parser::Assoc::Left,
+        ))
+        .op(pest::pratt_parser::Op::infix(
             Rule::op_or,
             pest::pratt_parser::Assoc::Left,
         ))
@@ -1244,7 +1252,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
         ))
         .op(pest::pratt_parser::Op::prefix(Rule::op_not)
             | pest::pratt_parser::Op::prefix(Rule::op_neg)
-            | pest::pratt_parser::Op::prefix(Rule::op_bitnot))
+            | pest::pratt_parser::Op::prefix(Rule::op_bitnot)
+            | pest::pratt_parser::Op::prefix(Rule::op_low_not))
         .map_primary(|primary| match primary.as_rule() {
             Rule::int => {
                 Ok(Expr::Int(primary.as_str().parse().map_err(|_| {
@@ -1271,7 +1280,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
         .map_prefix(|op, rhs| {
             Ok(Expr::Unary {
                 op: match op.as_rule() {
-                    Rule::op_not => UnaryOp::Not,
+                    Rule::op_not | Rule::op_low_not => UnaryOp::Not,
                     Rule::op_neg => UnaryOp::Neg,
                     Rule::op_bitnot => UnaryOp::BitNot,
                     other => return Err(format!("unexpected prefix operator: {other:?}")),
@@ -1303,8 +1312,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                     Rule::op_sle => BinaryOp::StrLe,
                     Rule::op_sge => BinaryOp::StrGe,
                     Rule::op_cmp => BinaryOp::Cmp,
-                    Rule::op_and => BinaryOp::And,
-                    Rule::op_or => BinaryOp::Or,
+                    Rule::op_and | Rule::op_low_and => BinaryOp::And,
+                    Rule::op_or | Rule::op_low_or => BinaryOp::Or,
                     Rule::op_bitand => BinaryOp::BitAnd,
                     Rule::op_bitor => BinaryOp::BitOr,
                     Rule::op_bitxor => BinaryOp::BitXor,
