@@ -14,7 +14,7 @@ var_list = { var ~ ("," ~ var)* }
 assign_stmt = { declaration? ~ var ~ assign_op ~ expr ~ ";" }
 array_assign_stmt = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr ~ ";" }
 hash_assign_stmt = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr ~ ";" }
-assign_op = { "+=" | "-=" | "*=" | "/=" | "%=" | ".=" | "=" }
+assign_op = { "<<=" | ">>=" | "**=" | "+=" | "-=" | "*=" | "/=" | "%=" | ".=" | "&=" | "|=" | "^=" | "=" }
 declare_stmt = { "my" ~ var ~ ";" }
 declaration = { "my" }
 if_stmt = { "if" ~ "(" ~ expr ~ ")" ~ block ~ elsif_clause* ~ else_clause? }

@@ -147,10 +147,16 @@ fn parse_assign(pair: Pair<'_, Rule>) -> Stmt {
                 compound_op = match inner.as_str() {
                     "+=" => Some(BinaryOp::Add),
                     "-=" => Some(BinaryOp::Sub),
+                    "**=" => Some(BinaryOp::Pow),
                     "*=" => Some(BinaryOp::Mul),
                     "/=" => Some(BinaryOp::Div),
                     "%=" => Some(BinaryOp::Mod),
                     ".=" => Some(BinaryOp::Concat),
+                    "&=" => Some(BinaryOp::BitAnd),
+                    "|=" => Some(BinaryOp::BitOr),
+                    "^=" => Some(BinaryOp::BitXor),
+                    "<<=" => Some(BinaryOp::Shl),
+                    ">>=" => Some(BinaryOp::Shr),
                     _ => None,
                 };
             }
@@ -376,10 +382,16 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
             let compound_op = match op_pair.as_str() {
                 "+=" => Some(BinaryOp::Add),
                 "-=" => Some(BinaryOp::Sub),
+                "**=" => Some(BinaryOp::Pow),
                 "*=" => Some(BinaryOp::Mul),
                 "/=" => Some(BinaryOp::Div),
                 "%=" => Some(BinaryOp::Mod),
                 ".=" => Some(BinaryOp::Concat),
+                "&=" => Some(BinaryOp::BitAnd),
+                "|=" => Some(BinaryOp::BitOr),
+                "^=" => Some(BinaryOp::BitXor),
+                "<<=" => Some(BinaryOp::Shl),
+                ">>=" => Some(BinaryOp::Shr),
                 _ => None,
             };
             let rhs = build_expr(inner.next().expect("for scalar assignment must have an expr"))
