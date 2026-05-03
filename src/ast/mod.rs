@@ -92,6 +92,10 @@ pub enum Expr {
     Pop {
         array: String,
     },
+    Exists {
+        hash: String,
+        key: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -676,6 +680,7 @@ fn references_variable(expr: &Expr, name: &str) -> bool {
         Expr::Call { args, .. } => args.iter().any(|arg| references_variable(arg, name)),
         Expr::Builtin { args, .. } => args.iter().any(|arg| references_variable(arg, name)),
         Expr::Pop { array } => array == name,
+        Expr::Exists { hash, key } => hash == name || references_variable(key, name),
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) => false,
     }
 }
@@ -1455,6 +1460,45 @@ fn infer_expr_type(
         }
         Expr::Pop { array } => {
             collection_element_type(function, env, array, AccessKind::Array)
+        }
+        Expr::Exists { hash, key } => {
+            // exists() requires the hash to be declared and have a hash type
+            let state = env
+                .get(hash)
+                .copied()
+                .ok_or_else(|| TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: hash.clone(),
+                })?;
+            if !state.initialized {
+                return Err(TypeCheckError::UninitializedVariable {
+                    function: function.to_string(),
+                    variable: hash.clone(),
+                });
+            }
+            let ty = state.ty.expect("initialized variables must have a type");
+            match ty {
+                Type::HashInt | Type::HashStr => {}
+                _ => {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "exists argument",
+                        expected: "Hash<Str, Int> or Hash<Str, Str>",
+                        found: render_expr_type(expr_type_from_type(ty)),
+                    });
+                }
+            }
+            // Key must be a string
+            expect_expr_type(
+                function,
+                "exists key",
+                key,
+                env,
+                assumptions,
+                ExprType::Str,
+                signatures,
+            )?;
+            Ok(ExprType::Int)
         }
     }
 }

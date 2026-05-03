@@ -1529,3 +1529,62 @@ sub check_defined_branch {
     let stdout2 = String::from_utf8_lossy(&output2.stdout);
     assert!(stdout2.contains("✔ check_defined_branch: verified"));
 }
+
+#[test]
+fn check_exists_builtin() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("exists.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Hash<Str, Int>, Str) -> Int
+# pre: length($k) >= 1
+# post: $result == 1
+sub check_exists_after_assign {
+    my ($h, $k) = @_;
+    $h{$k} = 42;
+    my $r = exists($h{$k});
+    return $r;
+}
+
+# sig: (Hash<Str, Int>, Str) -> Int
+# pre: length($k) >= 1
+# post: $result >= 0
+sub check_exists_param_hash {
+    my ($h, $k) = @_;
+    my $r = 0;
+    if (exists($h{$k}) == 1) {
+        $r = $h{$k};
+        if ($r < 0) {
+            $r = 0;
+        }
+    }
+    return $r;
+}
+
+# sig: (Hash<Str, Int>, Str, Str) -> Int
+# pre: length($k1) >= 1 && length($k2) >= 1
+# post: $result == 1
+sub check_exists_multiple_keys {
+    my ($h, $k1, $k2) = @_;
+    $h{$k1} = 10;
+    $h{$k2} = 20;
+    my $r = exists($h{$k1});
+    return $r;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ check_exists_after_assign: verified"));
+    assert!(stdout.contains("✔ check_exists_param_hash: verified"));
+    assert!(stdout.contains("✔ check_exists_multiple_keys: verified"));
+}

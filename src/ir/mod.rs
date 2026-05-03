@@ -97,6 +97,14 @@ pub enum SsaExpr {
         /// The base name used to create the symbolic variable name.
         name: String,
     },
+    /// A fresh unconstrained hash (Array<String, Int> or Array<String, String>).
+    /// Used for exists companion arrays and other hash-shaped companions.
+    FreshHash {
+        /// Whether values are Int or Str.
+        value_int: bool,
+        /// The base name used to create the symbolic variable name.
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,6 +224,7 @@ fn is_int_element(expr: &SsaExpr) -> bool {
         SsaExpr::Var(_) => true, // assume Int by default for variables
         SsaExpr::FreshVar(_) => true,
         SsaExpr::FreshArray { .. } => true,
+        SsaExpr::FreshHash { .. } => true,
     }
 }
 
@@ -236,6 +245,10 @@ struct SsaBuilder<'a> {
     /// Tracks which variables have a definedness companion.
     /// The companion is stored in env under the key "varname__defined".
     defined_companions: BTreeSet<String>,
+    /// Tracks the current SSA name for each hash's existence companion array.
+    /// Key: hash base name (e.g., "h"), Value: current SSA name (e.g., "h__exists__1").
+    /// The companion is a Hash<Str, Int> where 1 = key exists, 0 = does not exist.
+    exists_companions: BTreeMap<String, String>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -245,6 +258,7 @@ impl<'a> SsaBuilder<'a> {
             versions: BTreeMap::new(),
             len_companions: BTreeMap::new(),
             defined_companions: BTreeSet::new(),
+            exists_companions: BTreeMap::new(),
         }
     }
 
@@ -416,6 +430,33 @@ impl<'a> SsaBuilder<'a> {
                         .collect::<std::result::Result<Vec<_>, _>>()?,
                 }
             }
+            Expr::Exists { hash, key } => {
+                let key_expr = self.rewrite_expr(key, env, prefix)?;
+                // Look up the exists companion for this hash
+                let companion_ssa = if let Some(existing) = self.exists_companions.get(hash) {
+                    existing.clone()
+                } else {
+                    // No companion initialized — hash is a parameter or never assigned.
+                    // Create a fresh unconstrained companion hash (Array<Str, Int>).
+                    let exists_base = format!("{hash}__exists");
+                    let fresh_name = self.fresh_name(&exists_base);
+                    prefix.push(SsaStmt::Assign(
+                        fresh_name.clone(),
+                        SsaExpr::FreshHash {
+                            value_int: true,
+                            name: fresh_name.clone(),
+                        },
+                    ));
+                    self.exists_companions.insert(hash.clone(), fresh_name.clone());
+                    fresh_name
+                };
+                // Return Select(companion, key) — reads the existence flag (0 or 1)
+                SsaExpr::Access {
+                    kind: AccessKind::Hash,
+                    collection: Box::new(SsaExpr::Var(companion_ssa)),
+                    index: Box::new(key_expr),
+                }
+            }
             Expr::Pop { array } => {
                 let collection_name = env
                     .get(array)
@@ -532,12 +573,39 @@ impl<'a> SsaBuilder<'a> {
                     let store = SsaExpr::Store {
                         kind: AccessKind::Hash,
                         collection: Box::new(SsaExpr::Var(collection_name)),
-                        index: Box::new(key_expr),
+                        index: Box::new(key_expr.clone()),
                         value: Box::new(value_expr),
                     };
                     let ssa_name = self.fresh_name(name);
                     env.insert(name.clone(), ssa_name.clone());
                     lowered.push(SsaStmt::Assign(ssa_name, store));
+
+                    // Update the exists companion: store 1 for this key
+                    let exists_base = format!("{name}__exists");
+                    let old_exists = if let Some(existing) = self.exists_companions.get(name) {
+                        existing.clone()
+                    } else {
+                        // First hash assignment — create a fresh unconstrained companion
+                        let fresh_name = self.fresh_name(&exists_base);
+                        lowered.push(SsaStmt::Assign(
+                            fresh_name.clone(),
+                            SsaExpr::FreshHash {
+                                value_int: true,
+                                name: fresh_name.clone(),
+                            },
+                        ));
+                        self.exists_companions.insert(name.clone(), fresh_name.clone());
+                        fresh_name
+                    };
+                    let exists_store = SsaExpr::Store {
+                        kind: AccessKind::Hash,
+                        collection: Box::new(SsaExpr::Var(old_exists)),
+                        index: Box::new(key_expr),
+                        value: Box::new(SsaExpr::Int(1)),
+                    };
+                    let new_exists_name = self.fresh_name(&exists_base);
+                    lowered.push(SsaStmt::Assign(new_exists_name.clone(), exists_store));
+                    self.exists_companions.insert(name.clone(), new_exists_name);
                 }
                 crate::ast::Stmt::If {
                     condition,

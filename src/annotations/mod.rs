@@ -332,6 +332,10 @@ fn collect_variables_inner(expr: &Expr, variables: &mut BTreeSet<String>) {
         Expr::Pop { array } => {
             variables.insert(array.clone());
         }
+        Expr::Exists { hash, key } => {
+            variables.insert(hash.clone());
+            collect_variables_inner(key, variables);
+        }
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) => {}
     }
 }

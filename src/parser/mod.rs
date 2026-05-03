@@ -2165,6 +2165,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::replace_call => parse_builtin_call(primary, Builtin::Replace),
             Rule::char_at_call => parse_builtin_call(primary, Builtin::CharAt),
             Rule::defined_call => parse_builtin_call(primary, Builtin::Defined),
+            Rule::exists_call => parse_exists_call(primary),
             Rule::regex_match => parse_regex_match(primary, false),
             Rule::regex_not_match => parse_regex_match(primary, true),
             other => Err(format!("unexpected primary rule: {other:?}")),
@@ -2240,6 +2241,22 @@ fn parse_pop_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
         .ok_or_else(|| "pop call must have an identifier".to_string())?;
     let name = parse_bare_ident(ident);
     Ok(Expr::Pop { array: name })
+}
+
+fn parse_exists_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let var = inner
+        .next()
+        .ok_or_else(|| "exists call must have a variable".to_string())?;
+    let hash = parse_variable(var);
+    let key_pair = inner
+        .next()
+        .ok_or_else(|| "exists call must have a key".to_string())?;
+    let key = parse_access_operand(key_pair)?;
+    Ok(Expr::Exists {
+        hash,
+        key: Box::new(key),
+    })
 }
 
 fn parse_builtin_call(

@@ -667,6 +667,7 @@ fn collect_calls_from_expr(expr: &Expr, calls: &mut Vec<String>) {
             }
         }
         Expr::Pop { .. } => {}
+        Expr::Exists { key, .. } => collect_calls_from_expr(key, calls),
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) | Expr::Variable(_) => {}
     }
 }
@@ -976,6 +977,13 @@ fn eval_ssa_expr(
                 SymValue::ArrayStr(ArrayStrExpr::Var(name.clone()))
             }
         }
+        SsaExpr::FreshHash { value_int, name } => {
+            if *value_int {
+                SymValue::HashInt(HashIntExpr::Var(name.clone()))
+            } else {
+                SymValue::HashStr(HashStrExpr::Var(name.clone()))
+            }
+        }
     })
 }
 
@@ -1062,7 +1070,7 @@ fn eval_expr(
                 })?,
             eval_expr(function, index, env)?,
         )?,
-        Expr::Call { .. } | Expr::Pop { .. } => {
+        Expr::Call { .. } | Expr::Pop { .. } | Expr::Exists { .. } => {
             return Err(SymExecError::TypeMismatch {
                 function: function.to_string(),
             });

@@ -62,7 +62,7 @@ for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }
 expr = { ternary_expr }
 ternary_expr = { simple_expr ~ ("?" ~ simple_expr ~ ":" ~ ternary_expr)? }
 simple_expr = { prefix_op* ~ atom ~ (infix_op ~ prefix_op* ~ atom)* }
-atom = _{ scalar_call | pop_call | chomp_call | reverse_call | replace_call | char_at_call | starts_with_call | ends_with_call | contains_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | int_call | defined_call | call_expr | hash_access | array_access | string | int | regex_not_match | regex_match | var | "(" ~ expr ~ ")" }
+atom = _{ scalar_call | pop_call | chomp_call | reverse_call | replace_call | char_at_call | starts_with_call | ends_with_call | contains_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | int_call | defined_call | exists_call | call_expr | hash_access | array_access | string | int | regex_not_match | regex_match | var | "(" ~ expr ~ ")" }
 
 regex_literal = @{ "/" ~ regex_char* ~ "/" }
 regex_char = { !("/" | NEWLINE) ~ ANY }
@@ -90,6 +90,7 @@ ends_with_call = { "ends_with" ~ "(" ~ expr ~ "," ~ expr ~ ")" }
 replace_call = { "replace" ~ "(" ~ expr ~ "," ~ expr ~ "," ~ expr ~ ")" }
 char_at_call = { "char_at" ~ "(" ~ expr ~ "," ~ expr ~ ")" }
 defined_call = { "defined" ~ "(" ~ expr ~ ")" }
+exists_call = { "exists" ~ "(" ~ var ~ "{" ~ access_key ~ "}" ~ ")" }
 
 op_or = { "||" }
 op_and = { "&&" }
