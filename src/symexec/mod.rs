@@ -1012,6 +1012,9 @@ fn eval_binary(
         crate::ast::BinaryOp::Cmp => {
             unreachable!("`cmp` is desugared to Ite during IR lowering")
         }
+        crate::ast::BinaryOp::Repeat => {
+            unreachable!("`x` is desugared to repeated Concat during IR lowering")
+        }
     })
 }
 

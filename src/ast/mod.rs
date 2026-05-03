@@ -122,6 +122,7 @@ pub enum BinaryOp {
     Shr,
     Spaceship,
     Cmp,
+    Repeat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -686,6 +687,27 @@ fn infer_expr_type(
                 )?;
                 Ok(ExprType::Str)
             }
+            BinaryOp::Repeat => {
+                expect_expr_type(
+                    function,
+                    "repeat operand",
+                    left,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "repeat count",
+                    right,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
+            }
             BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
                 expect_expr_type(
                     function,
@@ -1232,7 +1254,8 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         | BinaryOp::Shl
         | BinaryOp::Shr
         | BinaryOp::Spaceship
-        | BinaryOp::Cmp => return None,
+        | BinaryOp::Cmp
+        | BinaryOp::Repeat => return None,
     };
     Some(Expr::Binary {
         left: Box::new(left.clone()),

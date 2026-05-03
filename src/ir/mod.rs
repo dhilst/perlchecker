@@ -225,6 +225,32 @@ impl<'a> SsaBuilder<'a> {
                 op: *op,
                 expr: Box::new(self.rewrite_expr(expr, env, prefix)?),
             },
+            Expr::Binary { left, op: BinaryOp::Repeat, right } => {
+                // Desugar: $s x N => repeated concatenation (constant N only)
+                let n = match right.as_ref() {
+                    Expr::Int(n) => *n,
+                    _ => return Err(IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: "x operator requires a constant integer count".to_string(),
+                    }),
+                };
+                let lhs = self.rewrite_expr(left, env, prefix)?;
+                if n <= 0 {
+                    SsaExpr::String(String::new())
+                } else if n == 1 {
+                    lhs
+                } else {
+                    let mut result = lhs.clone();
+                    for _ in 1..n {
+                        result = SsaExpr::Binary {
+                            left: Box::new(result),
+                            op: BinaryOp::Concat,
+                            right: Box::new(lhs.clone()),
+                        };
+                    }
+                    result
+                }
+            }
             Expr::Binary { left, op: BinaryOp::Spaceship, right } => {
                 let lhs = self.rewrite_expr(left, env, prefix)?;
                 let rhs = self.rewrite_expr(right, env, prefix)?;

@@ -1291,7 +1291,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                 | pest::pratt_parser::Op::infix(Rule::op_concat, pest::pratt_parser::Assoc::Left),
         )
         .op(
-            pest::pratt_parser::Op::infix(Rule::op_mul, pest::pratt_parser::Assoc::Left)
+            pest::pratt_parser::Op::infix(Rule::op_repeat, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_mul, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_div, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_mod, pest::pratt_parser::Assoc::Left),
         )
@@ -1370,6 +1371,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                     Rule::op_shl => BinaryOp::Shl,
                     Rule::op_shr => BinaryOp::Shr,
                     Rule::op_spaceship => BinaryOp::Spaceship,
+                    Rule::op_repeat => BinaryOp::Repeat,
                     other => return Err(format!("unexpected infix operator: {other:?}")),
                 },
                 right: Box::new(rhs?),
