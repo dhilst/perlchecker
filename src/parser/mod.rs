@@ -1217,6 +1217,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                 | pest::pratt_parser::Op::infix(Rule::op_sgt, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_sle, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_sge, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_cmp, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_spaceship, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_lt, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_le, pest::pratt_parser::Assoc::Left)
@@ -1301,6 +1302,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                     Rule::op_sgt => BinaryOp::StrGt,
                     Rule::op_sle => BinaryOp::StrLe,
                     Rule::op_sge => BinaryOp::StrGe,
+                    Rule::op_cmp => BinaryOp::Cmp,
                     Rule::op_and => BinaryOp::And,
                     Rule::op_or => BinaryOp::Or,
                     Rule::op_bitand => BinaryOp::BitAnd,

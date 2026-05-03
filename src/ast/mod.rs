@@ -118,6 +118,7 @@ pub enum BinaryOp {
     Shl,
     Shr,
     Spaceship,
+    Cmp,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -744,6 +745,27 @@ fn infer_expr_type(
                 )?;
                 Ok(ExprType::Bool)
             }
+            BinaryOp::Cmp => {
+                expect_expr_type(
+                    function,
+                    "string comparison operand",
+                    left,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "string comparison operand",
+                    right,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
             BinaryOp::And | BinaryOp::Or => {
                 expect_expr_type(
                     function,
@@ -1202,7 +1224,8 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         | BinaryOp::BitXor
         | BinaryOp::Shl
         | BinaryOp::Shr
-        | BinaryOp::Spaceship => return None,
+        | BinaryOp::Spaceship
+        | BinaryOp::Cmp => return None,
     };
     Some(Expr::Binary {
         left: Box::new(left.clone()),

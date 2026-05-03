@@ -1008,6 +1008,9 @@ fn eval_binary(
         crate::ast::BinaryOp::Spaceship => {
             unreachable!("`<=>` is desugared to Ite during IR lowering")
         }
+        crate::ast::BinaryOp::Cmp => {
+            unreachable!("`cmp` is desugared to Ite during IR lowering")
+        }
     })
 }
 
