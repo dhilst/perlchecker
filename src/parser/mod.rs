@@ -127,19 +127,42 @@ fn parse_assign(pair: Pair<'_, Rule>) -> Stmt {
     let mut declaration = false;
     let mut name = None;
     let mut expr = None;
+    let mut compound_op = None;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::declaration => declaration = true,
             Rule::var => name = Some(parse_variable(inner)),
+            Rule::assign_op => {
+                compound_op = match inner.as_str() {
+                    "+=" => Some(BinaryOp::Add),
+                    "-=" => Some(BinaryOp::Sub),
+                    "*=" => Some(BinaryOp::Mul),
+                    "/=" => Some(BinaryOp::Div),
+                    "%=" => Some(BinaryOp::Mod),
+                    ".=" => Some(BinaryOp::Concat),
+                    _ => None,
+                };
+            }
             Rule::expr => expr = Some(build_expr(inner).expect("validated expression")),
             _ => {}
         }
     }
 
+    let name = name.expect("assignment must have a variable");
+    let rhs = expr.expect("assignment must have an expression");
+    let final_expr = match compound_op {
+        Some(op) => Expr::Binary {
+            left: Box::new(Expr::Variable(name.clone())),
+            op,
+            right: Box::new(rhs),
+        },
+        None => rhs,
+    };
+
     Stmt::Assign {
-        name: name.expect("assignment must have a variable"),
-        expr: expr.expect("assignment must have an expression"),
+        name,
+        expr: final_expr,
         declaration,
     }
 }
@@ -279,8 +302,26 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
         Rule::for_scalar_assign => {
             let mut inner = inner.into_inner();
             let name = parse_variable(inner.next().expect("for scalar assignment must have a var"));
-            let expr = build_expr(inner.next().expect("for scalar assignment must have an expr"))
+            let op_pair = inner.next().expect("for scalar assignment must have an assign_op");
+            let compound_op = match op_pair.as_str() {
+                "+=" => Some(BinaryOp::Add),
+                "-=" => Some(BinaryOp::Sub),
+                "*=" => Some(BinaryOp::Mul),
+                "/=" => Some(BinaryOp::Div),
+                "%=" => Some(BinaryOp::Mod),
+                ".=" => Some(BinaryOp::Concat),
+                _ => None,
+            };
+            let rhs = build_expr(inner.next().expect("for scalar assignment must have an expr"))
                 .expect("validated for scalar assignment");
+            let expr = match compound_op {
+                Some(op) => Expr::Binary {
+                    left: Box::new(Expr::Variable(name.clone())),
+                    op,
+                    right: Box::new(rhs),
+                },
+                None => rhs,
+            };
             Stmt::Assign {
                 name,
                 expr,

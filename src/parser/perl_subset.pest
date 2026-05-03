@@ -7,9 +7,10 @@ stmt = _{ while_stmt | for_stmt | if_stmt | return_stmt | hash_assign_stmt | arr
 parameter_binding = { "my" ~ "(" ~ var_list? ~ ")" ~ "=" ~ "@_" ~ ";" }
 var_list = { var ~ ("," ~ var)* }
 
-assign_stmt = { declaration? ~ var ~ "=" ~ expr ~ ";" }
+assign_stmt = { declaration? ~ var ~ assign_op ~ expr ~ ";" }
 array_assign_stmt = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr ~ ";" }
 hash_assign_stmt = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr ~ ";" }
+assign_op = { "+=" | "-=" | "*=" | "/=" | "%=" | ".=" | "=" }
 declare_stmt = { "my" ~ var ~ ";" }
 declaration = { "my" }
 if_stmt = { "if" ~ "(" ~ expr ~ ")" ~ block ~ elsif_clause* ~ else_clause? }
@@ -20,7 +21,7 @@ else_clause = { "else" ~ block }
 block = { "{" ~ stmt* ~ "}" }
 return_stmt = { "return" ~ expr ~ ";" }
 for_assign = { for_hash_assign | for_array_assign | for_scalar_assign }
-for_scalar_assign = { var ~ "=" ~ expr }
+for_scalar_assign = { var ~ assign_op ~ expr }
 for_array_assign = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr }
 for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }
 
