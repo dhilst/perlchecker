@@ -11,7 +11,7 @@ use z3::{
 
 use crate::{
     ast::Type,
-    limits::SOLVER_TIMEOUT_MS,
+    limits::DEFAULT_SOLVER_TIMEOUT_MS,
     symexec::{
         ArrayIntExpr, ArrayStrExpr, BoolExpr, HashIntExpr, HashStrExpr, IntExpr, ModelValue,
         StrExpr,
@@ -33,8 +33,12 @@ pub enum SmtError {
 }
 
 pub fn is_satisfiable(function: &str, condition: &BoolExpr) -> std::result::Result<bool, SmtError> {
+    is_satisfiable_with_timeout(function, condition, DEFAULT_SOLVER_TIMEOUT_MS)
+}
+
+pub fn is_satisfiable_with_timeout(function: &str, condition: &BoolExpr, timeout_ms: u32) -> std::result::Result<bool, SmtError> {
     let solver = Solver::new();
-    apply_solver_timeout(&solver);
+    apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
     solver.assert(&encode_safety_constraints(condition));
     solver.assert(&encode_bool(condition));
@@ -61,8 +65,17 @@ pub fn find_model(
     condition: &BoolExpr,
     variables: &[ModelVar],
 ) -> std::result::Result<Option<BTreeMap<String, ModelValue>>, SmtError> {
+    find_model_with_timeout(function, condition, variables, DEFAULT_SOLVER_TIMEOUT_MS)
+}
+
+pub fn find_model_with_timeout(
+    function: &str,
+    condition: &BoolExpr,
+    variables: &[ModelVar],
+    timeout_ms: u32,
+) -> std::result::Result<Option<BTreeMap<String, ModelValue>>, SmtError> {
     let solver = Solver::new();
-    apply_solver_timeout(&solver);
+    apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
     solver.assert(&encode_safety_constraints(condition));
     solver.assert(&encode_bool(condition));
@@ -153,9 +166,9 @@ fn assert_string_bounds(solver: &Solver, condition: &BoolExpr) {
     }
 }
 
-fn apply_solver_timeout(solver: &Solver) {
+fn apply_solver_timeout(solver: &Solver, timeout_ms: u32) {
     let mut params = Params::new();
-    params.set_u32("timeout", SOLVER_TIMEOUT_MS);
+    params.set_u32("timeout", timeout_ms);
     solver.set_params(&params);
 }
 

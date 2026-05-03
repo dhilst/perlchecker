@@ -6,6 +6,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::{
     PerlcheckerError, Result, V1_LANGUAGE_SUBSET, extractor,
+    limits::{DEFAULT_MAX_LOOP_UNROLL, DEFAULT_MAX_PATHS, DEFAULT_SOLVER_TIMEOUT_MS, Limits},
     symexec::{Counterexample, ModelValue, VerificationResult, verify_extracted_functions},
 };
 
@@ -25,6 +26,18 @@ enum Commands {
     Check {
         /// Perl source file to analyze.
         path: PathBuf,
+
+        /// Maximum loop unroll depth.
+        #[arg(long, default_value_t = DEFAULT_MAX_LOOP_UNROLL)]
+        max_loop_unroll: usize,
+
+        /// Maximum number of symbolic execution paths.
+        #[arg(long, default_value_t = DEFAULT_MAX_PATHS)]
+        max_paths: usize,
+
+        /// SMT solver timeout in milliseconds.
+        #[arg(long, default_value_t = DEFAULT_SOLVER_TIMEOUT_MS)]
+        solver_timeout_ms: u32,
     },
 }
 
@@ -34,11 +47,23 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { path } => run_check(path),
+        Commands::Check {
+            path,
+            max_loop_unroll,
+            max_paths,
+            solver_timeout_ms,
+        } => run_check(
+            path,
+            Limits {
+                max_loop_unroll,
+                max_paths,
+                solver_timeout_ms,
+            },
+        ),
     }
 }
 
-fn run_check(path: PathBuf) -> Result<()> {
+fn run_check(path: PathBuf, limits: Limits) -> Result<()> {
     info!(
         supported_types = ?V1_LANGUAGE_SUBSET.supported_types,
         "running full verification pipeline"
@@ -57,7 +82,7 @@ fn run_check(path: PathBuf) -> Result<()> {
     }
 
     let mut failed = false;
-    for result in verify_extracted_functions(&functions)? {
+    for result in verify_extracted_functions(&functions, limits)? {
         match result {
             VerificationResult::Verified { function } => {
                 println!("✔ {function}: verified");

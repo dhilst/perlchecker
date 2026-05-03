@@ -6,7 +6,6 @@ use tracing::debug;
 use crate::{
     ast::{AccessKind, BinaryOp, Builtin, Expr, FunctionAst, Stmt, UnaryOp},
     extractor::ExtractedFunction,
-    limits::MAX_LOOP_UNROLL,
 };
 
 #[derive(Parser)]
@@ -38,6 +37,13 @@ pub fn parse_expr(input: &str) -> std::result::Result<Expr, String> {
 
 pub fn parse_function_ast(
     function: &ExtractedFunction,
+) -> std::result::Result<FunctionAst, ParseError> {
+    parse_function_ast_with_limits(function, crate::limits::DEFAULT_MAX_LOOP_UNROLL)
+}
+
+pub fn parse_function_ast_with_limits(
+    function: &ExtractedFunction,
+    max_loop_unroll: usize,
 ) -> std::result::Result<FunctionAst, ParseError> {
     let mut pairs =
         PerlSubsetParser::parse(Rule::function_body, &function.body).map_err(|error| {
@@ -73,7 +79,7 @@ pub fn parse_function_ast(
                     | Rule::return_stmt
             )
         })
-        .flat_map(parse_stmt)
+        .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
         .collect();
 
     let ast = FunctionAst {
@@ -103,15 +109,15 @@ fn parse_parameter_binding(pair: Pair<'_, Rule>) -> Vec<String> {
         .collect()
 }
 
-fn parse_stmt(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     match pair.as_rule() {
         Rule::assign_stmt => vec![parse_assign(pair)],
         Rule::array_assign_stmt => vec![parse_array_assign(pair)],
         Rule::hash_assign_stmt => vec![parse_hash_assign(pair)],
         Rule::declare_stmt => vec![parse_declare(pair)],
-        Rule::if_stmt => vec![parse_if(pair)],
-        Rule::while_stmt => parse_while(pair),
-        Rule::for_stmt => parse_for(pair),
+        Rule::if_stmt => vec![parse_if(pair, max_loop_unroll)],
+        Rule::while_stmt => parse_while(pair, max_loop_unroll),
+        Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
@@ -168,18 +174,18 @@ fn parse_declare(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Declare { name }
 }
 
-fn parse_if(pair: Pair<'_, Rule>) -> Stmt {
+fn parse_if(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("if must have a condition"))
         .expect("validated condition expression");
-    let then_branch = parse_block(inner.next().expect("if must have a then block"));
+    let then_branch = parse_block(inner.next().expect("if must have a then block"), max_loop_unroll);
     let mut elsif_clauses = Vec::new();
     let mut final_else = Vec::new();
 
     for clause in inner {
         match clause.as_rule() {
-            Rule::elsif_clause => elsif_clauses.push(parse_elsif_clause(clause)),
-            Rule::else_clause => final_else = parse_else_clause(clause),
+            Rule::elsif_clause => elsif_clauses.push(parse_elsif_clause(clause, max_loop_unroll)),
+            Rule::else_clause => final_else = parse_else_clause(clause, max_loop_unroll),
             other => unreachable!("unexpected if clause rule: {other:?}"),
         }
     }
@@ -213,7 +219,7 @@ fn parse_return(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Return(expr)
 }
 
-fn parse_block(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     pair.into_inner()
         .filter(|inner| {
             matches!(
@@ -228,19 +234,19 @@ fn parse_block(pair: Pair<'_, Rule>) -> Vec<Stmt> {
                     | Rule::return_stmt
             )
         })
-        .flat_map(parse_stmt)
+        .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
         .collect()
 }
 
-fn parse_while(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("while must have a condition"))
         .expect("validated while condition");
-    let body = parse_block(inner.next().expect("while must have a body"));
-    unroll_while(condition, body, MAX_LOOP_UNROLL)
+    let body = parse_block(inner.next().expect("while must have a body"), max_loop_unroll);
+    unroll_while(condition, body, max_loop_unroll)
 }
 
-fn parse_for(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let inner = pair.into_inner();
     let mut init = Vec::new();
     let mut condition = None;
@@ -252,7 +258,7 @@ fn parse_for(pair: Pair<'_, Rule>) -> Vec<Stmt> {
             Rule::for_assign if condition.is_none() => init.push(parse_for_assign(part)),
             Rule::expr => condition = Some(build_expr(part).expect("validated for condition")),
             Rule::for_assign => step.push(parse_for_assign(part)),
-            Rule::block => body = parse_block(part),
+            Rule::block => body = parse_block(part, max_loop_unroll),
             _ => {}
         }
     }
@@ -260,7 +266,7 @@ fn parse_for(pair: Pair<'_, Rule>) -> Vec<Stmt> {
     let condition = condition.expect("for must have a condition");
     let mut loop_body = body;
     loop_body.extend(step);
-    init.extend(unroll_while(condition, loop_body, MAX_LOOP_UNROLL));
+    init.extend(unroll_while(condition, loop_body, max_loop_unroll));
     init
 }
 
@@ -322,19 +328,20 @@ fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt>
         else_branch: Vec::new(),
     }]
 }
-fn parse_elsif_clause(pair: Pair<'_, Rule>) -> (Expr, Vec<Stmt>) {
+fn parse_elsif_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> (Expr, Vec<Stmt>) {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("elsif must have a condition"))
         .expect("validated elsif condition expression");
-    let block = parse_block(inner.next().expect("elsif must have a block"));
+    let block = parse_block(inner.next().expect("elsif must have a block"), max_loop_unroll);
     (condition, block)
 }
 
-fn parse_else_clause(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+fn parse_else_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     parse_block(
         pair.into_inner()
             .next()
             .expect("else clause must contain a block"),
+        max_loop_unroll,
     )
 }
 

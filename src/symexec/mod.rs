@@ -8,8 +8,8 @@ use crate::{
     ast::{AccessKind, Builtin, Expr, Type, type_check_function_with_signatures},
     extractor::ExtractedFunction,
     ir::{self, BlockStmt, ControlFlowGraph, SsaExpr, Terminator},
-    limits::MAX_PATHS,
-    parser::parse_function_ast,
+    limits::Limits,
+    parser::parse_function_ast_with_limits,
     smt,
 };
 
@@ -124,6 +124,7 @@ pub struct Program {
     pub order: Vec<String>,
     pub specs: BTreeMap<String, FunctionSpec>,
     pub cfgs: BTreeMap<String, ControlFlowGraph>,
+    pub limits: Limits,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,7 +160,14 @@ pub enum SymExecError {
 pub fn verify_extracted_function(
     function: &ExtractedFunction,
 ) -> crate::Result<VerificationResult> {
-    let results = verify_extracted_functions(std::slice::from_ref(function))?;
+    verify_extracted_function_with_limits(function, Limits::default())
+}
+
+pub fn verify_extracted_function_with_limits(
+    function: &ExtractedFunction,
+    limits: Limits,
+) -> crate::Result<VerificationResult> {
+    let results = verify_extracted_functions(std::slice::from_ref(function), limits)?;
     Ok(results
         .into_iter()
         .next()
@@ -168,8 +176,9 @@ pub fn verify_extracted_function(
 
 pub fn verify_extracted_functions(
     functions: &[ExtractedFunction],
+    limits: Limits,
 ) -> crate::Result<Vec<VerificationResult>> {
-    let program = prepare_program(functions)?;
+    let program = prepare_program(functions, limits)?;
     program
         .order
         .iter()
@@ -305,11 +314,11 @@ fn execute_cfg_from_state(
                         Box::new(state.path_condition),
                         Box::new(BoolExpr::Not(Box::new(condition))),
                     );
-                    if smt::is_satisfiable(&cfg.name, &then_pc)? {
-                        if path_budget >= MAX_PATHS {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &then_pc, program.limits.solver_timeout_ms)? {
+                        if path_budget >= program.limits.max_paths {
                             return Err(SymExecError::PathLimitExceeded {
                                 function: cfg.name.clone(),
-                                max_paths: MAX_PATHS,
+                                max_paths: program.limits.max_paths,
                             });
                         }
                         worklist.push_back((
@@ -321,11 +330,11 @@ fn execute_cfg_from_state(
                         ));
                         path_budget += 1;
                     }
-                    if smt::is_satisfiable(&cfg.name, &else_pc)? {
-                        if path_budget >= MAX_PATHS {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &else_pc, program.limits.solver_timeout_ms)? {
+                        if path_budget >= program.limits.max_paths {
                             return Err(SymExecError::PathLimitExceeded {
                                 function: cfg.name.clone(),
-                                max_paths: MAX_PATHS,
+                                max_paths: program.limits.max_paths,
                             });
                         }
                         worklist.push_back((
@@ -339,7 +348,7 @@ fn execute_cfg_from_state(
                     }
                 }
                 Terminator::LoopBoundExceeded => {
-                    if smt::is_satisfiable(&cfg.name, &state.path_condition)? {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
                         return Err(SymExecError::LoopBoundExceeded {
                             function: cfg.name.clone(),
                         });
@@ -381,7 +390,7 @@ pub fn verify_cfg(
             Box::new(state.path_condition.clone()),
             Box::new(well_defined_result_condition(&state.result)),
         );
-        if !smt::is_satisfiable(&cfg.name, &validity_condition)? {
+        if !smt::is_satisfiable_with_timeout(&cfg.name, &validity_condition, program.limits.solver_timeout_ms)? {
             saw_invalid_path = true;
             continue;
         }
@@ -400,7 +409,7 @@ pub fn verify_cfg(
             Box::new(state.path_condition.clone()),
             Box::new(BoolExpr::Not(Box::new(post))),
         );
-        if let Some(assignments) = smt::find_model(&cfg.name, &failure_condition, &variables)? {
+        if let Some(assignments) = smt::find_model_with_timeout(&cfg.name, &failure_condition, &variables, program.limits.solver_timeout_ms)? {
             return Ok(VerificationResult::Counterexample(Counterexample {
                 function: cfg.name.clone(),
                 assignments,
@@ -419,14 +428,14 @@ pub fn verify_cfg(
     })
 }
 
-fn prepare_program(functions: &[ExtractedFunction]) -> crate::Result<Program> {
+fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Result<Program> {
     let mut order = Vec::new();
     let mut specs = BTreeMap::new();
     let mut asts = BTreeMap::new();
 
     for function in functions {
         let spec = parse_function_spec(function)?;
-        let ast = parse_function_ast(function)?;
+        let ast = parse_function_ast_with_limits(function, limits.max_loop_unroll)?;
         order.push(function.name.clone());
         specs.insert(function.name.clone(), spec);
         asts.insert(function.name.clone(), ast);
@@ -466,7 +475,7 @@ fn prepare_program(functions: &[ExtractedFunction]) -> crate::Result<Program> {
         cfgs.insert(name.clone(), ir::build_cfg(&ssa));
     }
 
-    Ok(Program { order, specs, cfgs })
+    Ok(Program { order, specs, cfgs, limits })
 }
 
 fn collect_called_functions(function: &crate::ast::FunctionAst) -> Vec<String> {
@@ -1151,7 +1160,7 @@ mod tests {
             },
         ];
 
-        let results = super::verify_extracted_functions(&functions).unwrap();
+        let results = super::verify_extracted_functions(&functions, Default::default()).unwrap();
         assert_eq!(results.len(), 2);
         assert!(matches!(results[0], VerificationResult::Verified { .. }));
         assert!(matches!(results[1], VerificationResult::Verified { .. }));
@@ -1169,7 +1178,7 @@ mod tests {
             start_line: 1,
         }];
 
-        let error = super::verify_extracted_functions(&functions).unwrap_err();
+        let error = super::verify_extracted_functions(&functions, Default::default()).unwrap_err();
         assert!(error.to_string().contains("recursive call graph"));
     }
 
@@ -1240,7 +1249,7 @@ mod tests {
         crate::ast::type_check_function(&spec, &ast).unwrap();
         let ssa = crate::ir::lower_to_ssa(&ast).unwrap();
         let cfg = crate::ir::build_cfg(&ssa);
-        let program = prepare_program(std::slice::from_ref(&function)).unwrap();
+        let program = prepare_program(std::slice::from_ref(&function), Default::default()).unwrap();
         let states = execute_cfg(&program, &spec, &cfg).unwrap();
 
         assert_eq!(states.len(), 2);
