@@ -532,6 +532,9 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
                 collect_calls_from_expr(key, calls);
                 collect_calls_from_expr(expr, calls);
             }
+            crate::ast::Stmt::Push { value, .. } => {
+                collect_calls_from_expr(value, calls);
+            }
             crate::ast::Stmt::If {
                 condition,
                 then_branch,

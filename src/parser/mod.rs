@@ -82,6 +82,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::die_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
+                    | Rule::push_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -129,6 +130,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::die_stmt => vec![parse_die(pair)],
         Rule::last_stmt => vec![Stmt::Last],
         Rule::next_stmt => vec![Stmt::Next],
+        Rule::push_stmt => vec![parse_push(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -292,6 +294,20 @@ fn parse_die(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Die(expr)
 }
 
+fn parse_push(pair: Pair<'_, Rule>) -> Stmt {
+    let mut inner = pair.into_inner();
+    let array = inner
+        .find(|p| p.as_rule() == Rule::ident)
+        .map(parse_bare_ident)
+        .expect("push must have an array name");
+    let value = inner
+        .find(|p| p.as_rule() == Rule::expr)
+        .map(build_expr)
+        .expect("push must have a value expression")
+        .expect("validated push value expression");
+    Stmt::Push { array, value }
+}
+
 fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     pair.into_inner()
         .filter(|inner| {
@@ -310,6 +326,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::die_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
+                    | Rule::push_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))

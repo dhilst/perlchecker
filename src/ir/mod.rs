@@ -184,6 +184,9 @@ fn base_name(ssa_name: &str) -> &str {
 struct SsaBuilder<'a> {
     function: &'a str,
     versions: BTreeMap<String, usize>,
+    /// Tracks the current SSA name for each array's length companion variable.
+    /// Key: array base name (e.g., "arr"), Value: current SSA name (e.g., "arr__len__1").
+    len_companions: BTreeMap<String, String>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -191,6 +194,7 @@ impl<'a> SsaBuilder<'a> {
         Self {
             function,
             versions: BTreeMap::new(),
+            len_companions: BTreeMap::new(),
         }
     }
 
@@ -261,13 +265,23 @@ impl<'a> SsaBuilder<'a> {
                 });
                 SsaExpr::Var(temp)
             }
-            Expr::Builtin { function, args } => SsaExpr::Builtin {
-                function: *function,
-                args: args
-                    .iter()
-                    .map(|arg| self.rewrite_expr(arg, env, prefix))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
-            },
+            Expr::Builtin { function, args } => {
+                // If this is a Scalar call and we have a tracked len companion, use it
+                if *function == crate::ast::Builtin::Scalar {
+                    if let Some(Expr::Variable(arr_name)) = args.first() {
+                        if let Some(len_ssa) = self.len_companions.get(arr_name) {
+                            return Ok(SsaExpr::Var(len_ssa.clone()));
+                        }
+                    }
+                }
+                SsaExpr::Builtin {
+                    function: *function,
+                    args: args
+                        .iter()
+                        .map(|arg| self.rewrite_expr(arg, env, prefix))
+                        .collect::<std::result::Result<Vec<_>, _>>()?,
+                }
+            }
         })
     }
 
@@ -387,6 +401,57 @@ impl<'a> SsaBuilder<'a> {
                     let value = self.rewrite_expr(expr, &mut env, &mut prefix)?;
                     lowered.extend(prefix);
                     lowered.push(SsaStmt::Return(value));
+                }
+                crate::ast::Stmt::Push { array, value } => {
+                    let collection_name = env
+                        .get(array)
+                        .cloned()
+                        .ok_or_else(|| IrError::UnknownVariable {
+                            function: self.function.to_string(),
+                            variable: array.clone(),
+                        })?;
+
+                    // Get or initialize the length companion variable
+                    let len_base = format!("{array}__len");
+                    let len_ssa = if let Some(existing) = self.len_companions.get(array) {
+                        existing.clone()
+                    } else {
+                        // First push for this array: initialize len from Scalar builtin
+                        let init_name = self.fresh_name(&len_base);
+                        let scalar_expr = SsaExpr::Builtin {
+                            function: crate::ast::Builtin::Scalar,
+                            args: vec![SsaExpr::Var(collection_name.clone())],
+                        };
+                        lowered.push(SsaStmt::Assign(init_name.clone(), scalar_expr));
+                        self.len_companions.insert(array.clone(), init_name.clone());
+                        init_name
+                    };
+
+                    // Lower the value expression
+                    let mut prefix = Vec::new();
+                    let value_expr = self.rewrite_expr(value, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+
+                    // Emit: new_arr = Store(old_arr, len, value)
+                    let store = SsaExpr::Store {
+                        kind: AccessKind::Array,
+                        collection: Box::new(SsaExpr::Var(collection_name)),
+                        index: Box::new(SsaExpr::Var(len_ssa.clone())),
+                        value: Box::new(value_expr),
+                    };
+                    let new_arr_name = self.fresh_name(array);
+                    env.insert(array.clone(), new_arr_name.clone());
+                    lowered.push(SsaStmt::Assign(new_arr_name, store));
+
+                    // Emit: new_len = len + 1
+                    let new_len_name = self.fresh_name(&len_base);
+                    let increment = SsaExpr::Binary {
+                        left: Box::new(SsaExpr::Var(len_ssa)),
+                        op: BinaryOp::Add,
+                        right: Box::new(SsaExpr::Int(1)),
+                    };
+                    lowered.push(SsaStmt::Assign(new_len_name.clone(), increment));
+                    self.len_companions.insert(array.clone(), new_len_name);
                 }
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);

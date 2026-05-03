@@ -156,6 +156,10 @@ pub enum Stmt {
     Last,
     Next,
     Die(Expr),
+    Push {
+        array: String,
+        value: Expr,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -436,6 +440,18 @@ fn type_check_stmts(
                     expr_type_from_type(return_type),
                     signatures,
                 )?;
+            }
+            Stmt::Push { array, value } => {
+                let expr_type = infer_expr_type(function, value, &env, &assumptions, signatures)?;
+                let element_type = collection_element_type(function, &env, array, AccessKind::Array)?;
+                if expr_type != element_type {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "push value",
+                        expected: render_expr_type(element_type),
+                        found: render_expr_type(expr_type),
+                    });
+                }
             }
             Stmt::LoopBoundExceeded => {}
             Stmt::Last => {}
