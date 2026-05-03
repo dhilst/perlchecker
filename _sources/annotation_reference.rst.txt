@@ -1,0 +1,136 @@
+Annotation Reference
+====================
+
+Annotations are Perl comments placed in a contiguous block immediately above
+the ``sub`` keyword. Three directives are supported: ``sig``, ``pre``, and
+``post`` (or ``pos``).
+
+``# sig:`` — Type Signature
+----------------------------
+
+**Required.** Declares parameter types and return type.
+
+.. code-block:: perl
+
+   # sig: (Type1, Type2, ...) -> ReturnType
+
+Supported types:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Type
+     - Description
+   * - ``Int``
+     - 64-bit signed integer
+   * - ``Str``
+     - UTF-8 string
+   * - ``Array<Int>``
+     - Array of integers
+   * - ``Array<Str>``
+     - Array of strings
+   * - ``Hash<Str, Int>``
+     - String-keyed hash with integer values
+   * - ``Hash<Str, Str>``
+     - String-keyed hash with string values
+
+Examples:
+
+.. code-block:: perl
+
+   # sig: (Int) -> Int
+   # sig: (Int, Int) -> Int
+   # sig: (Str, Str) -> Str
+   # sig: (Array<Int>, Int) -> Int
+   # sig: (Hash<Str, Int>, Str) -> Int
+
+The number of types in the signature must match the number of parameters in the
+``my (...) = @_;`` binding.
+
+``# pre:`` — Precondition
+--------------------------
+
+**Optional.** Constrains valid inputs. If omitted, defaults to ``true``
+(all inputs are valid).
+
+.. code-block:: perl
+
+   # pre: boolean_expression
+
+The expression can reference function parameters (with ``$`` prefix) and use
+any operators or built-in functions the language supports.
+
+Examples:
+
+.. code-block:: perl
+
+   # pre: $x >= 0
+   # pre: $x > 0 && $y > 0
+   # pre: $x >= 0 && $x <= 5
+   # pre: length($s) >= 6 && length($s) <= 12
+   # pre: scalar(@arr) > 0
+   # pre: $y != 0
+
+During verification, paths that violate the precondition are pruned — the tool
+only checks paths where the precondition holds.
+
+``# post:`` — Postcondition
+-----------------------------
+
+**Required.** States what must be true about the return value. The alias
+``# pos:`` is also accepted.
+
+.. code-block:: perl
+
+   # post: boolean_expression
+
+Use ``$result`` to refer to the function's return value. The expression can
+also reference function parameters.
+
+Examples:
+
+.. code-block:: perl
+
+   # post: $result == $x
+   # post: $result >= 0
+   # post: $result == $x + $y
+   # post: length($result) == length($x) + length($y)
+   # post: $result eq $x . $y
+   # post: ($x <= $y && $result == $y - $x) || ($x > $y && $result == $x - $y)
+
+Common Patterns
+---------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Pattern
+     - Meaning
+   * - ``# post: $result == $x``
+     - Returns the input unchanged (identity)
+   * - ``# post: $result >= 0``
+     - Result is non-negative
+   * - ``# pre: $y != 0``
+     - Guards against division by zero
+   * - ``# pre: $x >= 0 && $x <= 5``
+     - Bounds input for loop unrolling
+   * - ``# post: $result == $arr[$i]``
+     - Returns the element at index ``$i``
+   * - ``# post: length($result) == length($x)``
+     - Preserves string length
+
+Validation Rules
+----------------
+
+The tool rejects annotations that violate these rules:
+
+- Missing ``# sig:`` → error
+- Missing ``# post:`` (or ``# pos:``) → error
+- Duplicate ``# sig:``, ``# pre:``, or ``# post:`` → error
+- Unknown directive (not sig/pre/post/pos) → error
+- Parameter count in signature does not match function parameters → error
+- Precondition or postcondition references an unknown variable → error
+- Postcondition does not reference ``$result`` → allowed but likely a mistake
+- Blank line between annotation block and ``sub`` → extraction error
