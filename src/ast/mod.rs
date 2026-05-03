@@ -337,7 +337,7 @@ pub fn type_check_function_with_signatures(
         signatures,
         &alias_map,
     )?;
-    let (env, assumptions, _alias_map) = type_check_stmts(
+    let (env, assumptions, body_alias_map) = type_check_stmts(
         &function.name,
         &function.body,
         &env,
@@ -363,7 +363,7 @@ pub fn type_check_function_with_signatures(
         &assumptions,
         ExprType::Bool,
         signatures,
-        &alias_map,
+        &body_alias_map,
     )?;
 
     debug!(function = function.name, "type checking completed");
