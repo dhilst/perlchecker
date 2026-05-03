@@ -34,6 +34,7 @@ pub enum IntExpr {
     Ite(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
     Length(Box<StrExpr>),
     Index(Box<StrExpr>, Box<StrExpr>),
+    StrToInt(Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
     HashSelect(Box<HashIntExpr>, Box<StrExpr>),
 }
@@ -1182,6 +1183,20 @@ fn eval_builtin(
                 value.clone(),
                 function,
             )?)))
+        }
+        Builtin::Int => {
+            let [value] = args else {
+                unreachable!("int arity is enforced by the parser");
+            };
+            match value {
+                SymValue::Int(i) => SymValue::Int(i.clone()),
+                SymValue::Str(s) => SymValue::Int(IntExpr::StrToInt(Box::new(s.clone()))),
+                _ => {
+                    return Err(SymExecError::TypeMismatch {
+                        function: function.to_string(),
+                    });
+                }
+            }
         }
     })
 }

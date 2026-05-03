@@ -41,6 +41,7 @@ pub enum Builtin {
     Chr,
     Chomp,
     Reverse,
+    Int,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1126,6 +1127,21 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Str)
+            }
+            Builtin::Int => {
+                let [value] = args.as_slice() else {
+                    unreachable!("int arity is enforced by the parser");
+                };
+                let arg_type = infer_expr_type(function, value, env, assumptions, signatures)?;
+                if arg_type != ExprType::Str && arg_type != ExprType::Int {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "int argument",
+                        expected: "Str or Int",
+                        found: render_expr_type(arg_type),
+                    });
+                }
+                Ok(ExprType::Int)
             }
         },
         Expr::Ternary { condition, then_expr, else_expr } => {
