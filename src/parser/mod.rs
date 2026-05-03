@@ -354,6 +354,39 @@ fn parse_bare_ident(pair: Pair<'_, Rule>) -> String {
 }
 
 fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    match pair.as_rule() {
+        Rule::ternary_expr => {
+            let mut inner = pair.into_inner();
+            let condition_pair = inner
+                .next()
+                .expect("ternary_expr must start with simple_expr");
+            let condition = build_simple_expr(condition_pair)?;
+
+            if let Some(then_pair) = inner.next() {
+                let then_expr = build_simple_expr(then_pair)?;
+                let else_expr = build_expr(inner.next().expect("ternary must have else branch"))?;
+                Ok(Expr::Ternary {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(then_expr),
+                    else_expr: Box::new(else_expr),
+                })
+            } else {
+                Ok(condition)
+            }
+        }
+        Rule::expr => {
+            let ternary_pair = pair
+                .into_inner()
+                .next()
+                .expect("expr must contain ternary_expr");
+            build_expr(ternary_pair)
+        }
+        Rule::simple_expr => build_simple_expr(pair),
+        other => Err(format!("unexpected expression rule: {other:?}")),
+    }
+}
+
+fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
     PrattParser::new()
         .op(pest::pratt_parser::Op::infix(
             Rule::op_or,
@@ -368,6 +401,10 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
                 | pest::pratt_parser::Op::infix(Rule::op_ne, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_seq, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_sne, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_slt, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_sgt, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_sle, pest::pratt_parser::Assoc::Left)
+                | pest::pratt_parser::Op::infix(Rule::op_sge, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_lt, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_le, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_gt, pest::pratt_parser::Assoc::Left)
@@ -401,6 +438,7 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
             Rule::length_call => parse_builtin_call(primary, Builtin::Length),
             Rule::substr_call => parse_builtin_call(primary, Builtin::Substr),
             Rule::index_call => parse_builtin_call(primary, Builtin::Index),
+            Rule::abs_call => parse_builtin_call(primary, Builtin::Abs),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {
@@ -431,6 +469,10 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
                     Rule::op_ne => BinaryOp::Ne,
                     Rule::op_seq => BinaryOp::StrEq,
                     Rule::op_sne => BinaryOp::StrNe,
+                    Rule::op_slt => BinaryOp::StrLt,
+                    Rule::op_sgt => BinaryOp::StrGt,
+                    Rule::op_sle => BinaryOp::StrLe,
+                    Rule::op_sge => BinaryOp::StrGe,
                     Rule::op_and => BinaryOp::And,
                     Rule::op_or => BinaryOp::Or,
                     other => return Err(format!("unexpected infix operator: {other:?}")),

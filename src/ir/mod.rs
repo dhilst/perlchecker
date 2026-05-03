@@ -59,6 +59,11 @@ pub enum SsaExpr {
         op: BinaryOp,
         right: Box<SsaExpr>,
     },
+    Ite {
+        condition: Box<SsaExpr>,
+        then_expr: Box<SsaExpr>,
+        else_expr: Box<SsaExpr>,
+    },
     Access {
         kind: AccessKind,
         collection: Box<SsaExpr>,
@@ -218,6 +223,11 @@ impl<'a> SsaBuilder<'a> {
                 left: Box::new(self.rewrite_expr(left, env, prefix)?),
                 op: *op,
                 right: Box::new(self.rewrite_expr(right, env, prefix)?),
+            },
+            Expr::Ternary { condition, then_expr, else_expr } => SsaExpr::Ite {
+                condition: Box::new(self.rewrite_expr(condition, env, prefix)?),
+                then_expr: Box::new(self.rewrite_expr(then_expr, env, prefix)?),
+                else_expr: Box::new(self.rewrite_expr(else_expr, env, prefix)?),
             },
             Expr::Access {
                 kind,

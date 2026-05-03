@@ -34,6 +34,7 @@ pub enum Builtin {
     Substr,
     Index,
     Scalar,
+    Abs,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -56,6 +57,11 @@ pub enum Expr {
         left: Box<Expr>,
         op: BinaryOp,
         right: Box<Expr>,
+    },
+    Ternary {
+        condition: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
     },
     Access {
         kind: AccessKind,
@@ -94,6 +100,10 @@ pub enum BinaryOp {
     Ne,
     StrEq,
     StrNe,
+    StrLt,
+    StrGt,
+    StrLe,
+    StrGe,
     And,
     Or,
 }
@@ -492,6 +502,9 @@ fn references_variable(expr: &Expr, name: &str) -> bool {
         Expr::Binary { left, right, .. } => {
             references_variable(left, name) || references_variable(right, name)
         }
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            references_variable(condition, name) || references_variable(then_expr, name) || references_variable(else_expr, name)
+        }
         Expr::Access {
             collection, index, ..
         } => collection == name || references_variable(index, name),
@@ -662,10 +675,10 @@ fn infer_expr_type(
                 )?;
                 Ok(ExprType::Bool)
             }
-            BinaryOp::StrEq | BinaryOp::StrNe => {
+            BinaryOp::StrEq | BinaryOp::StrNe | BinaryOp::StrLt | BinaryOp::StrGt | BinaryOp::StrLe | BinaryOp::StrGe => {
                 expect_expr_type(
                     function,
-                    "string equality operand",
+                    "string comparison operand",
                     left,
                     env,
                     assumptions,
@@ -674,7 +687,7 @@ fn infer_expr_type(
                 )?;
                 expect_expr_type(
                     function,
-                    "string equality operand",
+                    "string comparison operand",
                     right,
                     env,
                     assumptions,
@@ -912,7 +925,44 @@ fn infer_expr_type(
                     }),
                 }
             }
+            Builtin::Abs => {
+                let [value] = args.as_slice() else {
+                    unreachable!("abs arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "abs argument",
+                    value,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
         },
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            expect_expr_type(
+                function,
+                "ternary condition",
+                condition,
+                env,
+                assumptions,
+                ExprType::Bool,
+                signatures,
+            )?;
+            let then_type = infer_expr_type(function, then_expr, env, assumptions, signatures)?;
+            let else_type = infer_expr_type(function, else_expr, env, assumptions, signatures)?;
+            if then_type != else_type {
+                return Err(TypeCheckError::TypeMismatch {
+                    function: function.to_string(),
+                    context: "ternary branches",
+                    expected: render_expr_type(then_type),
+                    found: render_expr_type(else_type),
+                });
+            }
+            Ok(then_type)
+        }
     }
 }
 
@@ -1032,6 +1082,10 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         BinaryOp::Ne => BinaryOp::Eq,
         BinaryOp::StrEq => BinaryOp::StrNe,
         BinaryOp::StrNe => BinaryOp::StrEq,
+        BinaryOp::StrLt => BinaryOp::StrGe,
+        BinaryOp::StrLe => BinaryOp::StrGt,
+        BinaryOp::StrGt => BinaryOp::StrLe,
+        BinaryOp::StrGe => BinaryOp::StrLt,
         BinaryOp::Add
         | BinaryOp::Sub
         | BinaryOp::Mul

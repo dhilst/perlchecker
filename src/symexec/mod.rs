@@ -22,6 +22,8 @@ pub enum IntExpr {
     Mul(Box<IntExpr>, Box<IntExpr>),
     Div(Box<IntExpr>, Box<IntExpr>),
     Mod(Box<IntExpr>, Box<IntExpr>),
+    Abs(Box<IntExpr>),
+    Ite(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
     Length(Box<StrExpr>),
     Index(Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
@@ -34,6 +36,7 @@ pub enum StrExpr {
     Var(String),
     Concat(Box<StrExpr>, Box<StrExpr>),
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
+    Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayStrExpr>, Box<IntExpr>),
     HashSelect(Box<HashStrExpr>, Box<StrExpr>),
 }
@@ -80,6 +83,7 @@ pub enum BoolExpr {
     Or(Box<BoolExpr>, Box<BoolExpr>),
     IntCmp(CmpOp, Box<IntExpr>, Box<IntExpr>),
     StrEq(Box<StrExpr>, Box<StrExpr>),
+    StrCmp(CmpOp, Box<StrExpr>, Box<StrExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -530,6 +534,11 @@ fn collect_calls_from_expr(expr: &Expr, calls: &mut Vec<String>) {
             collect_calls_from_expr(left, calls);
             collect_calls_from_expr(right, calls);
         }
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            collect_calls_from_expr(condition, calls);
+            collect_calls_from_expr(then_expr, calls);
+            collect_calls_from_expr(else_expr, calls);
+        }
         Expr::Access { index, .. } => collect_calls_from_expr(index, calls),
         Expr::Call { function, args } => {
             calls.push(function.clone());
@@ -683,6 +692,37 @@ fn eval_ssa_expr(
             eval_ssa_expr(function, left, env)?,
             eval_ssa_expr(function, right, env)?,
         )?,
+        SsaExpr::Ite { condition, then_expr, else_expr } => {
+            let cond_val = eval_ssa_expr(function, condition, env)?;
+            let then_val = eval_ssa_expr(function, then_expr, env)?;
+            let else_val = eval_ssa_expr(function, else_expr, env)?;
+            let cond_bool = expect_bool(cond_val, function)?;
+            match (then_val, else_val) {
+                (SymValue::Int(then_int), SymValue::Int(else_int)) => {
+                    SymValue::Int(IntExpr::Ite(Box::new(cond_bool), Box::new(then_int), Box::new(else_int)))
+                }
+                (SymValue::Str(then_str), SymValue::Str(else_str)) => {
+                    SymValue::Str(StrExpr::Ite(Box::new(cond_bool), Box::new(then_str), Box::new(else_str)))
+                }
+                (SymValue::Bool(then_bool), SymValue::Bool(else_bool)) => {
+                    SymValue::Bool(BoolExpr::And(
+                        Box::new(BoolExpr::Or(
+                            Box::new(BoolExpr::Not(Box::new(cond_bool.clone()))),
+                            Box::new(then_bool),
+                        )),
+                        Box::new(BoolExpr::Or(
+                            Box::new(cond_bool),
+                            Box::new(else_bool),
+                        )),
+                    ))
+                }
+                _ => {
+                    return Err(SymExecError::TypeMismatch {
+                        function: function.to_string(),
+                    })
+                }
+            }
+        }
         SsaExpr::Access {
             kind,
             collection,
@@ -751,6 +791,37 @@ fn eval_expr(
             eval_expr(function, left, env)?,
             eval_expr(function, right, env)?,
         )?,
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            let cond_val = eval_expr(function, condition, env)?;
+            let then_val = eval_expr(function, then_expr, env)?;
+            let else_val = eval_expr(function, else_expr, env)?;
+            let cond_bool = expect_bool(cond_val, function)?;
+            match (then_val, else_val) {
+                (SymValue::Int(then_int), SymValue::Int(else_int)) => {
+                    SymValue::Int(IntExpr::Ite(Box::new(cond_bool), Box::new(then_int), Box::new(else_int)))
+                }
+                (SymValue::Str(then_str), SymValue::Str(else_str)) => {
+                    SymValue::Str(StrExpr::Ite(Box::new(cond_bool), Box::new(then_str), Box::new(else_str)))
+                }
+                (SymValue::Bool(then_bool), SymValue::Bool(else_bool)) => {
+                    SymValue::Bool(BoolExpr::And(
+                        Box::new(BoolExpr::Or(
+                            Box::new(BoolExpr::Not(Box::new(cond_bool.clone()))),
+                            Box::new(then_bool),
+                        )),
+                        Box::new(BoolExpr::Or(
+                            Box::new(cond_bool),
+                            Box::new(else_bool),
+                        )),
+                    ))
+                }
+                _ => {
+                    return Err(SymExecError::TypeMismatch {
+                        function: function.to_string(),
+                    })
+                }
+            }
+        }
         Expr::Access {
             kind,
             collection,
@@ -853,6 +924,26 @@ fn eval_binary(
             Box::new(expect_str(left, function)?),
             Box::new(expect_str(right, function)?),
         )))),
+        crate::ast::BinaryOp::StrLt => SymValue::Bool(BoolExpr::StrCmp(
+            CmpOp::Lt,
+            Box::new(expect_str(left, function)?),
+            Box::new(expect_str(right, function)?),
+        )),
+        crate::ast::BinaryOp::StrLe => SymValue::Bool(BoolExpr::StrCmp(
+            CmpOp::Le,
+            Box::new(expect_str(left, function)?),
+            Box::new(expect_str(right, function)?),
+        )),
+        crate::ast::BinaryOp::StrGt => SymValue::Bool(BoolExpr::StrCmp(
+            CmpOp::Gt,
+            Box::new(expect_str(left, function)?),
+            Box::new(expect_str(right, function)?),
+        )),
+        crate::ast::BinaryOp::StrGe => SymValue::Bool(BoolExpr::StrCmp(
+            CmpOp::Ge,
+            Box::new(expect_str(left, function)?),
+            Box::new(expect_str(right, function)?),
+        )),
         crate::ast::BinaryOp::And => SymValue::Bool(BoolExpr::And(
             Box::new(expect_bool(left, function)?),
             Box::new(expect_bool(right, function)?),
@@ -945,6 +1036,15 @@ fn eval_builtin(
                     });
                 }
             }
+        }
+        Builtin::Abs => {
+            let [value] = args else {
+                unreachable!("abs arity is enforced by the parser");
+            };
+            SymValue::Int(IntExpr::Abs(Box::new(expect_int(
+                value.clone(),
+                function,
+            )?)))
         }
     })
 }

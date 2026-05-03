@@ -292,6 +292,11 @@ fn collect_variables_inner(expr: &Expr, variables: &mut BTreeSet<String>) {
             collect_variables_inner(left, variables);
             collect_variables_inner(right, variables);
         }
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            collect_variables_inner(condition, variables);
+            collect_variables_inner(then_expr, variables);
+            collect_variables_inner(else_expr, variables);
+        }
         Expr::Access {
             collection, index, ..
         } => {

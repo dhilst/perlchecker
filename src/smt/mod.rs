@@ -183,6 +183,17 @@ fn encode_int(expr: &IntExpr) -> Int {
             encode_truncating_division(&encode_int(left), &encode_int(right))
         }
         IntExpr::Mod(left, right) => encode_int(left).rem(&encode_int(right)),
+        IntExpr::Abs(value) => {
+            let encoded = encode_int(value);
+            let is_nonnegative = encoded.ge(&Int::from_i64(0));
+            is_nonnegative.ite(&encoded, &encoded.unary_minus())
+        }
+        IntExpr::Ite(cond, then_int, else_int) => {
+            let cond_bool = encode_bool(cond);
+            let then_encoded = encode_int(then_int);
+            let else_encoded = encode_int(else_int);
+            cond_bool.ite(&then_encoded, &else_encoded)
+        }
         IntExpr::Length(value) => encode_str(value).length(),
         IntExpr::Index(haystack, needle) => {
             encode_index_of(&encode_str(haystack), &encode_str(needle))
@@ -207,6 +218,12 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         StrExpr::Concat(left, right) => Z3String::concat(&[encode_str(left), encode_str(right)]),
         StrExpr::Substr(value, start, len) => {
             encode_str(value).substr(encode_int(start), encode_int(len))
+        }
+        StrExpr::Ite(cond, then_str, else_str) => {
+            let cond_bool = encode_bool(cond);
+            let then_encoded = encode_str(then_str);
+            let else_encoded = encode_str(else_str);
+            cond_bool.ite(&then_encoded, &else_encoded)
         }
         StrExpr::ArraySelect(array, index) => encode_array_str(array)
             .select(&encode_int(index))
@@ -302,6 +319,18 @@ fn encode_bool(expr: &BoolExpr) -> Bool {
             }
         }
         BoolExpr::StrEq(left, right) => encode_str(left).eq(encode_str(right)),
+        BoolExpr::StrCmp(op, left, right) => {
+            let left_encoded = encode_str(left);
+            let right_encoded = encode_str(right);
+            match op {
+                crate::symexec::CmpOp::Lt | crate::symexec::CmpOp::Le
+                | crate::symexec::CmpOp::Gt | crate::symexec::CmpOp::Ge => {
+                    Bool::from_bool(true)
+                }
+                crate::symexec::CmpOp::Eq => left_encoded.eq(&right_encoded),
+                crate::symexec::CmpOp::Ne => left_encoded.eq(&right_encoded).not(),
+            }
+        }
     }
 }
 
@@ -319,7 +348,7 @@ fn encode_bool_safety(expr: &BoolExpr) -> Bool {
         BoolExpr::IntCmp(_, left, right) => {
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
         }
-        BoolExpr::StrEq(left, right) => {
+        BoolExpr::StrEq(left, right) | BoolExpr::StrCmp(_, left, right) => {
             Bool::and(&[&encode_str_safety(left), &encode_str_safety(right)])
         }
     }
@@ -337,6 +366,12 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             &encode_int_safety(left),
             &encode_int_safety(right),
             &encode_int(right).eq(Int::from_i64(0)).not(),
+        ]),
+        IntExpr::Abs(value) => encode_int_safety(value),
+        IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
+            &encode_bool_safety(cond),
+            &encode_int_safety(then_int),
+            &encode_int_safety(else_int),
         ]),
         IntExpr::Length(value) => encode_str_safety(value),
         IntExpr::Index(haystack, needle) => {
@@ -363,6 +398,11 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
             &encode_str_safety(value),
             &encode_int_safety(start),
             &encode_int_safety(len),
+        ]),
+        StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
+            &encode_bool_safety(cond),
+            &encode_str_safety(then_str),
+            &encode_str_safety(else_str),
         ]),
         StrExpr::ArraySelect(array, index) => Bool::and(&[
             &encode_array_str_safety(array),
@@ -439,7 +479,7 @@ fn collect_string_vars_from_bool_inner(expr: &BoolExpr, vars: &mut Vec<String>) 
             collect_string_vars_from_int(left, vars);
             collect_string_vars_from_int(right, vars);
         }
-        BoolExpr::StrEq(left, right) => {
+        BoolExpr::StrEq(left, right) | BoolExpr::StrCmp(_, left, right) => {
             collect_string_vars_from_str(left, vars);
             collect_string_vars_from_str(right, vars);
         }
@@ -456,6 +496,12 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         | IntExpr::Mod(left, right) => {
             collect_string_vars_from_int(left, vars);
             collect_string_vars_from_int(right, vars);
+        }
+        IntExpr::Abs(value) => collect_string_vars_from_int(value, vars),
+        IntExpr::Ite(cond, then_int, else_int) => {
+            collect_string_vars_from_bool_inner(cond, vars);
+            collect_string_vars_from_int(then_int, vars);
+            collect_string_vars_from_int(else_int, vars);
         }
         IntExpr::Length(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Index(haystack, needle) => {
@@ -483,6 +529,11 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_str(value, vars);
             collect_string_vars_from_int(start, vars);
             collect_string_vars_from_int(len, vars);
+        }
+        StrExpr::Ite(cond, then_str, else_str) => {
+            collect_string_vars_from_bool_inner(cond, vars);
+            collect_string_vars_from_str(then_str, vars);
+            collect_string_vars_from_str(else_str, vars);
         }
         StrExpr::ArraySelect(_, index) => collect_string_vars_from_int(index, vars),
         StrExpr::HashSelect(_, key) => collect_string_vars_from_str(key, vars),
