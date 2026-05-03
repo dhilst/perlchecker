@@ -1696,3 +1696,111 @@ sub arrow_hash_write {
     assert!(stdout.contains("✔ arrow_array_read: verified"));
     assert!(stdout.contains("✔ arrow_hash_write: verified"));
 }
+
+#[test]
+fn check_round118_integration_showcase() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("round118.pl");
+    fs::write(
+        &file,
+        r#"
+# extern: sanitize_input (Str) -> Str post: length($result) >= 0 && length($result) <= 20
+
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 15
+sub sum_array_foreach {
+    my ($x) = @_;
+    my @nums = (1, 2, 3, 4, 5);
+    my $sum = 0;
+    foreach my $n (@nums) {
+        $sum = $sum + $n;
+        # assert: $sum >= 0
+    }
+    return $sum;
+}
+
+# sig: (Hash<Str, Int>, Int) -> Int
+# pre: $x > 0 && $x < 100
+# post: $result == 1
+sub hash_ref_exists_defined {
+    my ($h, $x) = @_;
+    my $href = \%h;
+    $href->{"val"} = $x;
+    my $found = exists($h{"val"});
+    my $is_def = defined($x);
+    # assert: $is_def == 1
+    return $found;
+}
+
+# sig: (Int) -> Int
+# pre: $n >= 1 && $n <= 5
+# post: $result == $n * 3
+sub ghost_loop_invariant {
+    my ($n) = @_;
+    # ghost: $factor = 3
+    my $sum = 0;
+    my $i = 0;
+    # inv: $sum == $i * $factor && $i >= 0 && $i <= $n
+    while ($i < $n) {
+        $sum = $sum + $factor;
+        $i = $i + 1;
+    }
+    return $sum;
+}
+
+# sig: (Str) -> Int
+# pre: length($input) >= 1 && length($input) <= 10
+# post: $result >= 0 && $result <= 1
+sub validated_regex_check {
+    my ($input) = @_;
+    my $clean = sanitize_input($input);
+    my $has_prefix = 0;
+    if ($clean =~ /^foo/) {
+        $has_prefix = 1;
+    }
+    return $has_prefix;
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 10
+# post: $result == $x + 1
+sub ref_defined_assert {
+    my ($x) = @_;
+    my $y;
+    my $ref = \$x;
+    $y = $$ref + 1;
+    my $is_def = defined($y);
+    # assert: $is_def == 1
+    return $y;
+}
+
+# sig: (Int) -> Int
+# pre: $idx >= 0 && $idx <= 2
+# post: $result >= 10 && $result <= 30
+sub array_ref_lookup {
+    my ($idx) = @_;
+    my @data = (10, 20, 30);
+    my $aref = \@data;
+    my $val = $aref->[$idx];
+    return $val;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ sum_array_foreach: verified"));
+    assert!(stdout.contains("✔ hash_ref_exists_defined: verified"));
+    assert!(stdout.contains("✔ ghost_loop_invariant: verified"));
+    assert!(stdout.contains("✔ validated_regex_check: verified"));
+    assert!(stdout.contains("✔ ref_defined_assert: verified"));
+    assert!(stdout.contains("✔ array_ref_lookup: verified"));
+}
