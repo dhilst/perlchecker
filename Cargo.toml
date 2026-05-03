@@ -1,0 +1,19 @@
+[package]
+name = "perlchecker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+pest = "2.8"
+pest_derive = "2.8"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+z3 = "0.20"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+proptest = "1.6"
+tempfile = "3.16"

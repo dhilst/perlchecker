@@ -1,0 +1,65 @@
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
+annotation_expr = { SOI ~ expr ~ EOI }
+
+stmt = _{ while_stmt | for_stmt | if_stmt | return_stmt | hash_assign_stmt | array_assign_stmt | assign_stmt | declare_stmt }
+parameter_binding = { "my" ~ "(" ~ var_list? ~ ")" ~ "=" ~ "@_" ~ ";" }
+var_list = { var ~ ("," ~ var)* }
+
+assign_stmt = { declaration? ~ var ~ "=" ~ expr ~ ";" }
+array_assign_stmt = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr ~ ";" }
+hash_assign_stmt = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr ~ ";" }
+declare_stmt = { "my" ~ var ~ ";" }
+declaration = { "my" }
+if_stmt = { "if" ~ "(" ~ expr ~ ")" ~ block ~ elsif_clause* ~ else_clause? }
+while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
+for_stmt = { "for" ~ "(" ~ for_assign? ~ ";" ~ expr ~ ";" ~ for_assign? ~ ")" ~ block }
+elsif_clause = { "elsif" ~ "(" ~ expr ~ ")" ~ block }
+else_clause = { "else" ~ block }
+block = { "{" ~ stmt* ~ "}" }
+return_stmt = { "return" ~ expr ~ ";" }
+for_assign = { for_hash_assign | for_array_assign | for_scalar_assign }
+for_scalar_assign = { var ~ "=" ~ expr }
+for_array_assign = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr }
+for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }
+
+expr = { prefix_op* ~ atom ~ (infix_op ~ prefix_op* ~ atom)* }
+atom = _{ length_call | substr_call | index_call | call_expr | hash_access | array_access | string | int | var | "(" ~ expr ~ ")" }
+prefix_op = _{ op_not | op_neg }
+infix_op = _{ op_or | op_and | op_seq | op_sne | op_eq | op_ne | op_le | op_lt | op_ge | op_gt | op_concat | op_add | op_sub | op_mul | op_div | op_mod }
+
+length_call = { "length" ~ "(" ~ expr ~ ")" }
+substr_call = { "substr" ~ "(" ~ expr ~ "," ~ expr ~ "," ~ expr ~ ")" }
+index_call = { "index" ~ "(" ~ expr ~ "," ~ expr ~ ")" }
+
+op_or = { "||" }
+op_and = { "&&" }
+op_seq = { "eq" }
+op_sne = { "ne" }
+op_eq = { "==" }
+op_ne = { "!=" }
+op_le = { "<=" }
+op_lt = { "<" }
+op_ge = { ">=" }
+op_gt = { ">" }
+op_concat = { "." }
+op_add = { "+" }
+op_sub = { "-" }
+op_mul = { "*" }
+op_div = { "/" }
+op_mod = { "%" }
+op_not = { "!" }
+op_neg = { "-" }
+
+int = @{ ASCII_DIGIT+ }
+string = @{ "\"" ~ ( "\\\"" | "\\\\" | !("\"" | NEWLINE) ~ ANY )* ~ "\"" }
+var = @{ "$" ~ ident }
+bare_ident = @{ ident }
+ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+array_access = { var ~ "[" ~ access_index ~ "]" }
+hash_access = { var ~ "{" ~ access_key ~ "}" }
+access_index = { expr | bare_ident }
+access_key = { expr | bare_ident }
+call_expr = { ident ~ "(" ~ call_args? ~ ")" }
+call_args = { expr ~ ("," ~ expr)* }
