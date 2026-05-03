@@ -1,4 +1,4 @@
-pub const DEFAULT_MAX_LOOP_UNROLL: usize = 5;
+pub const DEFAULT_MAX_LOOP_UNROLL: usize = 9;
 pub const DEFAULT_MAX_PATHS: usize = 1024;
 pub const DEFAULT_SOLVER_TIMEOUT_MS: u32 = 5000;
 

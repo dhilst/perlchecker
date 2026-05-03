@@ -645,36 +645,108 @@ impl<'a> SsaBuilder<'a> {
                     condition,
                     body: loop_body,
                     step,
+                    has_last,
                     has_next,
                     max_unroll,
-                    ..
                 } => {
-                    // Unroll the While node back into Stmt::If chains, then lower those.
-                    // This preserves the exact same behavior as the old parser-level unrolling.
-                    let unrolled = if !step.is_empty() && *has_next {
-                        // For-loop with `next`: step must execute outside skip-flag guard
-                        crate::parser::unroll_for_with_next(
-                            condition.clone(),
-                            loop_body.clone(),
-                            step.clone(),
-                            *max_unroll,
-                        )
-                    } else if !step.is_empty() {
-                        // For-loop without `next`: append step to body, unroll as while
-                        let mut full_body = loop_body.clone();
-                        full_body.extend(step.clone());
-                        crate::parser::unroll_while(condition.clone(), full_body, *max_unroll)
+                    if *has_last || *has_next {
+                        // Loops with `last` or `next` use the AST-level unrolling
+                        // which handles flag-based desugaring correctly.
+                        let unrolled = if !step.is_empty() && *has_next {
+                            crate::parser::unroll_for_with_next(
+                                condition.clone(),
+                                loop_body.clone(),
+                                step.clone(),
+                                *max_unroll,
+                            )
+                        } else if !step.is_empty() {
+                            let mut full_body = loop_body.clone();
+                            full_body.extend(step.clone());
+                            crate::parser::unroll_while(condition.clone(), full_body, *max_unroll)
+                        } else {
+                            crate::parser::unroll_while(
+                                condition.clone(),
+                                loop_body.clone(),
+                                *max_unroll,
+                            )
+                        };
+                        let (unrolled_ssa, unrolled_env) = self.lower_stmts(&unrolled, &env)?;
+                        lowered.extend(unrolled_ssa);
+                        env = unrolled_env;
                     } else {
-                        // Simple while loop
-                        crate::parser::unroll_while(
-                            condition.clone(),
-                            loop_body.clone(),
-                            *max_unroll,
-                        )
-                    };
-                    let (unrolled_ssa, unrolled_env) = self.lower_stmts(&unrolled, &env)?;
-                    lowered.extend(unrolled_ssa);
-                    env = unrolled_env;
+                        // SSA-level loop unrolling: avoid creating intermediate AST
+                        // nodes by directly producing SsaStmt::If chains. Each
+                        // iteration lowers the condition and body fresh with new SSA
+                        // names, then emits merges for modified variables. This is
+                        // more memory-efficient than AST-level unrolling because no
+                        // intermediate Stmt::If chains are allocated.
+                        let full_body: Vec<crate::ast::Stmt> = if !step.is_empty() {
+                            let mut b = loop_body.clone();
+                            b.extend(step.clone());
+                            b
+                        } else {
+                            loop_body.clone()
+                        };
+
+                        for _iteration in 0..*max_unroll {
+                            let mut prefix = Vec::new();
+                            let cond = self.rewrite_expr(condition, &mut env, &mut prefix)?;
+                            lowered.extend(prefix);
+
+                            let (body_ssa, body_env) = self.lower_stmts(&full_body, &env)?;
+
+                            // Compute merges: the else branch is empty, so the
+                            // "else env" is the pre-body env.
+                            let else_env = env.clone();
+                            let mut merges = Vec::new();
+                            let mut next_env = env.clone();
+                            let keys = body_env
+                                .keys()
+                                .chain(else_env.keys())
+                                .cloned()
+                                .collect::<BTreeSet<_>>();
+
+                            for key in keys {
+                                let then_name = body_env.get(&key).cloned();
+                                let else_name = else_env.get(&key).cloned();
+                                match (then_name, else_name) {
+                                    (Some(tn), Some(en)) if tn == en => {
+                                        next_env.insert(key, tn);
+                                    }
+                                    (Some(tn), Some(en)) => {
+                                        let result_name = self.fresh_name(&key);
+                                        merges.push(SsaMerge {
+                                            source: key.clone(),
+                                            then_name: tn,
+                                            else_name: en,
+                                            result_name: result_name.clone(),
+                                        });
+                                        next_env.insert(key, result_name);
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            lowered.push(SsaStmt::If {
+                                condition: cond,
+                                then_branch: body_ssa,
+                                else_branch: Vec::new(),
+                                merges,
+                            });
+                            env = next_env;
+                        }
+
+                        // Final bound-exceeded check
+                        let mut prefix = Vec::new();
+                        let cond = self.rewrite_expr(condition, &mut env, &mut prefix)?;
+                        lowered.extend(prefix);
+                        lowered.push(SsaStmt::If {
+                            condition: cond,
+                            then_branch: vec![SsaStmt::LoopBoundExceeded],
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+                    }
                 }
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);
