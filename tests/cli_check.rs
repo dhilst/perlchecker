@@ -713,3 +713,49 @@ sub count_positive {
     assert!(stdout.contains("✔ sum_positive: verified"));
     assert!(stdout.contains("✔ count_positive: verified"));
 }
+
+#[test]
+fn check_array_literal_initialization() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("array_init.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 1 && $x <= 3
+# post: $result >= 10 && $result <= 30
+sub lookup_table {
+    my ($x) = @_;
+    my @table = (10, 20, 30);
+    my $idx = $x - 1;
+    return $table[$idx];
+}
+
+# sig: (Int) -> Int
+# pre: $n >= 0 && $n <= 3
+# post: $result >= 0
+sub sum_first_n {
+    my ($n) = @_;
+    my @vals = (5, 10, 15, 20);
+    my $sum = 0;
+    my $i = 0;
+    for ($i = 0; $i < $n; $i = $i + 1) {
+        $sum = $sum + $vals[$i];
+    }
+    return $sum;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ lookup_table: verified"));
+    assert!(stdout.contains("✔ sum_first_n: verified"));
+}

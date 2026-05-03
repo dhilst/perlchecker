@@ -530,6 +530,11 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
     for stmt in stmts {
         match stmt {
             crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded | crate::ast::Stmt::Last | crate::ast::Stmt::Next | crate::ast::Stmt::Die(_) => {}
+            crate::ast::Stmt::ArrayInit { elements, .. } => {
+                for elem in elements {
+                    collect_calls_from_expr(elem, calls);
+                }
+            }
             crate::ast::Stmt::Assign { expr, .. } | crate::ast::Stmt::Return(expr) => {
                 collect_calls_from_expr(expr, calls);
             }
@@ -789,6 +794,13 @@ fn eval_ssa_expr(
                 .map(|arg| eval_ssa_expr(function, arg, env))
                 .collect::<std::result::Result<Vec<_>, _>>()?;
             eval_builtin(function, *builtin, &args)?
+        }
+        SsaExpr::FreshArray { element_int, name } => {
+            if *element_int {
+                SymValue::ArrayInt(ArrayIntExpr::Var(name.clone()))
+            } else {
+                SymValue::ArrayStr(ArrayStrExpr::Var(name.clone()))
+            }
         }
     })
 }

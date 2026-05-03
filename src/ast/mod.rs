@@ -174,6 +174,10 @@ pub enum Stmt {
         array: String,
         value: Expr,
     },
+    ArrayInit {
+        name: String,
+        elements: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -466,6 +470,40 @@ fn type_check_stmts(
                         found: render_expr_type(expr_type),
                     });
                 }
+            }
+            Stmt::ArrayInit { name, elements } => {
+                // Infer type from first element, check all elements match
+                let first_type = infer_expr_type(function, &elements[0], &env, &assumptions, signatures)?;
+                let array_type = match first_type {
+                    ExprType::Int => Type::ArrayInt,
+                    ExprType::Str => Type::ArrayStr,
+                    _ => {
+                        return Err(TypeCheckError::TypeMismatch {
+                            function: function.to_string(),
+                            context: "array init element",
+                            expected: "Int or Str",
+                            found: render_expr_type(first_type),
+                        });
+                    }
+                };
+                for elem in &elements[1..] {
+                    let elem_type = infer_expr_type(function, elem, &env, &assumptions, signatures)?;
+                    if elem_type != first_type {
+                        return Err(TypeCheckError::TypeMismatch {
+                            function: function.to_string(),
+                            context: "array init element",
+                            expected: render_expr_type(first_type),
+                            found: render_expr_type(elem_type),
+                        });
+                    }
+                }
+                env.insert(
+                    name.clone(),
+                    VariableState {
+                        ty: Some(array_type),
+                        initialized: true,
+                    },
+                );
             }
             Stmt::LoopBoundExceeded => {}
             Stmt::Last => {}

@@ -80,6 +80,13 @@ pub enum SsaExpr {
         function: Builtin,
         args: Vec<SsaExpr>,
     },
+    /// A fresh unconstrained array, used as the base when declaring a local array.
+    FreshArray {
+        /// Whether elements are Int or Str.
+        element_int: bool,
+        /// The base name used to create the symbolic variable name.
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,6 +178,31 @@ pub fn build_cfg(function: &SsaFunction) -> ControlFlowGraph {
     }
     builder.lower_sequence(0, &function.body, &env);
     builder.finish()
+}
+
+/// Heuristic to determine whether an SSA expression represents an Int value.
+/// Used when creating a FreshArray to know whether the array is Array<Int> or Array<Str>.
+fn is_int_element(expr: &SsaExpr) -> bool {
+    match expr {
+        SsaExpr::Int(_) => true,
+        SsaExpr::String(_) => false,
+        SsaExpr::Bool(_) => true, // bools are represented as ints
+        SsaExpr::Unary { .. } | SsaExpr::Binary { .. } => true, // arithmetic produces ints
+        SsaExpr::Ite { then_expr, .. } => is_int_element(then_expr),
+        SsaExpr::Builtin { function, .. } => {
+            // Most builtins return Int, except string-producing ones
+            !matches!(function,
+                Builtin::Chr | Builtin::Chomp | Builtin::Reverse | Builtin::Replace | Builtin::CharAt
+            )
+        }
+        SsaExpr::Access { kind, .. } => {
+            // Array/hash access -- we don't know the element type, default to Int
+            matches!(kind, AccessKind::Array)
+        }
+        SsaExpr::Store { .. } => true,
+        SsaExpr::Var(_) => true, // assume Int by default for variables
+        SsaExpr::FreshArray { .. } => true,
+    }
 }
 
 fn base_name(ssa_name: &str) -> &str {
@@ -564,6 +596,50 @@ impl<'a> SsaBuilder<'a> {
                     };
                     lowered.push(SsaStmt::Assign(new_len_name.clone(), increment));
                     self.len_companions.insert(array.clone(), new_len_name);
+                }
+                crate::ast::Stmt::ArrayInit { name, elements } => {
+                    // Lower all element expressions first
+                    let mut element_exprs = Vec::new();
+                    for elem in elements {
+                        let mut prefix = Vec::new();
+                        let value_expr = self.rewrite_expr(elem, &mut env, &mut prefix)?;
+                        lowered.extend(prefix);
+                        element_exprs.push(value_expr);
+                    }
+
+                    // Determine element type from first element expression.
+                    let element_int = is_int_element(&element_exprs[0]);
+
+                    // Emit a FreshArray as the base, then build Store chain on top.
+                    let arr_name = self.fresh_name(name);
+                    env.insert(name.clone(), arr_name.clone());
+                    lowered.push(SsaStmt::Assign(arr_name.clone(), SsaExpr::FreshArray {
+                        element_int,
+                        name: arr_name.clone(),
+                    }));
+
+                    // Build stores iteratively: store element 0 at index 0, etc.
+                    for (i, value_expr) in element_exprs.into_iter().enumerate() {
+                        let collection_name = env
+                            .get(name)
+                            .cloned()
+                            .expect("array must be in env after init");
+                        let store = SsaExpr::Store {
+                            kind: AccessKind::Array,
+                            collection: Box::new(SsaExpr::Var(collection_name)),
+                            index: Box::new(SsaExpr::Int(i as i64)),
+                            value: Box::new(value_expr),
+                        };
+                        let new_arr_name = self.fresh_name(name);
+                        env.insert(name.clone(), new_arr_name.clone());
+                        lowered.push(SsaStmt::Assign(new_arr_name, store));
+                    }
+
+                    // Initialize the companion length variable to the number of elements
+                    let len_base = format!("{name}__len");
+                    let len_init_name = self.fresh_name(&len_base);
+                    lowered.push(SsaStmt::Assign(len_init_name.clone(), SsaExpr::Int(elements.len() as i64)));
+                    self.len_companions.insert(name.clone(), len_init_name);
                 }
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);

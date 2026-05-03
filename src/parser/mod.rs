@@ -92,6 +92,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::push_stmt
                     | Rule::inc_stmt
                     | Rule::dec_stmt
+                    | Rule::array_init_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -149,6 +150,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::push_stmt => vec![parse_push(pair)],
         Rule::inc_stmt => vec![parse_inc(pair)],
         Rule::dec_stmt => vec![parse_dec(pair)],
+        Rule::array_init_stmt => vec![parse_array_init(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -587,6 +589,24 @@ fn parse_push(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Push { array, value }
 }
 
+fn parse_array_init(pair: Pair<'_, Rule>) -> Stmt {
+    let mut name = None;
+    let mut elements = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::ident => name = Some(parse_bare_ident(inner)),
+            Rule::expr => elements.push(build_expr(inner).expect("validated array init expression")),
+            _ => {}
+        }
+    }
+
+    Stmt::ArrayInit {
+        name: name.expect("array init must have a name"),
+        elements,
+    }
+}
+
 fn parse_inc(pair: Pair<'_, Rule>) -> Stmt {
     let name = pair
         .into_inner()
@@ -649,6 +669,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::push_stmt
                     | Rule::inc_stmt
                     | Rule::dec_stmt
+                    | Rule::array_init_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
