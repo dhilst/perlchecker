@@ -275,12 +275,42 @@ fn parse_unless(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
 }
 
 fn parse_return(pair: Pair<'_, Rule>) -> Stmt {
-    let expr = pair
-        .into_inner()
-        .find(|inner| inner.as_rule() == Rule::expr)
-        .map(build_expr)
-        .expect("return must contain an expression")
+    let mut inner = pair.into_inner();
+    let expr = build_expr(inner.next().expect("return must contain an expression"))
         .expect("validated return expression");
+
+    // Check for statement modifier (return EXPR if/unless COND)
+    if let Some(modifier) = inner.next() {
+        match modifier.as_rule() {
+            Rule::return_if => {
+                let condition = build_expr(
+                    modifier.into_inner().next().expect("return_if must have a condition"),
+                )
+                .expect("validated return_if condition");
+                return Stmt::If {
+                    condition,
+                    then_branch: vec![Stmt::Return(expr)],
+                    else_branch: Vec::new(),
+                };
+            }
+            Rule::return_unless => {
+                let condition = build_expr(
+                    modifier.into_inner().next().expect("return_unless must have a condition"),
+                )
+                .expect("validated return_unless condition");
+                let negated = Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(condition),
+                };
+                return Stmt::If {
+                    condition: negated,
+                    then_branch: vec![Stmt::Return(expr)],
+                    else_branch: Vec::new(),
+                };
+            }
+            _ => {}
+        }
+    }
 
     Stmt::Return(expr)
 }

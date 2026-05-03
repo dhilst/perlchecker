@@ -26,7 +26,10 @@ for_stmt = { "for" ~ "(" ~ for_assign? ~ ";" ~ expr ~ ";" ~ for_assign? ~ ")" ~ 
 elsif_clause = { "elsif" ~ "(" ~ expr ~ ")" ~ block }
 else_clause = { "else" ~ block }
 block = { "{" ~ stmt* ~ "}" }
-return_stmt = { "return" ~ expr ~ ";" }
+return_stmt = { "return" ~ expr ~ return_modifier? ~ ";" }
+return_modifier = _{ return_if | return_unless }
+return_if = { "if" ~ "(" ~ expr ~ ")" }
+return_unless = { "unless" ~ "(" ~ expr ~ ")" }
 for_assign = { for_hash_assign | for_array_assign | for_scalar_assign }
 for_scalar_assign = { var ~ assign_op ~ expr }
 for_array_assign = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr }
