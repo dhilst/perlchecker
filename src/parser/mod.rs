@@ -76,6 +76,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::hash_assign_stmt
                     | Rule::declare_stmt
                     | Rule::if_stmt
+                    | Rule::unless_stmt
                     | Rule::return_stmt
             )
         })
@@ -116,6 +117,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::hash_assign_stmt => vec![parse_hash_assign(pair)],
         Rule::declare_stmt => vec![parse_declare(pair)],
         Rule::if_stmt => vec![parse_if(pair, max_loop_unroll)],
+        Rule::unless_stmt => vec![parse_unless(pair, max_loop_unroll)],
         Rule::while_stmt => parse_while(pair, max_loop_unroll),
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
@@ -231,6 +233,29 @@ fn parse_if(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
     }
 }
 
+fn parse_unless(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
+    let mut inner = pair.into_inner();
+    let condition = build_expr(inner.next().expect("unless must have a condition"))
+        .expect("validated unless condition expression");
+    let then_block = parse_block(inner.next().expect("unless must have a block"), max_loop_unroll);
+    let else_branch = inner
+        .find(|p| p.as_rule() == Rule::else_clause)
+        .map(|clause| parse_else_clause(clause, max_loop_unroll))
+        .unwrap_or_default();
+
+    // Desugar: unless (COND) { A } else { B } => if (!(COND)) { A } else { B }
+    let negated_condition = Expr::Unary {
+        op: UnaryOp::Not,
+        expr: Box::new(condition),
+    };
+
+    Stmt::If {
+        condition: negated_condition,
+        then_branch: then_block,
+        else_branch,
+    }
+}
+
 fn parse_return(pair: Pair<'_, Rule>) -> Stmt {
     let expr = pair
         .into_inner()
@@ -254,6 +279,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::hash_assign_stmt
                     | Rule::declare_stmt
                     | Rule::if_stmt
+                    | Rule::unless_stmt
                     | Rule::return_stmt
             )
         })
