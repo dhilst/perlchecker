@@ -171,6 +171,10 @@ pub enum SymExecError {
     PathLimitExceeded { function: String, max_paths: usize },
     #[error("function `{function}` exceeded the loop unroll bound on a feasible path")]
     LoopBoundExceeded { function: String },
+    #[error("function `{function}`: loop invariant does not hold on entry")]
+    InvariantInitFailed { function: String },
+    #[error("function `{function}`: loop invariant is not preserved by one iteration")]
+    InvariantPreservationFailed { function: String },
     #[error("function `{function}` can reach a `die` statement on a feasible path")]
     DieReached { function: String },
     #[error("function `{function}` has no valid execution paths after discarding invalid arithmetic paths")]
@@ -395,6 +399,20 @@ fn execute_cfg_from_state(
                     }
                 }
                 Terminator::Unreachable => {}
+                Terminator::InvariantInitFailed => {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
+                        return Err(SymExecError::InvariantInitFailed {
+                            function: cfg.name.clone(),
+                        });
+                    }
+                }
+                Terminator::InvariantPreservationFailed => {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
+                        return Err(SymExecError::InvariantPreservationFailed {
+                            function: cfg.name.clone(),
+                        });
+                    }
+                }
             }
         }
     }
@@ -804,6 +822,11 @@ fn eval_ssa_expr(
                 .map(|arg| eval_ssa_expr(function, arg, env))
                 .collect::<std::result::Result<Vec<_>, _>>()?;
             eval_builtin(function, *builtin, &args)?
+        }
+        SsaExpr::FreshVar(name) => {
+            // Create a fresh unconstrained symbolic integer variable.
+            // Used for loop invariant induction variables.
+            SymValue::Int(IntExpr::Var(name.clone()))
         }
         SsaExpr::FreshArray { element_int, name } => {
             if *element_int {

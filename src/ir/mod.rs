@@ -35,6 +35,12 @@ pub enum SsaStmt {
     Return(SsaExpr),
     LoopBoundExceeded,
     Die,
+    /// Silently prune this path (used for loop invariant exit assumptions).
+    Unreachable,
+    /// Loop invariant initialization check failed.
+    InvariantInitFailed,
+    /// Loop invariant preservation check failed.
+    InvariantPreservationFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,6 +86,8 @@ pub enum SsaExpr {
         function: Builtin,
         args: Vec<SsaExpr>,
     },
+    /// A fresh unconstrained scalar variable, used for loop invariant induction.
+    FreshVar(String),
     /// A fresh unconstrained array, used as the base when declaring a local array.
     FreshArray {
         /// Whether elements are Int or Str.
@@ -136,6 +144,8 @@ pub enum Terminator {
     LoopBoundExceeded,
     Die,
     Unreachable,
+    InvariantInitFailed,
+    InvariantPreservationFailed,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -201,6 +211,7 @@ fn is_int_element(expr: &SsaExpr) -> bool {
         }
         SsaExpr::Store { .. } => true,
         SsaExpr::Var(_) => true, // assume Int by default for variables
+        SsaExpr::FreshVar(_) => true,
         SsaExpr::FreshArray { .. } => true,
     }
 }
@@ -648,8 +659,159 @@ impl<'a> SsaBuilder<'a> {
                     has_last,
                     has_next,
                     max_unroll,
+                    invariant,
                 } => {
-                    if *has_last || *has_next {
+                    if let Some(inv_expr) = invariant {
+                        // Inductive verification using loop invariant.
+                        // Desugar into SSA statements that the existing symexec can handle:
+                        //
+                        // 1. Init check: if (¬invariant) { InvariantInitFailed }
+                        // 2. Preservation: create fresh vars, assume inv∧cond,
+                        //    execute body, check if (¬invariant_after) { InvariantPreservationFailed }
+                        // 3. Post-loop: create fresh vars, assume inv∧¬cond, continue
+
+                        let full_body: Vec<crate::ast::Stmt> = if !step.is_empty() {
+                            let mut b = loop_body.clone();
+                            b.extend(step.clone());
+                            b
+                        } else {
+                            loop_body.clone()
+                        };
+
+                        // --- Step 1: Init check ---
+                        // Evaluate the invariant in the current env
+                        let mut prefix = Vec::new();
+                        let inv_ssa = self.rewrite_expr(inv_expr, &mut env, &mut prefix)?;
+                        lowered.extend(prefix);
+                        // Negate it: if (¬inv) { InvariantInitFailed }
+                        let neg_inv = SsaExpr::Unary {
+                            op: UnaryOp::Not,
+                            expr: Box::new(inv_ssa),
+                        };
+                        lowered.push(SsaStmt::If {
+                            condition: neg_inv,
+                            then_branch: vec![SsaStmt::InvariantInitFailed],
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+
+                        // --- Step 2: Preservation check ---
+                        // Create fresh symbolic variables for all variables in scope,
+                        // representing an arbitrary state where the invariant holds.
+                        let pre_body_env = env.clone();
+                        let mut fresh_env = env.clone();
+                        for (perl_name, _ssa_name) in &pre_body_env {
+                            let fresh_ssa = self.fresh_name(perl_name);
+                            fresh_env.insert(perl_name.clone(), fresh_ssa.clone());
+                            // Emit an assignment to a fresh unconstrained symbolic variable.
+                            lowered.push(SsaStmt::Assign(fresh_ssa.clone(), SsaExpr::FreshVar(fresh_ssa)));
+                        }
+
+                        // Evaluate invariant and condition in the fresh env
+                        let mut prefix2 = Vec::new();
+                        let fresh_inv = self.rewrite_expr(inv_expr, &mut fresh_env, &mut prefix2)?;
+                        let fresh_cond = self.rewrite_expr(condition, &mut fresh_env, &mut prefix2)?;
+
+                        // Execute the body in the fresh env
+                        let (body_ssa, body_env) = self.lower_stmts(&full_body, &fresh_env)?;
+
+                        // Evaluate the invariant in the post-body env
+                        let mut body_env_for_inv = body_env.clone();
+                        let mut prefix3 = Vec::new();
+                        let post_inv = self.rewrite_expr(inv_expr, &mut body_env_for_inv, &mut prefix3)?;
+
+                        // Build preservation check:
+                        // if (inv ∧ cond) { BODY; prefix3; if (¬post_inv) { InvariantPreservationFailed } }
+                        let preservation_cond = SsaExpr::Binary {
+                            left: Box::new(fresh_inv),
+                            op: BinaryOp::And,
+                            right: Box::new(fresh_cond),
+                        };
+
+                        let mut preservation_body = Vec::new();
+                        preservation_body.extend(prefix2);
+                        preservation_body.extend(body_ssa);
+                        preservation_body.extend(prefix3);
+                        let neg_post_inv = SsaExpr::Unary {
+                            op: UnaryOp::Not,
+                            expr: Box::new(post_inv),
+                        };
+                        preservation_body.push(SsaStmt::If {
+                            condition: neg_post_inv,
+                            then_branch: vec![SsaStmt::InvariantPreservationFailed],
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+
+                        lowered.push(SsaStmt::If {
+                            condition: preservation_cond,
+                            then_branch: preservation_body,
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+
+                        // Determine which variables are modified by the loop body
+                        // by comparing pre-body and post-body SSA names.
+                        let modified_vars: std::collections::BTreeSet<String> = fresh_env
+                            .iter()
+                            .filter(|(perl_name, pre_ssa)| {
+                                body_env.get(*perl_name).map_or(false, |post_ssa| post_ssa != *pre_ssa)
+                            })
+                            .map(|(perl_name, _)| perl_name.clone())
+                            .collect();
+
+                        // --- Step 3: Post-loop ---
+                        // Create fresh variables only for modified variables,
+                        // representing the state at loop exit where inv∧¬cond holds.
+                        // Unmodified variables (like parameters) keep their original SSA name.
+                        let mut exit_env = env.clone();
+                        for (perl_name, _ssa_name) in &pre_body_env {
+                            if modified_vars.contains(perl_name) {
+                                let exit_ssa = self.fresh_name(perl_name);
+                                exit_env.insert(perl_name.clone(), exit_ssa.clone());
+                                lowered.push(SsaStmt::Assign(exit_ssa.clone(), SsaExpr::FreshVar(exit_ssa)));
+                            }
+                            // Unmodified variables keep their pre-loop SSA name
+                        }
+
+                        // Evaluate invariant and condition in the exit env
+                        let mut prefix4 = Vec::new();
+                        let exit_inv = self.rewrite_expr(inv_expr, &mut exit_env, &mut prefix4)?;
+                        let exit_cond = self.rewrite_expr(condition, &mut exit_env, &mut prefix4)?;
+                        lowered.extend(prefix4);
+
+                        // Assert inv∧¬cond by adding: if (¬(inv∧¬cond)) { Unreachable/skip }
+                        // Actually, we assume it. In the SSA framework, we can add an If
+                        // that guards the rest of execution: the symexec will only proceed
+                        // along the path where inv∧¬cond holds because we emit a branch.
+                        //
+                        // Simpler approach: the "exit assumption" becomes a condition on
+                        // an If that wraps everything after the loop. But that's complex.
+                        //
+                        // Simplest approach: emit the exit_inv and exit_cond as assertions
+                        // that the symexec will add to the path condition. We do this by
+                        // emitting: if (¬inv) { Unreachable } and if (cond) { Unreachable }
+                        // These prune paths where the exit assumptions don't hold.
+                        let neg_exit_inv = SsaExpr::Unary {
+                            op: UnaryOp::Not,
+                            expr: Box::new(exit_inv),
+                        };
+                        lowered.push(SsaStmt::If {
+                            condition: neg_exit_inv,
+                            then_branch: vec![SsaStmt::Unreachable],
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+                        // Also assume ¬condition at exit
+                        lowered.push(SsaStmt::If {
+                            condition: exit_cond,
+                            then_branch: vec![SsaStmt::Unreachable],
+                            else_branch: Vec::new(),
+                            merges: Vec::new(),
+                        });
+
+                        env = exit_env;
+                    } else if *has_last || *has_next {
                         // Loops with `last` or `next` use the AST-level unrolling
                         // which handles flag-based desugaring correctly.
                         let unrolled = if !step.is_empty() && *has_next {
@@ -844,6 +1006,10 @@ impl<'a> CfgBuilder<'a> {
                     self.blocks[current].terminator = Terminator::Die;
                     return BlockExit::terminated(env);
                 }
+                SsaStmt::Unreachable => {
+                    self.blocks[current].terminator = Terminator::Unreachable;
+                    return BlockExit::terminated(env);
+                }
                 SsaStmt::If {
                     condition,
                     then_branch,
@@ -899,6 +1065,14 @@ impl<'a> CfgBuilder<'a> {
                     }
 
                     return self.lower_sequence(join_block, rest, &env);
+                }
+                SsaStmt::InvariantInitFailed => {
+                    self.blocks[current].terminator = Terminator::InvariantInitFailed;
+                    return BlockExit::terminated(env);
+                }
+                SsaStmt::InvariantPreservationFailed => {
+                    self.blocks[current].terminator = Terminator::InvariantPreservationFailed;
+                    return BlockExit::terminated(env);
                 }
             }
         }
@@ -994,6 +1168,9 @@ mod tests {
                     super::SsaStmt::Return(_) => {}
                     super::SsaStmt::LoopBoundExceeded => {}
                     super::SsaStmt::Die => {}
+                    super::SsaStmt::Unreachable => {}
+                    super::SsaStmt::InvariantInitFailed => {}
+                    super::SsaStmt::InvariantPreservationFailed => {}
                 }
             }
         }

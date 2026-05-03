@@ -45,6 +45,10 @@ pub fn parse_function_ast_with_limits(
     function: &ExtractedFunction,
     max_loop_unroll: usize,
 ) -> std::result::Result<FunctionAst, ParseError> {
+    // Extract # inv: annotations from the body text before PEG parsing.
+    // These are collected in order and later attached to While nodes.
+    let invariants = extract_invariant_annotations(&function.name, &function.body)?;
+
     let mut pairs =
         PerlSubsetParser::parse(Rule::function_body, &function.body).map_err(|error| {
             let ((line, column), message) = render_body_error(error);
@@ -96,7 +100,10 @@ pub fn parse_function_ast_with_limits(
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Attach invariant annotations to While nodes in order of appearance.
+    let stmts = attach_invariants(stmts, &invariants);
 
     let ast = FunctionAst {
         name: function.name.clone(),
@@ -109,6 +116,80 @@ pub fn parse_function_ast_with_limits(
         "parsed function AST"
     );
     Ok(ast)
+}
+
+/// Extract `# inv:` annotations from the function body text.
+/// Returns the parsed invariant expressions in the order they appear.
+fn extract_invariant_annotations(
+    function: &str,
+    body: &str,
+) -> std::result::Result<Vec<Expr>, ParseError> {
+    let mut invariants = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("# inv:") {
+            let expr = parse_expr(rest.trim()).map_err(|_| ParseError::InvalidSyntax {
+                function: function.to_string(),
+                line: 0,
+                column: 0,
+                message: format!("invalid invariant expression: {}", rest.trim()),
+            })?;
+            invariants.push(expr);
+        }
+    }
+    Ok(invariants)
+}
+
+/// Walk the statement tree and attach invariant expressions to While nodes
+/// in the order they appear. Uses a counter to track which invariant to assign next.
+fn attach_invariants(stmts: Vec<Stmt>, invariants: &[Expr]) -> Vec<Stmt> {
+    let mut counter = 0;
+    attach_invariants_inner(stmts, invariants, &mut counter)
+}
+
+fn attach_invariants_inner(stmts: Vec<Stmt>, invariants: &[Expr], counter: &mut usize) -> Vec<Stmt> {
+    stmts
+        .into_iter()
+        .map(|stmt| match stmt {
+            Stmt::While {
+                condition,
+                body,
+                step,
+                has_last,
+                has_next,
+                max_unroll,
+                invariant: _,
+            } => {
+                let body = attach_invariants_inner(body, invariants, counter);
+                let inv = if *counter < invariants.len() {
+                    let expr = invariants[*counter].clone();
+                    *counter += 1;
+                    Some(expr)
+                } else {
+                    None
+                };
+                Stmt::While {
+                    condition,
+                    body,
+                    step,
+                    has_last,
+                    has_next,
+                    max_unroll,
+                    invariant: inv,
+                }
+            }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => Stmt::If {
+                condition,
+                then_branch: attach_invariants_inner(then_branch, invariants, counter),
+                else_branch: attach_invariants_inner(else_branch, invariants, counter),
+            },
+            other => other,
+        })
+        .collect()
 }
 
 fn parse_parameter_binding(pair: Pair<'_, Rule>) -> Vec<String> {
@@ -765,6 +846,7 @@ fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                 has_last: false,
                 has_next: false,
                 max_unroll: max_loop_unroll - 1,
+                invariant: None,
             });
         }
         result
@@ -863,6 +945,7 @@ fn parse_do_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                 has_last: false,
                 has_next: false,
                 max_unroll: max_loop_unroll - 1,
+                invariant: None,
             });
         }
         result
@@ -876,7 +959,7 @@ fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let body = parse_block(inner.next().expect("while must have a body"), max_loop_unroll);
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
-    vec![Stmt::While { condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll }]
+    vec![Stmt::While { condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll, invariant: None }]
 }
 
 fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
@@ -892,7 +975,7 @@ fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     };
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
-    vec![Stmt::While { condition: negated_condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll }]
+    vec![Stmt::While { condition: negated_condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll, invariant: None }]
 }
 
 fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
@@ -916,7 +999,7 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
 
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
-    init.push(Stmt::While { condition, body, step, has_last, has_next, max_unroll: max_loop_unroll });
+    init.push(Stmt::While { condition, body, step, has_last, has_next, max_unroll: max_loop_unroll, invariant: None });
     init
 }
 
@@ -996,6 +1079,7 @@ fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         has_last,
         has_next,
         max_unroll: max_loop_unroll,
+        invariant: None,
     });
     result
 }

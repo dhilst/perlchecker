@@ -997,3 +997,55 @@ sub double_reverse_identity {
     assert!(stdout.contains("✔ reverse_preserves_length: verified"));
     assert!(stdout.contains("✔ double_reverse_identity: verified"));
 }
+
+#[test]
+fn check_loop_invariant_annotations() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("invariant.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $n >= 0 && $n <= 100
+# post: $result == $n * 5
+sub multiply_by_five {
+    my ($n) = @_;
+    my $sum = 0;
+    my $i = 0;
+    # inv: $sum == $i * 5 && $i >= 0 && $i <= $n
+    while ($i < $n) {
+        $sum = $sum + 5;
+        $i = $i + 1;
+    }
+    return $sum;
+}
+
+# sig: (Int) -> Int
+# pre: $n >= 1 && $n <= 50
+# post: $result >= $n
+sub accumulate {
+    my ($n) = @_;
+    my $result = 0;
+    my $i = 0;
+    # inv: $result == $i * 3 && $i >= 0 && $i <= $n
+    while ($i < $n) {
+        $result = $result + 3;
+        $i = $i + 1;
+    }
+    return $result;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ multiply_by_five: verified"));
+    assert!(stdout.contains("✔ accumulate: verified"));
+}

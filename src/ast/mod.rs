@@ -188,6 +188,9 @@ pub enum Stmt {
         has_last: bool,
         has_next: bool,
         max_unroll: usize,
+        /// Optional loop invariant from `# inv:` annotation.
+        /// When present, the loop is verified inductively instead of unrolled.
+        invariant: Option<Expr>,
     },
 }
 

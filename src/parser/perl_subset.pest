@@ -1,4 +1,5 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
 
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
