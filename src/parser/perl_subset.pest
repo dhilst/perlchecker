@@ -104,7 +104,7 @@ op_low_and = { "and" }
 op_low_or = { "or" }
 op_low_not = { "not" }
 
-int = @{ "0x" ~ ASCII_HEX_DIGIT+ | ASCII_DIGIT+ }
+int = @{ "0x" ~ ASCII_HEX_DIGIT+ | "0o" ~ ASCII_OCT_DIGIT+ | "0b" ~ ("0" | "1")+ | ASCII_DIGIT+ }
 string = @{ "\"" ~ ( "\\\"" | "\\\\" | "\\n" | "\\t" | !("\"" | NEWLINE) ~ ANY )* ~ "\"" }
 var = @{ "$" ~ ident }
 bare_ident = @{ ident }
