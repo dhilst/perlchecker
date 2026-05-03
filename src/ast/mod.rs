@@ -615,7 +615,7 @@ fn type_check_stmts(
                 let mut else_assumptions = assumptions.clone();
                 else_assumptions.extend(collect_false_assumptions(condition));
 
-                let (then_env, then_assumptions, _) =
+                let (then_env, then_assumptions, then_aliases) =
                     type_check_stmts(
                         function,
                         then_branch,
@@ -625,10 +625,10 @@ fn type_check_stmts(
                         signatures,
                         &alias_map,
                     )?;
-                let (else_env, else_assumptions) = if else_branch.is_empty() {
-                    (env.clone(), else_assumptions)
+                let (else_env, else_assumptions, else_aliases) = if else_branch.is_empty() {
+                    (env.clone(), else_assumptions, alias_map.clone())
                 } else {
-                    let (e, a, _) = type_check_stmts(
+                    let (e, a, am) = type_check_stmts(
                         function,
                         else_branch,
                         &env,
@@ -637,10 +637,14 @@ fn type_check_stmts(
                         signatures,
                         &alias_map,
                     )?;
-                    (e, a)
+                    (e, a, am)
                 };
                 env = merge_branch_envs(function, &env, &then_env, &else_env)?;
                 assumptions = intersect_assumptions(&then_assumptions, &else_assumptions);
+                // Merge alias maps: keep aliases present in both branches with same target
+                alias_map = then_aliases.into_iter()
+                    .filter(|(k, v)| else_aliases.get(k) == Some(v))
+                    .collect();
             }
             Stmt::Return(expr) => {
                 expect_expr_type(
