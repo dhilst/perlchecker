@@ -202,6 +202,16 @@ fn encode_int(expr: &IntExpr) -> Int {
             let r_bv = BV::from_int(&encode_int(right), 32);
             l_bv.bvxor(&r_bv).to_int(false)
         }
+        IntExpr::Shl(left, right) => {
+            let l_bv = BV::from_int(&encode_int(left), 32);
+            let r_bv = BV::from_int(&encode_int(right), 32);
+            l_bv.bvshl(&r_bv).to_int(false)
+        }
+        IntExpr::Shr(left, right) => {
+            let l_bv = BV::from_int(&encode_int(left), 32);
+            let r_bv = BV::from_int(&encode_int(right), 32);
+            l_bv.bvashr(&r_bv).to_int(false)
+        }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
             let is_nonnegative = encoded.ge(&Int::from_i64(0));
@@ -396,7 +406,9 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
-        | IntExpr::BitXor(left, right) => {
+        | IntExpr::BitXor(left, right)
+        | IntExpr::Shl(left, right)
+        | IntExpr::Shr(left, right) => {
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
         }
         IntExpr::Div(left, right) | IntExpr::Mod(left, right) => Bool::and(&[
@@ -536,7 +548,9 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
-        | IntExpr::BitXor(left, right) => {
+        | IntExpr::BitXor(left, right)
+        | IntExpr::Shl(left, right)
+        | IntExpr::Shr(left, right) => {
             collect_string_vars_from_int(left, vars);
             collect_string_vars_from_int(right, vars);
         }
