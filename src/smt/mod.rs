@@ -7,7 +7,7 @@ use z3::{
     Params,
     Sort,
     Solver,
-    ast::{Ast as _, Array, Bool, Int, String as Z3String},
+    ast::{Ast as _, Array, BV, Bool, Int, String as Z3String},
 };
 
 use crate::{
@@ -184,6 +184,21 @@ fn encode_int(expr: &IntExpr) -> Int {
             encode_truncating_division(&encode_int(left), &encode_int(right))
         }
         IntExpr::Mod(left, right) => encode_int(left).rem(&encode_int(right)),
+        IntExpr::BitAnd(left, right) => {
+            let l_bv = BV::from_int(&encode_int(left), 32);
+            let r_bv = BV::from_int(&encode_int(right), 32);
+            l_bv.bvand(&r_bv).to_int(false)
+        }
+        IntExpr::BitOr(left, right) => {
+            let l_bv = BV::from_int(&encode_int(left), 32);
+            let r_bv = BV::from_int(&encode_int(right), 32);
+            l_bv.bvor(&r_bv).to_int(false)
+        }
+        IntExpr::BitXor(left, right) => {
+            let l_bv = BV::from_int(&encode_int(left), 32);
+            let r_bv = BV::from_int(&encode_int(right), 32);
+            l_bv.bvxor(&r_bv).to_int(false)
+        }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
             let is_nonnegative = encoded.ge(&Int::from_i64(0));
@@ -374,7 +389,10 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Const(_) | IntExpr::Var(_) => Bool::from_bool(true),
         IntExpr::Add(left, right)
         | IntExpr::Sub(left, right)
-        | IntExpr::Mul(left, right) => {
+        | IntExpr::Mul(left, right)
+        | IntExpr::BitAnd(left, right)
+        | IntExpr::BitOr(left, right)
+        | IntExpr::BitXor(left, right) => {
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
         }
         IntExpr::Div(left, right) | IntExpr::Mod(left, right) => Bool::and(&[
@@ -510,7 +528,10 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         | IntExpr::Sub(left, right)
         | IntExpr::Mul(left, right)
         | IntExpr::Div(left, right)
-        | IntExpr::Mod(left, right) => {
+        | IntExpr::Mod(left, right)
+        | IntExpr::BitAnd(left, right)
+        | IntExpr::BitOr(left, right)
+        | IntExpr::BitXor(left, right) => {
             collect_string_vars_from_int(left, vars);
             collect_string_vars_from_int(right, vars);
         }

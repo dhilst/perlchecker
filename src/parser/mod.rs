@@ -1153,6 +1153,18 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::op_and,
             pest::pratt_parser::Assoc::Left,
         ))
+        .op(pest::pratt_parser::Op::infix(
+            Rule::op_bitor,
+            pest::pratt_parser::Assoc::Left,
+        ))
+        .op(pest::pratt_parser::Op::infix(
+            Rule::op_bitxor,
+            pest::pratt_parser::Assoc::Left,
+        ))
+        .op(pest::pratt_parser::Op::infix(
+            Rule::op_bitand,
+            pest::pratt_parser::Assoc::Left,
+        ))
         .op(
             pest::pratt_parser::Op::infix(Rule::op_eq, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_ne, pest::pratt_parser::Assoc::Left)
@@ -1236,6 +1248,9 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                     Rule::op_sge => BinaryOp::StrGe,
                     Rule::op_and => BinaryOp::And,
                     Rule::op_or => BinaryOp::Or,
+                    Rule::op_bitand => BinaryOp::BitAnd,
+                    Rule::op_bitor => BinaryOp::BitOr,
+                    Rule::op_bitxor => BinaryOp::BitXor,
                     other => return Err(format!("unexpected infix operator: {other:?}")),
                 },
                 right: Box::new(rhs?),

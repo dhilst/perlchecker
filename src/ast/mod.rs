@@ -110,6 +110,9 @@ pub enum BinaryOp {
     StrGe,
     And,
     Or,
+    BitAnd,
+    BitOr,
+    BitXor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -599,7 +602,8 @@ fn infer_expr_type(
             }
         },
         Expr::Binary { left, op, right } => match op {
-            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod
+            | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
                 expect_expr_type(
                     function,
                     "arithmetic operand",
@@ -1155,7 +1159,10 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         | BinaryOp::Mod
         | BinaryOp::Concat
         | BinaryOp::And
-        | BinaryOp::Or => return None,
+        | BinaryOp::Or
+        | BinaryOp::BitAnd
+        | BinaryOp::BitOr
+        | BinaryOp::BitXor => return None,
     };
     Some(Expr::Binary {
         left: Box::new(left.clone()),
