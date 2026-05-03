@@ -1203,6 +1203,10 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                 | pest::pratt_parser::Op::infix(Rule::op_div, pest::pratt_parser::Assoc::Left)
                 | pest::pratt_parser::Op::infix(Rule::op_mod, pest::pratt_parser::Assoc::Left),
         )
+        .op(pest::pratt_parser::Op::infix(
+            Rule::op_pow,
+            pest::pratt_parser::Assoc::Right,
+        ))
         .op(pest::pratt_parser::Op::prefix(Rule::op_not)
             | pest::pratt_parser::Op::prefix(Rule::op_neg))
         .map_primary(|primary| match primary.as_rule() {
@@ -1247,6 +1251,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                     Rule::op_mul => BinaryOp::Mul,
                     Rule::op_div => BinaryOp::Div,
                     Rule::op_mod => BinaryOp::Mod,
+                    Rule::op_pow => BinaryOp::Pow,
                     Rule::op_concat => BinaryOp::Concat,
                     Rule::op_lt => BinaryOp::Lt,
                     Rule::op_le => BinaryOp::Le,

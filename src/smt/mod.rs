@@ -180,6 +180,9 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::Add(left, right) => Int::add(&[&encode_int(left), &encode_int(right)]),
         IntExpr::Sub(left, right) => Int::sub(&[&encode_int(left), &encode_int(right)]),
         IntExpr::Mul(left, right) => Int::mul(&[&encode_int(left), &encode_int(right)]),
+        IntExpr::Pow(left, right) => {
+            encode_int(left).power(&encode_int(right)).to_int()
+        }
         IntExpr::Div(left, right) => {
             encode_truncating_division(&encode_int(left), &encode_int(right))
         }
@@ -390,6 +393,7 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Add(left, right)
         | IntExpr::Sub(left, right)
         | IntExpr::Mul(left, right)
+        | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {
@@ -529,6 +533,7 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         | IntExpr::Mul(left, right)
         | IntExpr::Div(left, right)
         | IntExpr::Mod(left, right)
+        | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {

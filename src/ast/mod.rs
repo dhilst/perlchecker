@@ -95,6 +95,7 @@ pub enum BinaryOp {
     Mul,
     Div,
     Mod,
+    Pow,
     Concat,
     Lt,
     Le,
@@ -605,7 +606,7 @@ fn infer_expr_type(
         },
         Expr::Binary { left, op, right } => match op {
             BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod
-            | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
+            | BinaryOp::Pow | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
                 expect_expr_type(
                     function,
                     "arithmetic operand",
@@ -1159,6 +1160,7 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         | BinaryOp::Mul
         | BinaryOp::Div
         | BinaryOp::Mod
+        | BinaryOp::Pow
         | BinaryOp::Concat
         | BinaryOp::And
         | BinaryOp::Or

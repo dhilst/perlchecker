@@ -35,7 +35,7 @@ ternary_expr = { simple_expr ~ ("?" ~ simple_expr ~ ":" ~ ternary_expr)? }
 simple_expr = { prefix_op* ~ atom ~ (infix_op ~ prefix_op* ~ atom)* }
 atom = _{ scalar_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | call_expr | hash_access | array_access | string | int | var | "(" ~ expr ~ ")" }
 prefix_op = _{ op_not | op_neg }
-infix_op = _{ op_or | op_and | op_seq | op_sne | op_slt | op_sgt | op_sle | op_sge | op_eq | op_ne | op_le | op_lt | op_ge | op_gt | op_bitor | op_bitand | op_bitxor | op_concat | op_add | op_sub | op_mul | op_div | op_mod }
+infix_op = _{ op_or | op_and | op_seq | op_sne | op_slt | op_sgt | op_sle | op_sge | op_eq | op_ne | op_le | op_lt | op_ge | op_gt | op_bitor | op_bitand | op_bitxor | op_concat | op_add | op_sub | op_pow | op_mul | op_div | op_mod }
 
 scalar_call = { "scalar" ~ "(" ~ "@" ~ ident ~ ")" }
 length_call = { "length" ~ "(" ~ expr ~ ")" }
@@ -67,6 +67,7 @@ op_gt = { ">" }
 op_concat = { "." }
 op_add = { "+" }
 op_sub = { "-" }
+op_pow = { "**" }
 op_mul = { "*" }
 op_div = { "/" }
 op_mod = { "%" }

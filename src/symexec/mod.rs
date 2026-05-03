@@ -22,6 +22,7 @@ pub enum IntExpr {
     Mul(Box<IntExpr>, Box<IntExpr>),
     Div(Box<IntExpr>, Box<IntExpr>),
     Mod(Box<IntExpr>, Box<IntExpr>),
+    Pow(Box<IntExpr>, Box<IntExpr>),
     BitAnd(Box<IntExpr>, Box<IntExpr>),
     BitOr(Box<IntExpr>, Box<IntExpr>),
     BitXor(Box<IntExpr>, Box<IntExpr>),
@@ -893,6 +894,10 @@ fn eval_binary(
             Box::new(expect_int(right, function)?),
         )),
         crate::ast::BinaryOp::Mod => SymValue::Int(IntExpr::Mod(
+            Box::new(expect_int(left, function)?),
+            Box::new(expect_int(right, function)?),
+        )),
+        crate::ast::BinaryOp::Pow => SymValue::Int(IntExpr::Pow(
             Box::new(expect_int(left, function)?),
             Box::new(expect_int(right, function)?),
         )),
