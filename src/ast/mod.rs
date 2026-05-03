@@ -80,6 +80,9 @@ pub enum Expr {
         function: Builtin,
         args: Vec<Expr>,
     },
+    Pop {
+        array: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -545,6 +548,7 @@ fn references_variable(expr: &Expr, name: &str) -> bool {
         } => collection == name || references_variable(index, name),
         Expr::Call { args, .. } => args.iter().any(|arg| references_variable(arg, name)),
         Expr::Builtin { args, .. } => args.iter().any(|arg| references_variable(arg, name)),
+        Expr::Pop { array } => array == name,
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) => false,
     }
 }
@@ -1086,6 +1090,9 @@ fn infer_expr_type(
                 });
             }
             Ok(then_type)
+        }
+        Expr::Pop { array } => {
+            collection_element_type(function, env, array, AccessKind::Array)
         }
     }
 }

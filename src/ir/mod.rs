@@ -326,6 +326,48 @@ impl<'a> SsaBuilder<'a> {
                         .collect::<std::result::Result<Vec<_>, _>>()?,
                 }
             }
+            Expr::Pop { array } => {
+                let collection_name = env
+                    .get(array)
+                    .cloned()
+                    .ok_or_else(|| IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: array.clone(),
+                    })?;
+
+                // Get or initialize the length companion variable
+                let len_base = format!("{array}__len");
+                let len_ssa = if let Some(existing) = self.len_companions.get(array) {
+                    existing.clone()
+                } else {
+                    // First pop for this array: initialize len from Scalar builtin
+                    let init_name = self.fresh_name(&len_base);
+                    let scalar_expr = SsaExpr::Builtin {
+                        function: crate::ast::Builtin::Scalar,
+                        args: vec![SsaExpr::Var(collection_name.clone())],
+                    };
+                    prefix.push(SsaStmt::Assign(init_name.clone(), scalar_expr));
+                    self.len_companions.insert(array.clone(), init_name.clone());
+                    init_name
+                };
+
+                // Emit: new_len = old_len - 1
+                let new_len_name = self.fresh_name(&len_base);
+                let decrement = SsaExpr::Binary {
+                    left: Box::new(SsaExpr::Var(len_ssa)),
+                    op: BinaryOp::Sub,
+                    right: Box::new(SsaExpr::Int(1)),
+                };
+                prefix.push(SsaStmt::Assign(new_len_name.clone(), decrement));
+                self.len_companions.insert(array.clone(), new_len_name.clone());
+
+                // The popped value is at index new_len (i.e., the last element)
+                SsaExpr::Access {
+                    kind: AccessKind::Array,
+                    collection: Box::new(SsaExpr::Var(collection_name)),
+                    index: Box::new(SsaExpr::Var(new_len_name)),
+                }
+            }
         })
     }
 

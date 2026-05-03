@@ -572,6 +572,7 @@ fn collect_calls_from_expr(expr: &Expr, calls: &mut Vec<String>) {
                 collect_calls_from_expr(arg, calls);
             }
         }
+        Expr::Pop { .. } => {}
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) | Expr::Variable(_) => {}
     }
 }
@@ -866,7 +867,7 @@ fn eval_expr(
                 })?,
             eval_expr(function, index, env)?,
         )?,
-        Expr::Call { .. } => {
+        Expr::Call { .. } | Expr::Pop { .. } => {
             return Err(SymExecError::TypeMismatch {
                 function: function.to_string(),
             });

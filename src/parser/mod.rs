@@ -1316,6 +1316,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::call_expr => parse_call_expr(primary),
             Rule::expr => build_expr(primary),
             Rule::scalar_call => parse_scalar_call(primary),
+            Rule::pop_call => parse_pop_call(primary),
             Rule::length_call => parse_builtin_call(primary, Builtin::Length),
             Rule::substr_call => parse_builtin_call(primary, Builtin::Substr),
             Rule::index_call => parse_builtin_call(primary, Builtin::Index),
@@ -1387,6 +1388,15 @@ fn parse_scalar_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
         function: Builtin::Scalar,
         args: vec![Expr::Variable(name)],
     })
+}
+
+fn parse_pop_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let ident = inner
+        .next()
+        .ok_or_else(|| "pop call must have an identifier".to_string())?;
+    let name = parse_bare_ident(ident);
+    Ok(Expr::Pop { array: name })
 }
 
 fn parse_builtin_call(
