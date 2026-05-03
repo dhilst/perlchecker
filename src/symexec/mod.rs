@@ -638,6 +638,9 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
                 collect_calls_from_stmts(body, calls);
                 collect_calls_from_stmts(step, calls);
             }
+            crate::ast::Stmt::DerefAssign { expr, .. } => {
+                collect_calls_from_expr(expr, calls);
+            }
         }
     }
 }
@@ -668,6 +671,7 @@ fn collect_calls_from_expr(expr: &Expr, calls: &mut Vec<String>) {
         }
         Expr::Pop { .. } => {}
         Expr::Exists { key, .. } => collect_calls_from_expr(key, calls),
+        Expr::Ref(_) | Expr::Deref(_) => {}
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) | Expr::Variable(_) => {}
     }
 }
@@ -862,6 +866,8 @@ fn symbolic_value(name: &str, ty: Type) -> SymValue {
         Type::ArrayStr => SymValue::ArrayStr(ArrayStrExpr::Var(name.to_string())),
         Type::HashInt => SymValue::HashInt(HashIntExpr::Var(name.to_string())),
         Type::HashStr => SymValue::HashStr(HashStrExpr::Var(name.to_string())),
+        // References are desugared before symbolic execution; these should never appear.
+        Type::RefInt | Type::RefStr => SymValue::Int(IntExpr::Const(0)),
     }
 }
 
@@ -1070,7 +1076,7 @@ fn eval_expr(
                 })?,
             eval_expr(function, index, env)?,
         )?,
-        Expr::Call { .. } | Expr::Pop { .. } | Expr::Exists { .. } => {
+        Expr::Call { .. } | Expr::Pop { .. } | Expr::Exists { .. } | Expr::Ref(_) | Expr::Deref(_) => {
             return Err(SymExecError::TypeMismatch {
                 function: function.to_string(),
             });

@@ -104,6 +104,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::inc_stmt
                     | Rule::dec_stmt
                     | Rule::array_init_stmt
+                    | Rule::deref_assign_stmt
             )
         })
         .collect();
@@ -336,6 +337,7 @@ fn parse_stmt_with_asserts(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_
         Rule::inc_stmt => vec![parse_inc(pair)],
         Rule::dec_stmt => vec![parse_dec(pair)],
         Rule::array_init_stmt => vec![parse_array_init(pair)],
+        Rule::deref_assign_stmt => vec![parse_deref_assign(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -792,6 +794,36 @@ fn parse_array_init(pair: Pair<'_, Rule>) -> Stmt {
     }
 }
 
+fn parse_deref_assign(pair: Pair<'_, Rule>) -> Stmt {
+    let mut inner = pair.into_inner();
+    let deref = inner.next().expect("deref_assign_stmt must have a deref_var");
+    let ref_name = parse_deref_var_name(deref);
+    // Skip assign_op (we only support plain '=' for deref assignment)
+    let _assign_op = inner.next().expect("deref_assign_stmt must have assign_op");
+    let expr = build_expr(inner.next().expect("deref_assign_stmt must have an expression"))
+        .expect("validated deref assignment expression");
+    Stmt::DerefAssign { ref_name, expr }
+}
+
+fn parse_ref_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let var = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::var)
+        .ok_or_else(|| "ref_expr must contain a variable".to_string())?;
+    let target = parse_variable(var);
+    Ok(Expr::Ref(target))
+}
+
+fn parse_deref_var(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let ref_name = parse_deref_var_name(pair);
+    Ok(Expr::Deref(ref_name))
+}
+
+fn parse_deref_var_name(pair: Pair<'_, Rule>) -> String {
+    // deref_var is @{ "$$" ~ ident }, so its text is "$$name"
+    pair.as_str().trim_start_matches('$').trim_start_matches('$').to_string()
+}
+
 fn parse_inc(pair: Pair<'_, Rule>) -> Stmt {
     let name = pair
         .into_inner()
@@ -856,6 +888,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations:
                     | Rule::inc_stmt
                     | Rule::dec_stmt
                     | Rule::array_init_stmt
+                    | Rule::deref_assign_stmt
             )
         })
         .collect();
@@ -2168,6 +2201,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::exists_call => parse_exists_call(primary),
             Rule::regex_match => parse_regex_match(primary, false),
             Rule::regex_not_match => parse_regex_match(primary, true),
+            Rule::ref_expr => parse_ref_expr(primary),
+            Rule::deref_var => parse_deref_var(primary),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {

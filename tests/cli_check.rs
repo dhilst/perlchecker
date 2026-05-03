@@ -1588,3 +1588,56 @@ sub check_exists_multiple_keys {
     assert!(stdout.contains("✔ check_exists_param_hash: verified"));
     assert!(stdout.contains("✔ check_exists_multiple_keys: verified"));
 }
+
+#[test]
+fn check_scalar_references() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("refs.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $x > 0
+# post: $result == 10
+sub ref_write {
+    my ($x) = @_;
+    my $ref = \$x;
+    $$ref = 10;
+    return $x;
+}
+
+# sig: (Int) -> Int
+# pre: $x > 0
+# post: $result == $x * 2
+sub ref_read {
+    my ($x) = @_;
+    my $ref = \$x;
+    my $y = $$ref + $x;
+    return $y;
+}
+
+# sig: (Int) -> Int
+# pre: $n > 0
+# post: $result == $n + 5
+sub ref_chain {
+    my ($n) = @_;
+    my $ref = \$n;
+    $$ref = $n + 5;
+    return $$ref;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ ref_write: verified"));
+    assert!(stdout.contains("✔ ref_read: verified"));
+    assert!(stdout.contains("✔ ref_chain: verified"));
+}

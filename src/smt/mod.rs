@@ -162,6 +162,10 @@ pub fn find_model_with_timeout(
                             .unwrap_or_else(|| "<unknown>".to_string());
                         ModelValue::Collection(value)
                     }
+                    // References are desugared before SMT; these should never appear.
+                    Type::RefInt | Type::RefStr => {
+                        ModelValue::Int(0)
+                    }
                 };
                 assignments.insert(variable.name.clone(), value);
             }

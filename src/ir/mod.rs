@@ -249,6 +249,9 @@ struct SsaBuilder<'a> {
     /// Key: hash base name (e.g., "h"), Value: current SSA name (e.g., "h__exists__1").
     /// The companion is a Hash<Str, Int> where 1 = key exists, 0 = does not exist.
     exists_companions: BTreeMap<String, String>,
+    /// Tracks static reference aliases: ref_name -> target_name.
+    /// When we see `$ref = \$x`, we record alias_map["ref"] = "x".
+    alias_map: BTreeMap<String, String>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -259,6 +262,7 @@ impl<'a> SsaBuilder<'a> {
             len_companions: BTreeMap::new(),
             defined_companions: BTreeSet::new(),
             exists_companions: BTreeMap::new(),
+            alias_map: BTreeMap::new(),
         }
     }
 
@@ -499,6 +503,24 @@ impl<'a> SsaBuilder<'a> {
                     index: Box::new(SsaExpr::Var(new_len_name)),
                 }
             }
+            Expr::Ref(_target) => {
+                // Reference creation is handled at the Stmt::Assign level.
+                // If we reach here, the ref is used in a non-assignment context,
+                // which shouldn't happen after type checking. Treat as a no-op.
+                SsaExpr::Int(0)
+            }
+            Expr::Deref(ref_name) => {
+                // Dereference: look up the alias in the alias_map to find the target,
+                // then resolve the target's current SSA name.
+                let target = self.alias_map.get(ref_name).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: format!("$${} (not a known reference)", ref_name),
+                })?;
+                SsaExpr::Var(env.get(&target).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: target,
+                })?)
+            }
         })
     }
 
@@ -522,18 +544,25 @@ impl<'a> SsaBuilder<'a> {
                 }
                 crate::ast::Stmt::LoopBoundExceeded => lowered.push(SsaStmt::LoopBoundExceeded),
                 crate::ast::Stmt::Assign { name, expr, .. } => {
-                    let mut prefix = Vec::new();
-                    let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
-                    lowered.extend(prefix);
-                    let ssa_name = self.fresh_name(name);
-                    env.insert(name.clone(), ssa_name.clone());
-                    lowered.push(SsaStmt::Assign(ssa_name, rhs));
-                    // Emit companion definedness variable: name__defined = 1
-                    if self.defined_companions.contains(name) {
-                        let def_base = format!("{name}__defined");
-                        let def_name = self.fresh_name(&def_base);
-                        lowered.push(SsaStmt::Assign(def_name.clone(), SsaExpr::Int(1)));
-                        env.insert(def_base, def_name);
+                    // Check if this is a reference assignment: $ref = \$target
+                    if let crate::ast::Expr::Ref(target) = expr {
+                        // Record the alias and skip emitting any SSA assignment.
+                        // The reference variable doesn't exist at IR level.
+                        self.alias_map.insert(name.clone(), target.clone());
+                    } else {
+                        let mut prefix = Vec::new();
+                        let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                        lowered.extend(prefix);
+                        let ssa_name = self.fresh_name(name);
+                        env.insert(name.clone(), ssa_name.clone());
+                        lowered.push(SsaStmt::Assign(ssa_name, rhs));
+                        // Emit companion definedness variable: name__defined = 1
+                        if self.defined_companions.contains(name) {
+                            let def_base = format!("{name}__defined");
+                            let def_name = self.fresh_name(&def_base);
+                            lowered.push(SsaStmt::Assign(def_name.clone(), SsaExpr::Int(1)));
+                            env.insert(def_base, def_name);
+                        }
                     }
                 }
                 crate::ast::Stmt::ArrayAssign { name, index, expr } => {
@@ -1040,6 +1069,19 @@ impl<'a> SsaBuilder<'a> {
                         else_branch: Vec::new(),
                         merges: Vec::new(),
                     });
+                }
+                crate::ast::Stmt::DerefAssign { ref_name, expr } => {
+                    // Desugar $$ref = expr to target = expr using the alias map
+                    let target = self.alias_map.get(ref_name).cloned().ok_or_else(|| IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: format!("$${} (not a known reference)", ref_name),
+                    })?;
+                    let mut prefix = Vec::new();
+                    let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+                    let ssa_name = self.fresh_name(&target);
+                    env.insert(target, ssa_name.clone());
+                    lowered.push(SsaStmt::Assign(ssa_name, rhs));
                 }
                 crate::ast::Stmt::Last => {
                     unreachable!("`last` should be desugared by the parser before IR lowering")

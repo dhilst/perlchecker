@@ -15,6 +15,8 @@ pub enum Type {
     ArrayStr,
     HashInt,
     HashStr,
+    RefInt,
+    RefStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,6 +28,8 @@ enum ExprType {
     ArrayStr,
     HashInt,
     HashStr,
+    RefInt,
+    RefStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,6 +100,10 @@ pub enum Expr {
         hash: String,
         key: Box<Expr>,
     },
+    /// Reference creation: `\$x` — stores the target variable name.
+    Ref(String),
+    /// Reference dereference: `$$ref` — stores the ref variable name.
+    Deref(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -188,6 +196,11 @@ pub enum Stmt {
         name: String,
         elements: Vec<Expr>,
     },
+    /// Dereference assignment: `$$ref = expr`
+    DerefAssign {
+        ref_name: String,
+        expr: Expr,
+    },
     While {
         condition: Expr,
         body: Vec<Stmt>,
@@ -279,6 +292,7 @@ pub fn type_check_function_with_signatures(
     }
 
     let initial_assumptions = collect_true_assumptions(&spec.pre);
+    let alias_map = BTreeMap::new();
     expect_expr_type(
         &function.name,
         "precondition",
@@ -287,14 +301,16 @@ pub fn type_check_function_with_signatures(
         &initial_assumptions,
         ExprType::Bool,
         signatures,
+        &alias_map,
     )?;
-    let (env, assumptions) = type_check_stmts(
+    let (env, assumptions, _alias_map) = type_check_stmts(
         &function.name,
         &function.body,
         &env,
         &initial_assumptions,
         spec.ret_type,
         signatures,
+        &alias_map,
     )?;
 
     let mut post_env = env;
@@ -313,11 +329,14 @@ pub fn type_check_function_with_signatures(
         &assumptions,
         ExprType::Bool,
         signatures,
+        &alias_map,
     )?;
 
     debug!(function = function.name, "type checking completed");
     Ok(())
 }
+
+type AliasMap = BTreeMap<String, String>;
 
 fn type_check_stmts(
     function: &str,
@@ -326,9 +345,11 @@ fn type_check_stmts(
     assumptions: &Assumptions,
     return_type: Type,
     signatures: &BTreeMap<String, (Vec<Type>, Type)>,
-) -> std::result::Result<(TypeEnv, Assumptions), TypeCheckError> {
+    alias_map: &AliasMap,
+) -> std::result::Result<(TypeEnv, Assumptions, AliasMap), TypeCheckError> {
     let mut env = env.clone();
     let mut assumptions = assumptions.clone();
+    let mut alias_map = alias_map.clone();
 
     for stmt in stmts {
         match stmt {
@@ -347,42 +368,81 @@ fn type_check_stmts(
                 expr,
                 declaration,
             } => {
-                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures)?;
-                let assign_type = expect_assignable_type(function, "assignment", expr_type)?;
-                if *declaration {
-                    env.insert(
-                        name.clone(),
-                        VariableState {
-                            ty: Some(assign_type),
-                            initialized: true,
-                        },
-                    );
-                } else {
-                    let prior = env.get(name).copied().ok_or_else(|| {
+                // Check if this is a reference assignment: my $ref = \$x
+                if let Expr::Ref(target) = expr {
+                    // Look up the target variable's type
+                    let target_state = env.get(target).copied().ok_or_else(|| {
                         TypeCheckError::UndeclaredVariable {
                             function: function.to_string(),
-                            variable: name.clone(),
+                            variable: target.clone(),
                         }
                     })?;
-                    if let Some(prior_type) = prior.ty
-                        && prior_type != assign_type
-                    {
-                        return Err(TypeCheckError::TypeMismatch {
+                    if !target_state.initialized {
+                        return Err(TypeCheckError::UninitializedVariable {
                             function: function.to_string(),
-                            context: "assignment",
-                            expected: render_expr_type(expr_type_from_type(prior_type)),
-                            found: render_expr_type(expr_type),
+                            variable: target.clone(),
                         });
                     }
+                    let target_type = target_state.ty.expect("initialized variables must have a type");
+                    let ref_type = match target_type {
+                        Type::Int => Type::RefInt,
+                        Type::Str => Type::RefStr,
+                        _ => {
+                            return Err(TypeCheckError::TypeMismatch {
+                                function: function.to_string(),
+                                context: "reference creation",
+                                expected: "Int or Str",
+                                found: render_expr_type(expr_type_from_type(target_type)),
+                            });
+                        }
+                    };
                     env.insert(
                         name.clone(),
                         VariableState {
-                            ty: Some(assign_type),
+                            ty: Some(ref_type),
                             initialized: true,
                         },
                     );
+                    alias_map.insert(name.clone(), target.clone());
+                    assumptions = remove_variable_assumptions(&assumptions, name);
+                } else {
+                    let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
+                    let assign_type = expect_assignable_type(function, "assignment", expr_type)?;
+                    if *declaration {
+                        env.insert(
+                            name.clone(),
+                            VariableState {
+                                ty: Some(assign_type),
+                                initialized: true,
+                            },
+                        );
+                    } else {
+                        let prior = env.get(name).copied().ok_or_else(|| {
+                            TypeCheckError::UndeclaredVariable {
+                                function: function.to_string(),
+                                variable: name.clone(),
+                            }
+                        })?;
+                        if let Some(prior_type) = prior.ty
+                            && prior_type != assign_type
+                        {
+                            return Err(TypeCheckError::TypeMismatch {
+                                function: function.to_string(),
+                                context: "assignment",
+                                expected: render_expr_type(expr_type_from_type(prior_type)),
+                                found: render_expr_type(expr_type),
+                            });
+                        }
+                        env.insert(
+                            name.clone(),
+                            VariableState {
+                                ty: Some(assign_type),
+                                initialized: true,
+                            },
+                        );
+                    }
+                    assumptions = remove_variable_assumptions(&assumptions, name);
                 }
-                assumptions = remove_variable_assumptions(&assumptions, name);
             }
             Stmt::ArrayAssign { name, index, expr } => {
                 expect_expr_type(
@@ -393,8 +453,9 @@ fn type_check_stmts(
                     &assumptions,
                     ExprType::Int,
                     signatures,
+                    &alias_map,
                 )?;
-                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures)?;
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
                 let element_type = collection_element_type(function, &env, name, AccessKind::Array)?;
                 if expr_type != element_type {
                     return Err(TypeCheckError::TypeMismatch {
@@ -415,8 +476,9 @@ fn type_check_stmts(
                     &assumptions,
                     ExprType::Str,
                     signatures,
+                    &alias_map,
                 )?;
-                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures)?;
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
                 let element_type = collection_element_type(function, &env, name, AccessKind::Hash)?;
                 if expr_type != element_type {
                     return Err(TypeCheckError::TypeMismatch {
@@ -441,6 +503,7 @@ fn type_check_stmts(
                     &assumptions,
                     ExprType::Bool,
                     signatures,
+                    &alias_map,
                 )?;
 
                 let mut then_assumptions = assumptions.clone();
@@ -448,7 +511,7 @@ fn type_check_stmts(
                 let mut else_assumptions = assumptions.clone();
                 else_assumptions.extend(collect_false_assumptions(condition));
 
-                let (then_env, then_assumptions) =
+                let (then_env, then_assumptions, _) =
                     type_check_stmts(
                         function,
                         then_branch,
@@ -456,18 +519,21 @@ fn type_check_stmts(
                         &then_assumptions,
                         return_type,
                         signatures,
+                        &alias_map,
                     )?;
                 let (else_env, else_assumptions) = if else_branch.is_empty() {
                     (env.clone(), else_assumptions)
                 } else {
-                    type_check_stmts(
+                    let (e, a, _) = type_check_stmts(
                         function,
                         else_branch,
                         &env,
                         &else_assumptions,
                         return_type,
                         signatures,
-                    )?
+                        &alias_map,
+                    )?;
+                    (e, a)
                 };
                 env = merge_branch_envs(function, &env, &then_env, &else_env)?;
                 assumptions = intersect_assumptions(&then_assumptions, &else_assumptions);
@@ -481,10 +547,11 @@ fn type_check_stmts(
                     &assumptions,
                     expr_type_from_type(return_type),
                     signatures,
+                    &alias_map,
                 )?;
             }
             Stmt::Push { array, value } => {
-                let expr_type = infer_expr_type(function, value, &env, &assumptions, signatures)?;
+                let expr_type = infer_expr_type(function, value, &env, &assumptions, signatures, &alias_map)?;
                 let element_type = collection_element_type(function, &env, array, AccessKind::Array)?;
                 if expr_type != element_type {
                     return Err(TypeCheckError::TypeMismatch {
@@ -497,7 +564,7 @@ fn type_check_stmts(
             }
             Stmt::ArrayInit { name, elements } => {
                 // Infer type from first element, check all elements match
-                let first_type = infer_expr_type(function, &elements[0], &env, &assumptions, signatures)?;
+                let first_type = infer_expr_type(function, &elements[0], &env, &assumptions, signatures, &alias_map)?;
                 let array_type = match first_type {
                     ExprType::Int => Type::ArrayInt,
                     ExprType::Str => Type::ArrayStr,
@@ -511,7 +578,7 @@ fn type_check_stmts(
                     }
                 };
                 for elem in &elements[1..] {
-                    let elem_type = infer_expr_type(function, elem, &env, &assumptions, signatures)?;
+                    let elem_type = infer_expr_type(function, elem, &env, &assumptions, signatures, &alias_map)?;
                     if elem_type != first_type {
                         return Err(TypeCheckError::TypeMismatch {
                             function: function.to_string(),
@@ -529,6 +596,35 @@ fn type_check_stmts(
                     },
                 );
             }
+            Stmt::DerefAssign { ref_name, expr } => {
+                // Look up the alias to find the target variable
+                let target = alias_map.get(ref_name).ok_or_else(|| {
+                    TypeCheckError::UndeclaredVariable {
+                        function: function.to_string(),
+                        variable: format!("$${} (not a known reference)", ref_name),
+                    }
+                })?;
+                let target_state = env.get(target).copied().ok_or_else(|| {
+                    TypeCheckError::UndeclaredVariable {
+                        function: function.to_string(),
+                        variable: target.clone(),
+                    }
+                })?;
+                let target_type = target_state.ty.expect("initialized variables must have a type");
+                // Check that the expression type matches the target's type
+                expect_expr_type(
+                    function,
+                    "dereference assignment",
+                    expr,
+                    &env,
+                    &assumptions,
+                    expr_type_from_type(target_type),
+                    signatures,
+                    &alias_map,
+                )?;
+                // The assignment modifies the target variable's assumptions
+                assumptions = remove_variable_assumptions(&assumptions, target);
+            }
             Stmt::While {
                 condition,
                 body: loop_body,
@@ -544,15 +640,17 @@ fn type_check_stmts(
                     &assumptions,
                     ExprType::Bool,
                     signatures,
+                    &alias_map,
                 )?;
                 // Type-check the body
-                let (body_env, _) = type_check_stmts(
+                let (body_env, _, _) = type_check_stmts(
                     function,
                     loop_body,
                     &env,
                     &assumptions,
                     return_type,
                     signatures,
+                    &alias_map,
                 )?;
                 // Type-check the step (if any)
                 if !step.is_empty() {
@@ -563,6 +661,7 @@ fn type_check_stmts(
                         &assumptions,
                         return_type,
                         signatures,
+                        &alias_map,
                     )?;
                 }
             }
@@ -579,10 +678,11 @@ fn type_check_stmts(
                     &assumptions,
                     ExprType::Bool,
                     signatures,
+                    &alias_map,
                 )?;
             }
             Stmt::GhostAssign { name, expr } => {
-                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures)?;
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
                 let assign_type = expect_assignable_type(function, "ghost assignment", expr_type)?;
                 env.insert(
                     name.clone(),
@@ -596,7 +696,7 @@ fn type_check_stmts(
         }
     }
 
-    Ok((env, assumptions))
+    Ok((env, assumptions, alias_map))
 }
 
 fn merge_branch_envs(
@@ -681,6 +781,8 @@ fn references_variable(expr: &Expr, name: &str) -> bool {
         Expr::Builtin { args, .. } => args.iter().any(|arg| references_variable(arg, name)),
         Expr::Pop { array } => array == name,
         Expr::Exists { hash, key } => hash == name || references_variable(key, name),
+        Expr::Ref(target) => target == name,
+        Expr::Deref(ref_name) => ref_name == name,
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) => false,
     }
 }
@@ -693,8 +795,9 @@ fn expect_expr_type(
     assumptions: &Assumptions,
     expected: ExprType,
     signatures: &BTreeMap<String, (Vec<Type>, Type)>,
+    alias_map: &AliasMap,
 ) -> std::result::Result<(), TypeCheckError> {
-    let found = infer_expr_type(function, expr, env, assumptions, signatures)?;
+    let found = infer_expr_type(function, expr, env, assumptions, signatures, alias_map)?;
     if found == expected {
         Ok(())
     } else {
@@ -713,6 +816,7 @@ fn infer_expr_type(
     env: &TypeEnv,
     assumptions: &Assumptions,
     signatures: &BTreeMap<String, (Vec<Type>, Type)>,
+    alias_map: &AliasMap,
 ) -> std::result::Result<ExprType, TypeCheckError> {
     match expr {
         Expr::Int(_) => Ok(ExprType::Int),
@@ -745,6 +849,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -757,6 +862,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Bool,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Bool)
             }
@@ -769,6 +875,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -785,6 +892,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -794,11 +902,12 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
             BinaryOp::Concat => {
-                let left_ty = infer_expr_type(function, left, env, assumptions, signatures)?;
+                let left_ty = infer_expr_type(function, left, env, assumptions, signatures, alias_map)?;
                 if left_ty != ExprType::Str && left_ty != ExprType::Int {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
@@ -807,7 +916,7 @@ fn infer_expr_type(
                         found: render_expr_type(left_ty),
                     });
                 }
-                let right_ty = infer_expr_type(function, right, env, assumptions, signatures)?;
+                let right_ty = infer_expr_type(function, right, env, assumptions, signatures, alias_map)?;
                 if right_ty != ExprType::Str && right_ty != ExprType::Int {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
@@ -827,6 +936,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -836,6 +946,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -848,6 +959,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -857,6 +969,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Bool)
             }
@@ -869,6 +982,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -878,6 +992,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Bool)
             }
@@ -890,6 +1005,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -899,6 +1015,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Bool)
             }
@@ -911,6 +1028,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -920,6 +1038,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -932,6 +1051,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Bool,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -941,6 +1061,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Bool,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Bool)
             }
@@ -956,6 +1077,7 @@ fn infer_expr_type(
                 env,
                 assumptions,
                 signatures,
+                alias_map,
             )?;
             match kind {
                 AccessKind::Array => {
@@ -967,6 +1089,7 @@ fn infer_expr_type(
                         assumptions,
                         ExprType::Int,
                         signatures,
+                        alias_map,
                     )?;
                     match collection_type {
                         ExprType::ArrayInt => Ok(ExprType::Int),
@@ -988,6 +1111,7 @@ fn infer_expr_type(
                         assumptions,
                         ExprType::Str,
                         signatures,
+                        alias_map,
                     )?;
                     match collection_type {
                         ExprType::HashInt => Ok(ExprType::Int),
@@ -1027,6 +1151,7 @@ fn infer_expr_type(
                     assumptions,
                     expr_type_from_type(*expected),
                     signatures,
+                    alias_map,
                 )?;
             }
             Ok(expr_type_from_type(*ret_type))
@@ -1047,6 +1172,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1062,6 +1188,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1071,6 +1198,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1080,6 +1208,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 if is_negative_literal(start) {
                     return Err(TypeCheckError::NegativeSubstringArgument {
@@ -1126,6 +1255,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1135,6 +1265,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 if let Some(start) = start {
                     expect_expr_type(
@@ -1145,6 +1276,7 @@ fn infer_expr_type(
                         assumptions,
                         ExprType::Int,
                         signatures,
+                        alias_map,
                     )?;
                 }
                 Ok(ExprType::Int)
@@ -1159,6 +1291,7 @@ fn infer_expr_type(
                     env,
                     assumptions,
                     signatures,
+                    alias_map,
                 )?;
                 match array_type {
                     ExprType::ArrayInt | ExprType::ArrayStr => Ok(ExprType::Int),
@@ -1182,6 +1315,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1197,6 +1331,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1206,6 +1341,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1221,6 +1357,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1236,6 +1373,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -1251,6 +1389,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -1266,6 +1405,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -1273,7 +1413,7 @@ fn infer_expr_type(
                 let [value] = args.as_slice() else {
                     unreachable!("int arity is enforced by the parser");
                 };
-                let arg_type = infer_expr_type(function, value, env, assumptions, signatures)?;
+                let arg_type = infer_expr_type(function, value, env, assumptions, signatures, alias_map)?;
                 if arg_type != ExprType::Str && arg_type != ExprType::Int {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
@@ -1296,6 +1436,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1305,6 +1446,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1320,6 +1462,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1329,6 +1472,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1344,6 +1488,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1353,6 +1498,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Int)
             }
@@ -1368,6 +1514,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1377,6 +1524,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1386,6 +1534,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -1401,6 +1550,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Str,
                     signatures,
+                    alias_map,
                 )?;
                 expect_expr_type(
                     function,
@@ -1410,6 +1560,7 @@ fn infer_expr_type(
                     assumptions,
                     ExprType::Int,
                     signatures,
+                    alias_map,
                 )?;
                 Ok(ExprType::Str)
             }
@@ -1431,7 +1582,7 @@ fn infer_expr_type(
                     // Allow both initialized and uninitialized variables
                     let _ = state;
                 } else {
-                    let _arg_type = infer_expr_type(function, value, env, assumptions, signatures)?;
+                    let _arg_type = infer_expr_type(function, value, env, assumptions, signatures, alias_map)?;
                 }
                 Ok(ExprType::Int)
             }
@@ -1445,9 +1596,10 @@ fn infer_expr_type(
                 assumptions,
                 ExprType::Bool,
                 signatures,
+                alias_map,
             )?;
-            let then_type = infer_expr_type(function, then_expr, env, assumptions, signatures)?;
-            let else_type = infer_expr_type(function, else_expr, env, assumptions, signatures)?;
+            let then_type = infer_expr_type(function, then_expr, env, assumptions, signatures, alias_map)?;
+            let else_type = infer_expr_type(function, else_expr, env, assumptions, signatures, alias_map)?;
             if then_type != else_type {
                 return Err(TypeCheckError::TypeMismatch {
                     function: function.to_string(),
@@ -1497,8 +1649,60 @@ fn infer_expr_type(
                 assumptions,
                 ExprType::Str,
                 signatures,
+                alias_map,
             )?;
             Ok(ExprType::Int)
+        }
+        Expr::Ref(target) => {
+            // \$x — reference creation
+            let target_state = env
+                .get(target)
+                .copied()
+                .ok_or_else(|| TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                })?;
+            if !target_state.initialized {
+                return Err(TypeCheckError::UninitializedVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                });
+            }
+            let target_type = target_state.ty.expect("initialized variables must have a type");
+            match target_type {
+                Type::Int => Ok(ExprType::RefInt),
+                Type::Str => Ok(ExprType::RefStr),
+                _ => Err(TypeCheckError::TypeMismatch {
+                    function: function.to_string(),
+                    context: "reference creation",
+                    expected: "Int or Str",
+                    found: render_expr_type(expr_type_from_type(target_type)),
+                }),
+            }
+        }
+        Expr::Deref(ref_name) => {
+            // $$ref — dereference: resolve alias to target variable's type
+            let target = alias_map.get(ref_name).ok_or_else(|| {
+                TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: format!("$${} (not a known reference)", ref_name),
+                }
+            })?;
+            let target_state = env
+                .get(target)
+                .copied()
+                .ok_or_else(|| TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                })?;
+            if !target_state.initialized {
+                return Err(TypeCheckError::UninitializedVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                });
+            }
+            let target_type = target_state.ty.expect("initialized variables must have a type");
+            Ok(expr_type_from_type(target_type))
         }
     }
 }
@@ -1515,6 +1719,8 @@ fn expect_assignable_type(
         ExprType::ArrayStr => Ok(Type::ArrayStr),
         ExprType::HashInt => Ok(Type::HashInt),
         ExprType::HashStr => Ok(Type::HashStr),
+        ExprType::RefInt => Ok(Type::RefInt),
+        ExprType::RefStr => Ok(Type::RefStr),
         ExprType::Bool => Err(TypeCheckError::TypeMismatch {
             function: function.to_string(),
             context,
@@ -1762,6 +1968,8 @@ fn expr_type_from_type(ty: Type) -> ExprType {
         Type::ArrayStr => ExprType::ArrayStr,
         Type::HashInt => ExprType::HashInt,
         Type::HashStr => ExprType::HashStr,
+        Type::RefInt => ExprType::RefInt,
+        Type::RefStr => ExprType::RefStr,
     }
 }
 
@@ -1774,6 +1982,8 @@ fn render_expr_type(ty: ExprType) -> &'static str {
         ExprType::ArrayStr => "Array<Str>",
         ExprType::HashInt => "Hash<Str, Int>",
         ExprType::HashStr => "Hash<Str, Str>",
+        ExprType::RefInt => "Ref<Int>",
+        ExprType::RefStr => "Ref<Str>",
     }
 }
 

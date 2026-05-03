@@ -4,7 +4,7 @@ COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
 
-stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | foreach_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | list_assign_stmt | inc_stmt | dec_stmt | array_init_stmt | assign_stmt | declare_stmt }
+stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | foreach_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | list_assign_stmt | inc_stmt | dec_stmt | array_init_stmt | deref_assign_stmt | assign_stmt | declare_stmt }
 array_init_stmt = { "my" ~ "@" ~ ident ~ "=" ~ "(" ~ expr ~ ("," ~ expr)* ~ ","? ~ ")" ~ ";" }
 inc_stmt = { var ~ "++" ~ ";" }
 dec_stmt = { var ~ "--" ~ ";" }
@@ -62,7 +62,7 @@ for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }
 expr = { ternary_expr }
 ternary_expr = { simple_expr ~ ("?" ~ simple_expr ~ ":" ~ ternary_expr)? }
 simple_expr = { prefix_op* ~ atom ~ (infix_op ~ prefix_op* ~ atom)* }
-atom = _{ scalar_call | pop_call | chomp_call | reverse_call | replace_call | char_at_call | starts_with_call | ends_with_call | contains_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | int_call | defined_call | exists_call | call_expr | hash_access | array_access | string | int | regex_not_match | regex_match | var | "(" ~ expr ~ ")" }
+atom = _{ scalar_call | pop_call | chomp_call | reverse_call | replace_call | char_at_call | starts_with_call | ends_with_call | contains_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | int_call | defined_call | exists_call | call_expr | hash_access | array_access | string | int | regex_not_match | regex_match | ref_expr | deref_var | var | "(" ~ expr ~ ")" }
 
 regex_literal = @{ "/" ~ regex_char* ~ "/" }
 regex_char = { !("/" | NEWLINE) ~ ANY }
@@ -131,6 +131,9 @@ op_low_not = { "not" }
 int = @{ "0x" ~ (ASCII_HEX_DIGIT | "_")+ | "0o" ~ (ASCII_OCT_DIGIT | "_")+ | "0b" ~ ("0" | "1" | "_")+ | ASCII_DIGIT ~ (ASCII_DIGIT | "_")* }
 string = @{ "\"" ~ ( "\\\"" | "\\\\" | "\\n" | "\\t" | !("\"" | NEWLINE) ~ ANY )* ~ "\""
            | "'" ~ ( "\\'" | "\\\\" | !("'" | NEWLINE) ~ ANY )* ~ "'" }
+ref_expr = { "\\" ~ var }
+deref_var = @{ "$$" ~ ident }
+deref_assign_stmt = { deref_var ~ assign_op ~ expr ~ ";" }
 var = @{ "$" ~ ident }
 bare_ident = @{ ident }
 ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
