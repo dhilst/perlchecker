@@ -144,6 +144,7 @@ fn parse_assign(pair: Pair<'_, Rule>) -> Stmt {
     let mut name = None;
     let mut expr = None;
     let mut compound_op = None;
+    let mut modifier: Option<Pair<'_, Rule>> = None;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -167,6 +168,7 @@ fn parse_assign(pair: Pair<'_, Rule>) -> Stmt {
                 };
             }
             Rule::expr => expr = Some(build_expr(inner).expect("validated expression")),
+            Rule::assign_if | Rule::assign_unless => modifier = Some(inner),
             _ => {}
         }
     }
@@ -182,11 +184,46 @@ fn parse_assign(pair: Pair<'_, Rule>) -> Stmt {
         None => rhs,
     };
 
-    Stmt::Assign {
+    let assign_stmt = Stmt::Assign {
         name,
         expr: final_expr,
         declaration,
+    };
+
+    // Handle statement modifier (ASSIGN if/unless COND)
+    if let Some(mod_pair) = modifier {
+        match mod_pair.as_rule() {
+            Rule::assign_if => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("assign_if must have a condition"),
+                )
+                .expect("validated assign_if condition");
+                return Stmt::If {
+                    condition,
+                    then_branch: vec![assign_stmt],
+                    else_branch: Vec::new(),
+                };
+            }
+            Rule::assign_unless => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("assign_unless must have a condition"),
+                )
+                .expect("validated assign_unless condition");
+                let negated = Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(condition),
+                };
+                return Stmt::If {
+                    condition: negated,
+                    then_branch: vec![assign_stmt],
+                    else_branch: Vec::new(),
+                };
+            }
+            _ => {}
+        }
     }
+
+    assign_stmt
 }
 
 fn parse_array_assign(pair: Pair<'_, Rule>) -> Stmt {

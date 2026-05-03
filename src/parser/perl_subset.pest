@@ -14,7 +14,10 @@ unless_stmt = { "unless" ~ "(" ~ expr ~ ")" ~ block ~ else_clause? }
 parameter_binding = { "my" ~ "(" ~ var_list? ~ ")" ~ "=" ~ "@_" ~ ";" }
 var_list = { var ~ ("," ~ var)* }
 
-assign_stmt = { declaration? ~ var ~ assign_op ~ expr ~ ";" }
+assign_stmt = { declaration? ~ var ~ assign_op ~ expr ~ assign_modifier? ~ ";" }
+assign_modifier = _{ assign_if | assign_unless }
+assign_if = { "if" ~ "(" ~ expr ~ ")" }
+assign_unless = { "unless" ~ "(" ~ expr ~ ")" }
 array_assign_stmt = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr ~ ";" }
 hash_assign_stmt = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr ~ ";" }
 assign_op = { "<<=" | ">>=" | "**=" | "+=" | "-=" | "*=" | "/=" | "%=" | ".=" | "&=" | "|=" | "^=" | "=" }
