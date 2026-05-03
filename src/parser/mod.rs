@@ -81,6 +81,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::unless_stmt
                     | Rule::return_stmt
                     | Rule::die_stmt
+                    | Rule::warn_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
@@ -130,6 +131,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
         Rule::die_stmt => vec![parse_die(pair)],
+        Rule::warn_stmt => vec![], // warn is a no-op for verification
         Rule::last_stmt => vec![Stmt::Last],
         Rule::next_stmt => vec![Stmt::Next],
         Rule::push_stmt => vec![parse_push(pair)],
@@ -357,6 +359,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::unless_stmt
                     | Rule::return_stmt
                     | Rule::die_stmt
+                    | Rule::warn_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
