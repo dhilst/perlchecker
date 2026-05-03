@@ -170,6 +170,7 @@ pub enum Stmt {
     Last,
     Next,
     Die(Expr),
+    Assert(Expr),
     Push {
         array: String,
         value: Expr,
@@ -560,6 +561,17 @@ fn type_check_stmts(
             Stmt::Last => {}
             Stmt::Next => {}
             Stmt::Die(_) => {}
+            Stmt::Assert(expr) => {
+                expect_expr_type(
+                    function,
+                    "assert expression",
+                    expr,
+                    &env,
+                    &assumptions,
+                    ExprType::Bool,
+                    signatures,
+                )?;
+            }
         }
     }
 

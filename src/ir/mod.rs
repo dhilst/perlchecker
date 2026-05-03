@@ -41,6 +41,8 @@ pub enum SsaStmt {
     InvariantInitFailed,
     /// Loop invariant preservation check failed.
     InvariantPreservationFailed,
+    /// Mid-function assertion failed.
+    AssertFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,6 +148,7 @@ pub enum Terminator {
     Unreachable,
     InvariantInitFailed,
     InvariantPreservationFailed,
+    AssertFailed,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -913,6 +916,22 @@ impl<'a> SsaBuilder<'a> {
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);
                 }
+                crate::ast::Stmt::Assert(expr) => {
+                    let mut prefix = Vec::new();
+                    let assert_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+                    // Desugar: if (!assert_expr) { AssertFailed }
+                    let neg = SsaExpr::Unary {
+                        op: UnaryOp::Not,
+                        expr: Box::new(assert_expr),
+                    };
+                    lowered.push(SsaStmt::If {
+                        condition: neg,
+                        then_branch: vec![SsaStmt::AssertFailed],
+                        else_branch: Vec::new(),
+                        merges: Vec::new(),
+                    });
+                }
                 crate::ast::Stmt::Last => {
                     unreachable!("`last` should be desugared by the parser before IR lowering")
                 }
@@ -1074,6 +1093,10 @@ impl<'a> CfgBuilder<'a> {
                     self.blocks[current].terminator = Terminator::InvariantPreservationFailed;
                     return BlockExit::terminated(env);
                 }
+                SsaStmt::AssertFailed => {
+                    self.blocks[current].terminator = Terminator::AssertFailed;
+                    return BlockExit::terminated(env);
+                }
             }
         }
 
@@ -1171,6 +1194,7 @@ mod tests {
                     super::SsaStmt::Unreachable => {}
                     super::SsaStmt::InvariantInitFailed => {}
                     super::SsaStmt::InvariantPreservationFailed => {}
+                    super::SsaStmt::AssertFailed => {}
                 }
             }
         }

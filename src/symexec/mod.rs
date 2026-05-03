@@ -181,6 +181,8 @@ pub enum SymExecError {
     InvariantPreservationFailed { function: String },
     #[error("function `{function}` can reach a `die` statement on a feasible path")]
     DieReached { function: String },
+    #[error("function `{function}`: assertion failed")]
+    AssertFailed { function: String },
     #[error("function `{function}` has no valid execution paths after discarding invalid arithmetic paths")]
     NoValidPaths { function: String },
     #[error(transparent)]
@@ -418,6 +420,13 @@ fn execute_cfg_from_state(
                         });
                     }
                 }
+                Terminator::AssertFailed => {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
+                        return Err(SymExecError::AssertFailed {
+                            function: cfg.name.clone(),
+                        });
+                    }
+                }
             }
         }
     }
@@ -559,6 +568,9 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
     for stmt in stmts {
         match stmt {
             crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded | crate::ast::Stmt::Last | crate::ast::Stmt::Next | crate::ast::Stmt::Die(_) => {}
+            crate::ast::Stmt::Assert(expr) => {
+                collect_calls_from_expr(expr, calls);
+            }
             crate::ast::Stmt::ArrayInit { elements, .. } => {
                 for elem in elements {
                     collect_calls_from_expr(elem, calls);

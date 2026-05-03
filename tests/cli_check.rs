@@ -1110,3 +1110,110 @@ sub has_invariant {
     // Second function should verify
     assert!(stdout.contains("✔ has_invariant: verified"));
 }
+
+#[test]
+fn check_assert_annotations() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("assert_test.pl");
+
+    // Test 1: Assertions that pass
+    fs::write(
+        &file,
+        r#"
+# sig: (Int, Int) -> Int
+# pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
+# post: $result >= 0
+sub sum_checked {
+    my ($x, $y) = @_;
+    my $sum = $x + $y;
+    # assert: $sum >= 0
+    # assert: $sum <= 20
+    return $sum;
+}
+
+# sig: (Int, Int) -> Int
+# pre: $a >= 0 && $a <= 10 && $b >= 1 && $b <= 10
+# post: $result >= 0
+sub div_checked {
+    my ($a, $b) = @_;
+    # assert: $b >= 1
+    my $result = $a / $b;
+    return $result;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ sum_checked: verified"));
+    assert!(stdout.contains("✔ div_checked: verified"));
+
+    // Test 2: Assertion that fails
+    let file2 = tempdir.path().join("assert_fail.pl");
+    fs::write(
+        &file2,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 10
+# post: $result >= 0
+sub bad_assert {
+    my ($x) = @_;
+    my $y = $x - 5;
+    # assert: $y >= 0
+    return $y;
+}
+"#,
+    )
+    .unwrap();
+
+    let output2 = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file2)
+        .output()
+        .unwrap();
+
+    assert!(!output2.status.success());
+    let stderr2 = String::from_utf8_lossy(&output2.stderr);
+    assert!(stderr2.contains("assertion failed"));
+
+    // Test 3: Assertion inside a loop body
+    let file3 = tempdir.path().join("assert_loop.pl");
+    fs::write(
+        &file3,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 5
+# post: $result >= 0
+sub loop_assert {
+    my ($x) = @_;
+    my $sum = 0;
+    my $i = 0;
+    # inv: $sum >= 0 && $i >= 0
+    while ($i < $x) {
+        $sum = $sum + $i;
+        # assert: $sum >= 0
+        $i = $i + 1;
+    }
+    return $sum;
+}
+"#,
+    )
+    .unwrap();
+
+    let output3 = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file3)
+        .output()
+        .unwrap();
+
+    assert!(output3.status.success());
+    let stdout3 = String::from_utf8_lossy(&output3.stdout);
+    assert!(stdout3.contains("✔ loop_assert: verified"));
+}

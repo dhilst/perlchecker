@@ -49,6 +49,9 @@ pub fn parse_function_ast_with_limits(
     // These are collected in order and later attached to While nodes.
     let invariants = extract_invariant_annotations(&function.name, &function.body)?;
 
+    // Extract # assert: annotations with their line numbers (1-based within body).
+    let assert_annotations = extract_assert_annotations(&function.name, &function.body)?;
+
     let mut pairs =
         PerlSubsetParser::parse(Rule::function_body, &function.body).map_err(|error| {
             let ((line, column), message) = render_body_error(error);
@@ -69,7 +72,8 @@ pub fn parse_function_ast_with_limits(
             .next()
             .expect("function_body must begin with a parameter binding"),
     );
-    let stmts = inner
+
+    let stmt_pairs: Vec<_> = inner
         .filter(|pair| {
             matches!(
                 pair.as_rule(),
@@ -99,8 +103,33 @@ pub fn parse_function_ast_with_limits(
                     | Rule::array_init_stmt
             )
         })
-        .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
-        .collect::<Vec<_>>();
+        .collect();
+
+    // Interleave assert annotations into the statement list based on line numbers.
+    let stmts = if assert_annotations.is_empty() {
+        stmt_pairs
+            .into_iter()
+            .flat_map(|pair| parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations))
+            .collect()
+    } else {
+        let mut stmts = Vec::new();
+        let mut assert_idx = 0;
+        for pair in stmt_pairs {
+            let stmt_line = pair.as_span().start_pos().line_col().0;
+            while assert_idx < assert_annotations.len()
+                && assert_annotations[assert_idx].0 < stmt_line
+            {
+                stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+                assert_idx += 1;
+            }
+            stmts.extend(parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations));
+        }
+        while assert_idx < assert_annotations.len() {
+            stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+            assert_idx += 1;
+        }
+        stmts
+    };
 
     // Attach invariant annotations to While nodes in order of appearance.
     let stmts = attach_invariants(stmts, &invariants);
@@ -138,6 +167,29 @@ fn extract_invariant_annotations(
         }
     }
     Ok(invariants)
+}
+
+/// Extract `# assert:` annotations from the function body text.
+/// Returns the parsed assert expressions with their 1-based line numbers in the body.
+fn extract_assert_annotations(
+    function: &str,
+    body: &str,
+) -> std::result::Result<Vec<(usize, Expr)>, ParseError> {
+    let mut asserts = Vec::new();
+    for (line_idx, line) in body.lines().enumerate() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("# assert:") {
+            let expr = parse_expr(rest.trim()).map_err(|_| ParseError::InvalidSyntax {
+                function: function.to_string(),
+                line: 0,
+                column: 0,
+                message: format!("invalid assert expression: {}", rest.trim()),
+            })?;
+            // Line numbers are 1-based to match pest's line_col()
+            asserts.push((line_idx + 1, expr));
+        }
+    }
+    Ok(asserts)
 }
 
 /// Walk the statement tree and attach invariant expressions to While nodes
@@ -206,21 +258,21 @@ fn parse_parameter_binding(pair: Pair<'_, Rule>) -> Vec<String> {
         .collect()
 }
 
-fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_stmt_with_asserts(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     match pair.as_rule() {
         Rule::assign_stmt => vec![parse_assign(pair)],
         Rule::array_assign_stmt => vec![parse_array_assign(pair)],
         Rule::hash_assign_stmt => vec![parse_hash_assign(pair)],
         Rule::list_assign_stmt => parse_list_assign(pair),
         Rule::declare_stmt => vec![parse_declare(pair)],
-        Rule::if_stmt => vec![parse_if(pair, max_loop_unroll)],
-        Rule::unless_stmt => vec![parse_unless(pair, max_loop_unroll)],
-        Rule::do_while_stmt => parse_do_while(pair, max_loop_unroll),
-        Rule::do_until_stmt => parse_do_until(pair, max_loop_unroll),
-        Rule::while_stmt => parse_while(pair, max_loop_unroll),
-        Rule::until_stmt => parse_until(pair, max_loop_unroll),
-        Rule::for_stmt => parse_for(pair, max_loop_unroll),
-        Rule::foreach_stmt => parse_foreach(pair, max_loop_unroll),
+        Rule::if_stmt => vec![parse_if(pair, max_loop_unroll, assert_annotations)],
+        Rule::unless_stmt => vec![parse_unless(pair, max_loop_unroll, assert_annotations)],
+        Rule::do_while_stmt => parse_do_while(pair, max_loop_unroll, assert_annotations),
+        Rule::do_until_stmt => parse_do_until(pair, max_loop_unroll, assert_annotations),
+        Rule::while_stmt => parse_while(pair, max_loop_unroll, assert_annotations),
+        Rule::until_stmt => parse_until(pair, max_loop_unroll, assert_annotations),
+        Rule::for_stmt => parse_for(pair, max_loop_unroll, assert_annotations),
+        Rule::foreach_stmt => parse_foreach(pair, max_loop_unroll, assert_annotations),
         Rule::return_stmt => vec![parse_return(pair)],
         Rule::die_stmt => vec![parse_die(pair)],
         Rule::warn_stmt => vec![], // warn is a no-op for verification
@@ -409,18 +461,18 @@ fn parse_declare(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Declare { name }
 }
 
-fn parse_if(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
+fn parse_if(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Stmt {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("if must have a condition"))
         .expect("validated condition expression");
-    let then_branch = parse_block(inner.next().expect("if must have a then block"), max_loop_unroll);
+    let then_branch = parse_block(inner.next().expect("if must have a then block"), max_loop_unroll, assert_annotations);
     let mut elsif_clauses = Vec::new();
     let mut final_else = Vec::new();
 
     for clause in inner {
         match clause.as_rule() {
-            Rule::elsif_clause => elsif_clauses.push(parse_elsif_clause(clause, max_loop_unroll)),
-            Rule::else_clause => final_else = parse_else_clause(clause, max_loop_unroll),
+            Rule::elsif_clause => elsif_clauses.push(parse_elsif_clause(clause, max_loop_unroll, assert_annotations)),
+            Rule::else_clause => final_else = parse_else_clause(clause, max_loop_unroll, assert_annotations),
             other => unreachable!("unexpected if clause rule: {other:?}"),
         }
     }
@@ -443,14 +495,14 @@ fn parse_if(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
     }
 }
 
-fn parse_unless(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Stmt {
+fn parse_unless(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Stmt {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("unless must have a condition"))
         .expect("validated unless condition expression");
-    let then_block = parse_block(inner.next().expect("unless must have a block"), max_loop_unroll);
+    let then_block = parse_block(inner.next().expect("unless must have a block"), max_loop_unroll, assert_annotations);
     let else_branch = inner
         .find(|p| p.as_rule() == Rule::else_clause)
-        .map(|clause| parse_else_clause(clause, max_loop_unroll))
+        .map(|clause| parse_else_clause(clause, max_loop_unroll, assert_annotations))
         .unwrap_or_default();
 
     // Desugar: unless (COND) { A } else { B } => if (!(COND)) { A } else { B }
@@ -722,8 +774,9 @@ fn parse_dec(pair: Pair<'_, Rule>) -> Stmt {
     }
 }
 
-fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
-    pair.into_inner()
+fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
+    let stmt_pairs: Vec<_> = pair
+        .into_inner()
         .filter(|inner| {
             matches!(
                 inner.as_rule(),
@@ -753,13 +806,37 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::array_init_stmt
             )
         })
-        .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
-        .collect()
+        .collect();
+
+    if assert_annotations.is_empty() {
+        return stmt_pairs
+            .into_iter()
+            .flat_map(|pair| parse_stmt_with_asserts(pair, max_loop_unroll, assert_annotations))
+            .collect();
+    }
+
+    let mut stmts = Vec::new();
+    let mut assert_idx = 0;
+    for pair in stmt_pairs {
+        let stmt_line = pair.as_span().start_pos().line_col().0;
+        while assert_idx < assert_annotations.len()
+            && assert_annotations[assert_idx].0 < stmt_line
+        {
+            stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+            assert_idx += 1;
+        }
+        stmts.extend(parse_stmt_with_asserts(pair, max_loop_unroll, assert_annotations));
+    }
+    while assert_idx < assert_annotations.len() {
+        stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+        assert_idx += 1;
+    }
+    stmts
 }
 
-fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
-    let body = parse_block(inner.next().expect("do-while must have a body"), max_loop_unroll);
+    let body = parse_block(inner.next().expect("do-while must have a body"), max_loop_unroll, assert_annotations);
     let condition = build_expr(inner.next().expect("do-while must have a condition"))
         .expect("validated do-while condition");
 
@@ -853,9 +930,9 @@ fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     }
 }
 
-fn parse_do_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_do_until(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
-    let body = parse_block(inner.next().expect("do-until must have a body"), max_loop_unroll);
+    let body = parse_block(inner.next().expect("do-until must have a body"), max_loop_unroll, assert_annotations);
     let condition = build_expr(inner.next().expect("do-until must have a condition"))
         .expect("validated do-until condition");
     // Desugar: do { BODY } until (C) => do { BODY } while (!(C))
@@ -952,21 +1029,21 @@ fn parse_do_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     }
 }
 
-fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("while must have a condition"))
         .expect("validated while condition");
-    let body = parse_block(inner.next().expect("while must have a body"), max_loop_unroll);
+    let body = parse_block(inner.next().expect("while must have a body"), max_loop_unroll, assert_annotations);
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
     vec![Stmt::While { condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll, invariant: None }]
 }
 
-fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("until must have a condition"))
         .expect("validated until condition");
-    let body = parse_block(inner.next().expect("until must have a body"), max_loop_unroll);
+    let body = parse_block(inner.next().expect("until must have a body"), max_loop_unroll, assert_annotations);
 
     // Desugar: until (COND) { BODY } => while (!(COND)) { BODY }
     let negated_condition = Expr::Unary {
@@ -978,7 +1055,7 @@ fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     vec![Stmt::While { condition: negated_condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll, invariant: None }]
 }
 
-fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let inner = pair.into_inner();
     let mut init = Vec::new();
     let mut condition = None;
@@ -990,7 +1067,7 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
             Rule::for_assign if condition.is_none() => init.push(parse_for_assign(part)),
             Rule::expr => condition = Some(build_expr(part).expect("validated for condition")),
             Rule::for_assign => step.push(parse_for_assign(part)),
-            Rule::block => body = parse_block(part, max_loop_unroll),
+            Rule::block => body = parse_block(part, max_loop_unroll, assert_annotations),
             _ => {}
         }
     }
@@ -1003,7 +1080,7 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     init
 }
 
-fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     let mut inner = pair.into_inner();
     let loop_var = parse_variable(inner.next().expect("foreach must have a loop variable"));
     let array_name = inner
@@ -1011,7 +1088,7 @@ fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         .expect("foreach must have an array name")
         .as_str()
         .to_string();
-    let user_body = parse_block(inner.next().expect("foreach must have a body"), max_loop_unroll);
+    let user_body = parse_block(inner.next().expect("foreach must have a body"), max_loop_unroll, assert_annotations);
 
     // Desugar: foreach my $x (@arr) { BODY }
     // =>
@@ -1860,20 +1937,21 @@ fn transform_body_for_last_and_next(stmts: Vec<Stmt>, break_flag: &str, skip_fla
 
     result
 }
-fn parse_elsif_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> (Expr, Vec<Stmt>) {
+fn parse_elsif_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> (Expr, Vec<Stmt>) {
     let mut inner = pair.into_inner();
     let condition = build_expr(inner.next().expect("elsif must have a condition"))
         .expect("validated elsif condition expression");
-    let block = parse_block(inner.next().expect("elsif must have a block"), max_loop_unroll);
+    let block = parse_block(inner.next().expect("elsif must have a block"), max_loop_unroll, assert_annotations);
     (condition, block)
 }
 
-fn parse_else_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+fn parse_else_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations: &[(usize, Expr)]) -> Vec<Stmt> {
     parse_block(
         pair.into_inner()
             .next()
             .expect("else clause must contain a block"),
         max_loop_unroll,
+        assert_annotations,
     )
 }
 
