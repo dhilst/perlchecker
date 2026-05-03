@@ -824,12 +824,8 @@ fn execute_extern_call(
     }
 
     // Evaluate precondition with the actual arguments substituted
-    let pre = eval_expr(&ext.name, &ext.precondition, &annotation_env)
-        .unwrap_or(SymValue::Bool(BoolExpr::Const(true)));
-    let pre_bool = match pre {
-        SymValue::Bool(b) => b,
-        _ => BoolExpr::Const(true),
-    };
+    let pre = eval_expr(&ext.name, &ext.precondition, &annotation_env)?;
+    let pre_bool = expect_bool(pre, &ext.name)?;
 
     // Create a fresh symbolic return value
     let counter = EXTERN_FRESH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -838,12 +834,8 @@ fn execute_extern_call(
 
     // Evaluate postcondition with $result mapped to the fresh return value
     annotation_env.insert("result".to_string(), result_value.clone());
-    let post = eval_expr(&ext.name, &ext.postcondition, &annotation_env)
-        .unwrap_or(SymValue::Bool(BoolExpr::Const(true)));
-    let post_bool = match post {
-        SymValue::Bool(b) => b,
-        _ => BoolExpr::Const(true),
-    };
+    let post = eval_expr(&ext.name, &ext.postcondition, &annotation_env)?;
+    let post_bool = expect_bool(post, &ext.name)?;
 
     // Path condition: caller_pc AND precondition AND postcondition
     let pc = BoolExpr::And(
