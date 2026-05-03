@@ -33,6 +33,7 @@ pub enum Builtin {
     Length,
     Substr,
     Index,
+    Scalar,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -889,6 +890,27 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Int)
+            }
+            Builtin::Scalar => {
+                let [array] = args.as_slice() else {
+                    unreachable!("scalar arity is enforced by the parser");
+                };
+                let array_type = infer_expr_type(
+                    function,
+                    array,
+                    env,
+                    assumptions,
+                    signatures,
+                )?;
+                match array_type {
+                    ExprType::ArrayInt | ExprType::ArrayStr => Ok(ExprType::Int),
+                    _ => Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "scalar argument",
+                        expected: "Array<Int> or Array<Str>",
+                        found: render_expr_type(array_type),
+                    }),
+                }
             }
         },
     }

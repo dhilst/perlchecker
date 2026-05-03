@@ -216,6 +216,56 @@ index($x, $y)
 
 ---
 
+## Array Length via scalar(@arr)
+
+```perl
+scalar(@arr)
+```
+
+**Type signature:** `Array<T> → Int`
+
+**Semantics:**
+
+Returns the number of elements in an array. The scalar builtin is specifically designed for use with arrays in scalar context.
+
+**Grammar:**
+
+```text
+scalar_call = { "scalar" ~ "(" ~ "@" ~ ident ~ ")" }
+```
+
+**Note on naming:** The `@` prefix is required in scalar() calls; it denotes array context. Variables used elsewhere in the program use the `$` prefix.
+
+**Symbolic execution:**
+
+```
+scalar(@arr) → IntExpr::Var("arr__len")
+```
+
+The symbolic execution engine creates a companion length variable (`{array_name}__len`) for each array parameter. This variable is free/unconstrained unless bounded in a `# pre:` annotation.
+
+**Example usage:**
+
+```perl
+# sig: (Array<Int>) -> Int
+# pre: scalar(@arr) > 0
+# post: $result == scalar(@arr)
+sub get_array_length {
+    my ($arr) = @_;
+    return scalar(@arr);
+}
+```
+
+**SMT encoding:**
+
+```
+scalar(@arr) encodes to (Int::new_const "arr__len")
+```
+
+The length variable is unconstrained in the SMT solver unless explicitly bounded by preconditions.
+
+---
+
 ## Array
 
 ```perl

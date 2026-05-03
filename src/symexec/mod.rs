@@ -200,7 +200,16 @@ pub fn execute_cfg(
     for (cfg_param, ty) in cfg.params.iter().zip(function.arg_types.iter()) {
         let symbolic = symbolic_value(cfg_param.source.as_str(), *ty);
         env.insert(cfg_param.ssa_name.clone(), symbolic.clone());
-        annotation_env.insert(cfg_param.source.clone(), symbolic);
+        annotation_env.insert(cfg_param.source.clone(), symbolic.clone());
+
+        // For array parameters, add companion length variables
+        match ty {
+            Type::ArrayInt | Type::ArrayStr => {
+                let len_var = format!("{}__len", cfg_param.source);
+                annotation_env.insert(len_var.clone(), SymValue::Int(IntExpr::Var(len_var)));
+            }
+            _ => {}
+        }
     }
     let initial_path = expect_bool(
         eval_expr(&cfg.name, &function.pre, &annotation_env)?,
@@ -598,14 +607,23 @@ fn execute_call(
 
     let mut env = BTreeMap::new();
     let mut annotation_env = BTreeMap::new();
-    for ((param, _ty), arg_value) in cfg
+    for ((param, arg_type), arg_value) in cfg
         .params
         .iter()
         .zip(spec.arg_types.iter())
         .zip(args.into_iter())
     {
         env.insert(param.ssa_name.clone(), arg_value.clone());
-        annotation_env.insert(param.source.clone(), arg_value);
+        annotation_env.insert(param.source.clone(), arg_value.clone());
+
+        // For array parameters, add companion length variables
+        match arg_type {
+            Type::ArrayInt | Type::ArrayStr => {
+                let len_var = format!("{}__len", param.source);
+                annotation_env.insert(len_var.clone(), SymValue::Int(IntExpr::Var(len_var)));
+            }
+            _ => {}
+        }
     }
     let pre = expect_bool(eval_expr(callee, &spec.pre, &annotation_env)?, callee)?;
     let initial_path_condition = BoolExpr::And(Box::new(caller_path_condition), Box::new(pre));
@@ -846,6 +864,26 @@ fn eval_binary(
     })
 }
 
+fn extract_array_int_base_name(array: &SymValue) -> String {
+    match array {
+        SymValue::ArrayInt(ArrayIntExpr::Var(name)) => name.clone(),
+        SymValue::ArrayInt(ArrayIntExpr::Store(inner, _, _)) => extract_array_int_base_name(
+            &SymValue::ArrayInt((**inner).clone())
+        ),
+        _ => unreachable!("extract_array_int_base_name should only be called with ArrayInt"),
+    }
+}
+
+fn extract_array_str_base_name(array: &SymValue) -> String {
+    match array {
+        SymValue::ArrayStr(ArrayStrExpr::Var(name)) => name.clone(),
+        SymValue::ArrayStr(ArrayStrExpr::Store(inner, _, _)) => extract_array_str_base_name(
+            &SymValue::ArrayStr((**inner).clone())
+        ),
+        _ => unreachable!("extract_array_str_base_name should only be called with ArrayStr"),
+    }
+}
+
 fn eval_builtin(
     function: &str,
     builtin: Builtin,
@@ -879,6 +917,34 @@ fn eval_builtin(
                 Box::new(expect_str(haystack.clone(), function)?),
                 Box::new(expect_str(needle.clone(), function)?),
             ))
+        }
+        Builtin::Scalar => {
+            let [array] = args else {
+                unreachable!("scalar arity is enforced by the parser");
+            };
+            match array {
+                SymValue::ArrayInt(ArrayIntExpr::Var(name)) => {
+                    SymValue::Int(IntExpr::Var(format!("{name}__len")))
+                }
+                SymValue::ArrayInt(ArrayIntExpr::Store(_, _, _)) => {
+                    // For Store variants, we need to extract the base variable name
+                    let base_name = extract_array_int_base_name(array);
+                    SymValue::Int(IntExpr::Var(format!("{base_name}__len")))
+                }
+                SymValue::ArrayStr(ArrayStrExpr::Var(name)) => {
+                    SymValue::Int(IntExpr::Var(format!("{name}__len")))
+                }
+                SymValue::ArrayStr(ArrayStrExpr::Store(_, _, _)) => {
+                    // For Store variants, we need to extract the base variable name
+                    let base_name = extract_array_str_base_name(array);
+                    SymValue::Int(IntExpr::Var(format!("{base_name}__len")))
+                }
+                _ => {
+                    return Err(SymExecError::TypeMismatch {
+                        function: function.to_string(),
+                    });
+                }
+            }
         }
     })
 }

@@ -397,6 +397,7 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
             Rule::hash_access => parse_collection_access(primary, AccessKind::Hash),
             Rule::call_expr => parse_call_expr(primary),
             Rule::expr => build_expr(primary),
+            Rule::scalar_call => parse_scalar_call(primary),
             Rule::length_call => parse_builtin_call(primary, Builtin::Length),
             Rule::substr_call => parse_builtin_call(primary, Builtin::Substr),
             Rule::index_call => parse_builtin_call(primary, Builtin::Index),
@@ -438,6 +439,18 @@ fn build_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
             })
         })
         .parse(pair.into_inner())
+}
+
+fn parse_scalar_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let ident = inner
+        .next()
+        .ok_or_else(|| "scalar call must have an identifier".to_string())?;
+    let name = parse_bare_ident(ident);
+    Ok(Expr::Builtin {
+        function: Builtin::Scalar,
+        args: vec![Expr::Variable(name)],
+    })
 }
 
 fn parse_builtin_call(
@@ -760,5 +773,26 @@ mod tests {
         };
 
         assert!(parse_function_ast(&function).is_err());
+    }
+
+    #[test]
+    fn parses_scalar_call() {
+        let function = ExtractedFunction {
+            name: "test_scalar".to_string(),
+            annotations: Vec::new(),
+            body: r#"
+    my ($arr) = @_;
+    my $len = scalar(@arr);
+    return $len;
+"#
+            .to_string(),
+            start_line: 1,
+        };
+
+        let ast = parse_function_ast(&function).unwrap();
+        assert_eq!(ast.name, "test_scalar");
+        assert_eq!(ast.params, vec!["arr"]);
+        // Check that we have some statements (assignment and return)
+        assert!(ast.body.len() >= 2);
     }
 }
