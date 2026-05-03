@@ -1640,10 +1640,28 @@ fn well_defined_result_condition(result: &SymValue) -> BoolExpr {
         }
         SymValue::Str(expr) => BoolExpr::StrEq(Box::new(expr.clone()), Box::new(expr.clone())),
         SymValue::Bool(expr) => expr.clone(),
-        SymValue::ArrayInt(_)
-        | SymValue::ArrayStr(_)
-        | SymValue::HashInt(_)
-        | SymValue::HashStr(_) => BoolExpr::Const(true),
+        SymValue::ArrayInt(arr) => {
+            let access = IntExpr::ArraySelect(Box::new(arr.clone()), Box::new(IntExpr::Const(0)));
+            BoolExpr::IntCmp(CmpOp::Eq, Box::new(access.clone()), Box::new(access))
+        }
+        SymValue::ArrayStr(arr) => {
+            let access = StrExpr::ArraySelect(Box::new(arr.clone()), Box::new(IntExpr::Const(0)));
+            BoolExpr::StrEq(Box::new(access.clone()), Box::new(access))
+        }
+        SymValue::HashInt(hash) => {
+            let access = IntExpr::HashSelect(
+                Box::new(hash.clone()),
+                Box::new(StrExpr::Const("".to_string())),
+            );
+            BoolExpr::IntCmp(CmpOp::Eq, Box::new(access.clone()), Box::new(access))
+        }
+        SymValue::HashStr(hash) => {
+            let access = StrExpr::HashSelect(
+                Box::new(hash.clone()),
+                Box::new(StrExpr::Const("".to_string())),
+            );
+            BoolExpr::StrEq(Box::new(access.clone()), Box::new(access))
+        }
     }
 }
 
