@@ -35,6 +35,8 @@ pub enum Builtin {
     Index,
     Scalar,
     Abs,
+    Min,
+    Max,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -933,6 +935,30 @@ fn infer_expr_type(
                     function,
                     "abs argument",
                     value,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
+            Builtin::Min | Builtin::Max => {
+                let [left, right] = args.as_slice() else {
+                    unreachable!("min/max arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "min/max argument",
+                    left,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "min/max argument",
+                    right,
                     env,
                     assumptions,
                     ExprType::Int,

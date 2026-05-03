@@ -1046,6 +1046,40 @@ fn eval_builtin(
                 function,
             )?)))
         }
+        Builtin::Min => {
+            let [left, right] = args else {
+                unreachable!("min arity is enforced by the parser");
+            };
+            let left_int = expect_int(left.clone(), function)?;
+            let right_int = expect_int(right.clone(), function)?;
+            // min(a, b) = ite(a <= b, a, b)
+            SymValue::Int(IntExpr::Ite(
+                Box::new(BoolExpr::IntCmp(
+                    CmpOp::Le,
+                    Box::new(left_int.clone()),
+                    Box::new(right_int.clone()),
+                )),
+                Box::new(left_int),
+                Box::new(right_int),
+            ))
+        }
+        Builtin::Max => {
+            let [left, right] = args else {
+                unreachable!("max arity is enforced by the parser");
+            };
+            let left_int = expect_int(left.clone(), function)?;
+            let right_int = expect_int(right.clone(), function)?;
+            // max(a, b) = ite(a >= b, a, b)
+            SymValue::Int(IntExpr::Ite(
+                Box::new(BoolExpr::IntCmp(
+                    CmpOp::Ge,
+                    Box::new(left_int.clone()),
+                    Box::new(right_int.clone()),
+                )),
+                Box::new(left_int),
+                Box::new(right_int),
+            ))
+        }
     })
 }
 

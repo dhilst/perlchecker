@@ -506,6 +506,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::substr_call => parse_builtin_call(primary, Builtin::Substr),
             Rule::index_call => parse_builtin_call(primary, Builtin::Index),
             Rule::abs_call => parse_builtin_call(primary, Builtin::Abs),
+            Rule::min_call => parse_builtin_call(primary, Builtin::Min),
+            Rule::max_call => parse_builtin_call(primary, Builtin::Max),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {
