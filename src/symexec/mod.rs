@@ -153,6 +153,10 @@ pub struct Program {
 pub enum VerificationResult {
     Verified { function: String },
     Counterexample(Counterexample),
+    Unknown {
+        function: String,
+        max_unroll: usize,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -169,8 +173,8 @@ pub enum SymExecError {
     RecursionDetected { function: String },
     #[error("function `{function}` exceeded the maximum number of symbolic paths ({max_paths})")]
     PathLimitExceeded { function: String, max_paths: usize },
-    #[error("function `{function}` exceeded the loop unroll bound on a feasible path")]
-    LoopBoundExceeded { function: String },
+    #[error("function `{function}` exceeded the loop unroll bound (max {max_unroll} iterations) on a feasible path")]
+    LoopBoundExceeded { function: String, max_unroll: usize },
     #[error("function `{function}`: loop invariant does not hold on entry")]
     InvariantInitFailed { function: String },
     #[error("function `{function}`: loop invariant is not preserved by one iteration")]
@@ -388,6 +392,7 @@ fn execute_cfg_from_state(
                     if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
                         return Err(SymExecError::LoopBoundExceeded {
                             function: cfg.name.clone(),
+                            max_unroll: program.limits.max_loop_unroll,
                         });
                     }
                 }
@@ -430,7 +435,13 @@ pub fn verify_cfg(
     spec: &FunctionSpec,
     cfg: &ControlFlowGraph,
 ) -> std::result::Result<VerificationResult, SymExecError> {
-    let completed = execute_cfg(program, spec, cfg)?;
+    let completed = match execute_cfg(program, spec, cfg) {
+        Ok(completed) => completed,
+        Err(SymExecError::LoopBoundExceeded { function, max_unroll }) => {
+            return Ok(VerificationResult::Unknown { function, max_unroll });
+        }
+        Err(e) => return Err(e),
+    };
     let variables = cfg
         .params
         .iter()
@@ -1632,7 +1643,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_feasible_loop_bound_exhaustion() {
+    fn loop_bound_exhaustion_produces_unknown_verdict() {
         let function = ExtractedFunction {
             name: "spin".to_string(),
             annotations: vec![
@@ -1643,8 +1654,14 @@ mod tests {
             start_line: 1,
         };
 
-        let error = verify_extracted_function(&function).unwrap_err();
-        assert!(error.to_string().contains("loop unroll bound"));
+        let result = verify_extracted_function(&function).unwrap();
+        match result {
+            VerificationResult::Unknown { function, max_unroll } => {
+                assert_eq!(function, "spin");
+                assert_eq!(max_unroll, crate::limits::DEFAULT_MAX_LOOP_UNROLL);
+            }
+            other => panic!("expected Unknown, got {:?}", other),
+        }
     }
 
     #[test]

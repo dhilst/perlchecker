@@ -554,8 +554,10 @@ sub spin {
         .unwrap();
 
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(predicate::str::contains("loop unroll bound").eval(&stderr));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("UNKNOWN"));
+    assert!(stdout.contains("loop may exceed unroll bound"));
+    assert!(stdout.contains("Add a loop invariant"));
 }
 
 #[test]
@@ -1048,4 +1050,63 @@ sub accumulate {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("✔ multiply_by_five: verified"));
     assert!(stdout.contains("✔ accumulate: verified"));
+}
+
+#[test]
+fn check_loop_unknown_verdict() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("unknown.pl");
+    fs::write(
+        &file,
+        r#"
+# A function with a loop that exceeds the unroll bound
+# This should produce UNKNOWN, not an error
+# sig: (Int) -> Int
+# pre: $n >= 0 && $n <= 100
+# post: $result >= 0
+sub needs_invariant {
+    my ($n) = @_;
+    my $sum = 0;
+    my $i = 0;
+    while ($i < $n) {
+        $sum = $sum + 1;
+        $i = $i + 1;
+    }
+    return $sum;
+}
+
+# Same function but WITH an invariant — should verify
+# sig: (Int) -> Int
+# pre: $n >= 0 && $n <= 100
+# post: $result >= 0 && $result == $n
+sub has_invariant {
+    my ($n) = @_;
+    my $sum = 0;
+    my $i = 0;
+    # inv: $sum == $i && $i >= 0 && $i <= $n
+    while ($i < $n) {
+        $sum = $sum + 1;
+        $i = $i + 1;
+    }
+    return $sum;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    // Should fail (non-zero exit) because of the UNKNOWN verdict
+    assert!(!output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // First function should produce UNKNOWN
+    assert!(stdout.contains("needs_invariant: UNKNOWN"));
+    assert!(stdout.contains("loop may exceed unroll bound"));
+    assert!(stdout.contains("Add a loop invariant"));
+    // Second function should verify
+    assert!(stdout.contains("✔ has_invariant: verified"));
 }

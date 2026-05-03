@@ -91,6 +91,10 @@ fn run_check(path: PathBuf, limits: Limits) -> Result<()> {
                 failed = true;
                 print_counterexample(&example);
             }
+            VerificationResult::Unknown { function, max_unroll } => {
+                failed = true;
+                print_unknown(&function, max_unroll);
+            }
         }
     }
 
@@ -99,6 +103,15 @@ fn run_check(path: PathBuf, limits: Limits) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn print_unknown(function: &str, max_unroll: usize) {
+    println!(
+        "\u{26a0} {function}: UNKNOWN \u{2014} loop may exceed unroll bound (max {max_unroll} iterations)"
+    );
+    println!("  Add a loop invariant: # inv: <your invariant expression>");
+    println!("  The invariant must hold on loop entry, be preserved by each iteration,");
+    println!("  and together with the exit condition imply the postcondition.");
 }
 
 fn print_counterexample(example: &Counterexample) {
