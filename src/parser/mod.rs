@@ -438,7 +438,7 @@ fn parse_die(pair: Pair<'_, Rule>) -> Stmt {
         }
     }
 
-    let die_expr = expr.expect("die must contain an expression");
+    let die_expr = expr.unwrap_or_else(|| Expr::String(String::new()));
     let die_stmt = Stmt::Die(die_expr);
 
     // Handle statement modifier (die EXPR if/unless COND)
