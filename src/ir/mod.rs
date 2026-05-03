@@ -225,6 +225,28 @@ impl<'a> SsaBuilder<'a> {
                 op: *op,
                 expr: Box::new(self.rewrite_expr(expr, env, prefix)?),
             },
+            Expr::Binary { left, op: BinaryOp::Spaceship, right } => {
+                let lhs = self.rewrite_expr(left, env, prefix)?;
+                let rhs = self.rewrite_expr(right, env, prefix)?;
+                // Desugar: ($a <=> $b) => (($a < $b) ? -1 : (($a == $b) ? 0 : 1))
+                SsaExpr::Ite {
+                    condition: Box::new(SsaExpr::Binary {
+                        left: Box::new(lhs.clone()),
+                        op: BinaryOp::Lt,
+                        right: Box::new(rhs.clone()),
+                    }),
+                    then_expr: Box::new(SsaExpr::Int(-1)),
+                    else_expr: Box::new(SsaExpr::Ite {
+                        condition: Box::new(SsaExpr::Binary {
+                            left: Box::new(lhs),
+                            op: BinaryOp::Eq,
+                            right: Box::new(rhs),
+                        }),
+                        then_expr: Box::new(SsaExpr::Int(0)),
+                        else_expr: Box::new(SsaExpr::Int(1)),
+                    }),
+                }
+            }
             Expr::Binary { left, op, right } => SsaExpr::Binary {
                 left: Box::new(self.rewrite_expr(left, env, prefix)?),
                 op: *op,

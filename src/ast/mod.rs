@@ -117,6 +117,7 @@ pub enum BinaryOp {
     BitXor,
     Shl,
     Shr,
+    Spaceship,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -638,7 +639,7 @@ fn infer_expr_type(
         Expr::Binary { left, op, right } => match op {
             BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod
             | BinaryOp::Pow | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor
-            | BinaryOp::Shl | BinaryOp::Shr => {
+            | BinaryOp::Shl | BinaryOp::Shr | BinaryOp::Spaceship => {
                 expect_expr_type(
                     function,
                     "arithmetic operand",
@@ -1200,7 +1201,8 @@ fn complement_of_comparison(left: &Expr, op: &BinaryOp, right: &Expr) -> Option<
         | BinaryOp::BitOr
         | BinaryOp::BitXor
         | BinaryOp::Shl
-        | BinaryOp::Shr => return None,
+        | BinaryOp::Shr
+        | BinaryOp::Spaceship => return None,
     };
     Some(Expr::Binary {
         left: Box::new(left.clone()),

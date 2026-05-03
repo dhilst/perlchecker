@@ -1005,6 +1005,9 @@ fn eval_binary(
             Box::new(expect_bool(left, function)?),
             Box::new(expect_bool(right, function)?),
         )),
+        crate::ast::BinaryOp::Spaceship => {
+            unreachable!("`<=>` is desugared to Ite during IR lowering")
+        }
     })
 }
 
