@@ -42,6 +42,7 @@ pub enum Builtin {
     Chomp,
     Reverse,
     Int,
+    Contains,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1154,6 +1155,30 @@ fn infer_expr_type(
                         found: render_expr_type(arg_type),
                     });
                 }
+                Ok(ExprType::Int)
+            }
+            Builtin::Contains => {
+                let [haystack, needle] = args.as_slice() else {
+                    unreachable!("contains arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "contains haystack",
+                    haystack,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "contains needle",
+                    needle,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
                 Ok(ExprType::Int)
             }
         },

@@ -35,6 +35,7 @@ pub enum IntExpr {
     Length(Box<StrExpr>),
     Index(Box<StrExpr>, Box<StrExpr>, Box<IntExpr>),
     StrToInt(Box<StrExpr>),
+    Contains(Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
     HashSelect(Box<HashIntExpr>, Box<StrExpr>),
 }
@@ -1204,6 +1205,15 @@ fn eval_builtin(
                     });
                 }
             }
+        }
+        Builtin::Contains => {
+            let [haystack, needle] = args else {
+                unreachable!("contains arity is enforced by the parser");
+            };
+            SymValue::Int(IntExpr::Contains(
+                Box::new(expect_str(haystack.clone(), function)?),
+                Box::new(expect_str(needle.clone(), function)?),
+            ))
         }
     })
 }

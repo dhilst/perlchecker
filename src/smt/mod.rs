@@ -257,6 +257,15 @@ fn encode_int(expr: &IntExpr) -> Int {
                 Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
             }
         }
+        IntExpr::Contains(haystack, needle) => {
+            let ctx = &Context::thread_local();
+            let h = encode_str(haystack);
+            let n = encode_str(needle);
+            let contains_bool = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_contains(ctx.get_z3_context(), h.get_z3_ast(), n.get_z3_ast()).unwrap())
+            };
+            contains_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+        }
         IntExpr::Ite(cond, then_int, else_int) => {
             let cond_bool = encode_bool(cond);
             let then_encoded = encode_int(then_int);
@@ -495,6 +504,9 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Abs(value) => encode_int_safety(value),
         IntExpr::StrToInt(value) => encode_str_safety(value),
         IntExpr::Ord(value) => encode_str_safety(value),
+        IntExpr::Contains(haystack, needle) => {
+            Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle)])
+        }
         IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_int_safety(then_int),
@@ -637,6 +649,10 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         IntExpr::BitNot(value) => collect_string_vars_from_int(value, vars),
         IntExpr::Abs(value) => collect_string_vars_from_int(value, vars),
         IntExpr::StrToInt(value) => collect_string_vars_from_str(value, vars),
+        IntExpr::Contains(haystack, needle) => {
+            collect_string_vars_from_str(haystack, vars);
+            collect_string_vars_from_str(needle, vars);
+        }
         IntExpr::Ord(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Ite(cond, then_int, else_int) => {
             collect_string_vars_from_bool_inner(cond, vars);
