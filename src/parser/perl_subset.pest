@@ -3,7 +3,7 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
 
-stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | inc_stmt | dec_stmt | assign_stmt | declare_stmt }
+stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | list_assign_stmt | inc_stmt | dec_stmt | assign_stmt | declare_stmt }
 inc_stmt = { var ~ "++" ~ ";" }
 dec_stmt = { var ~ "--" ~ ";" }
 do_while_stmt = { "do" ~ block ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
@@ -20,6 +20,9 @@ say_stmt = { "say" ~ expr ~ ";" }
 unless_stmt = { "unless" ~ "(" ~ expr ~ ")" ~ block ~ else_clause? }
 parameter_binding = { "my" ~ "(" ~ var_list? ~ ")" ~ "=" ~ "@_" ~ ";" }
 var_list = { var ~ ("," ~ var)* }
+
+list_assign_stmt = { declaration? ~ "(" ~ var_list ~ ")" ~ "=" ~ "(" ~ expr_list ~ ")" ~ ";" }
+expr_list = { expr ~ ("," ~ expr)* }
 
 assign_stmt = { declaration? ~ var ~ assign_op ~ expr ~ assign_modifier? ~ ";" }
 assign_modifier = _{ assign_if | assign_unless }

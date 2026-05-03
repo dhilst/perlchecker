@@ -77,6 +77,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::assign_stmt
                     | Rule::array_assign_stmt
                     | Rule::hash_assign_stmt
+                    | Rule::list_assign_stmt
                     | Rule::declare_stmt
                     | Rule::if_stmt
                     | Rule::unless_stmt
@@ -127,6 +128,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::assign_stmt => vec![parse_assign(pair)],
         Rule::array_assign_stmt => vec![parse_array_assign(pair)],
         Rule::hash_assign_stmt => vec![parse_hash_assign(pair)],
+        Rule::list_assign_stmt => parse_list_assign(pair),
         Rule::declare_stmt => vec![parse_declare(pair)],
         Rule::if_stmt => vec![parse_if(pair, max_loop_unroll)],
         Rule::unless_stmt => vec![parse_unless(pair, max_loop_unroll)],
@@ -254,6 +256,62 @@ fn parse_hash_assign(pair: Pair<'_, Rule>) -> Stmt {
     let expr = build_expr(inner.next().expect("hash assignment must have an expression"))
         .expect("validated hash assignment expression");
     Stmt::HashAssign { name, key, expr }
+}
+
+fn parse_list_assign(pair: Pair<'_, Rule>) -> Vec<Stmt> {
+    let mut declaration = false;
+    let mut vars = Vec::new();
+    let mut exprs = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::declaration => declaration = true,
+            Rule::var_list => {
+                vars = inner
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::var)
+                    .map(parse_variable)
+                    .collect();
+            }
+            Rule::expr_list => {
+                exprs = inner
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::expr)
+                    .map(|p| build_expr(p).expect("validated list expression"))
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+
+    // To get swap semantics right, evaluate all RHS into temporaries first,
+    // then assign from temporaries to the target variables.
+    let mut stmts = Vec::new();
+    let temp_names: Vec<String> = (0..exprs.len())
+        .map(|i| format!("__list_tmp_{}", i))
+        .collect();
+
+    // Step 1: Assign each RHS expression to a temp variable
+    for (i, expr) in exprs.into_iter().enumerate() {
+        stmts.push(Stmt::Assign {
+            name: temp_names[i].clone(),
+            expr,
+            declaration: true,
+        });
+    }
+
+    // Step 2: Assign from temps to the target variables
+    for (i, var) in vars.into_iter().enumerate() {
+        if i < temp_names.len() {
+            stmts.push(Stmt::Assign {
+                name: var,
+                expr: Expr::Variable(temp_names[i].clone()),
+                declaration,
+            });
+        }
+    }
+
+    stmts
 }
 
 fn parse_declare(pair: Pair<'_, Rule>) -> Stmt {
@@ -480,6 +538,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::assign_stmt
                     | Rule::array_assign_stmt
                     | Rule::hash_assign_stmt
+                    | Rule::list_assign_stmt
                     | Rule::declare_stmt
                     | Rule::if_stmt
                     | Rule::unless_stmt
