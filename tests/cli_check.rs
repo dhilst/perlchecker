@@ -1217,3 +1217,119 @@ sub loop_assert {
     let stdout3 = String::from_utf8_lossy(&output3.stdout);
     assert!(stdout3.contains("✔ loop_assert: verified"));
 }
+
+#[test]
+fn check_extern_declarations() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("extern_test.pl");
+    fs::write(
+        &file,
+        r#"
+# extern: external_abs (Int) -> Int post: $result >= 0
+
+# sig: (Int) -> Int
+# pre: $x >= -100 && $x <= 100
+# post: $result >= 0
+sub use_external_abs {
+    my ($x) = @_;
+    my $result = external_abs($x);
+    return $result;
+}
+
+# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c
+
+# sig: (Int) -> Int
+# pre: $x >= -1000 && $x <= 1000
+# post: $result >= 0 && $result <= 100
+sub use_clamp {
+    my ($x) = @_;
+    return clamp($x, 0, 100);
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ use_external_abs: verified"));
+    assert!(stdout.contains("✔ use_clamp: verified"));
+}
+
+#[test]
+fn check_extern_local_function_takes_priority() {
+    // When a function is defined both as extern and locally, the local version wins
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("extern_priority.pl");
+    fs::write(
+        &file,
+        r#"
+# extern: inc (Int) -> Int post: $result == $a + 100
+
+# sig: (Int) -> Int
+# post: $result == $x + 1
+sub inc {
+    my ($x) = @_;
+    return $x + 1;
+}
+
+# sig: (Int) -> Int
+# post: $result == $x + 1
+sub use_inc {
+    my ($x) = @_;
+    return inc($x);
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    // Should succeed because local inc (returns x+1) is used, not extern (returns x+100)
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ inc: verified"));
+    assert!(stdout.contains("✔ use_inc: verified"));
+}
+
+#[test]
+fn check_extern_unknown_callee_without_extern() {
+    // Without an extern declaration, calling an unknown function should fail
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("no_extern.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# post: $result >= 0
+sub use_missing {
+    my ($x) = @_;
+    return missing_func($x);
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // The type checker rejects calls to unknown functions as "undeclared variable"
+    assert!(
+        stderr.contains("undeclared variable") || stderr.contains("unknown callee"),
+        "expected error about missing function, got: {stderr}"
+    );
+}

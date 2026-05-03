@@ -7,7 +7,7 @@ use tracing_subscriber::EnvFilter;
 use crate::{
     PerlcheckerError, Result, V1_LANGUAGE_SUBSET, extractor,
     limits::{DEFAULT_MAX_LOOP_UNROLL, DEFAULT_MAX_PATHS, DEFAULT_SOLVER_TIMEOUT_MS, Limits},
-    symexec::{Counterexample, ModelValue, VerificationResult, verify_extracted_functions},
+    symexec::{Counterexample, ModelValue, VerificationResult, verify_extracted_functions_with_externs},
 };
 
 #[derive(Debug, Parser)]
@@ -74,15 +74,20 @@ fn run_check(path: PathBuf, limits: Limits) -> Result<()> {
         source,
     })?;
     let functions = extractor::extract_annotated_functions(&source)?;
+    let extern_lines = extractor::extract_extern_lines(&source);
 
-    debug!(function_count = functions.len(), "extraction completed");
+    debug!(
+        function_count = functions.len(),
+        extern_count = extern_lines.len(),
+        "extraction completed"
+    );
     if functions.is_empty() {
         println!("Found 0 annotated functions");
         return Ok(());
     }
 
     let mut failed = false;
-    for result in verify_extracted_functions(&functions, limits)? {
+    for result in verify_extracted_functions_with_externs(&functions, &extern_lines, limits)? {
         match result {
             VerificationResult::Verified { function } => {
                 println!("✔ {function}: verified");

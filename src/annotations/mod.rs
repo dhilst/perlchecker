@@ -13,6 +13,7 @@ pub const SIG_PREFIX: &str = "# sig:";
 pub const PRE_PREFIX: &str = "# pre:";
 pub const POST_PREFIX: &str = "# post:";
 pub const POS_PREFIX: &str = "# pos:";
+pub const EXTERN_PREFIX: &str = "# extern:";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionSpec {
@@ -21,6 +22,15 @@ pub struct FunctionSpec {
     pub ret_type: Type,
     pub pre: Expr,
     pub post: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternSpec {
+    pub name: String,
+    pub param_types: Vec<Type>,
+    pub return_type: Type,
+    pub precondition: Expr,
+    pub postcondition: Expr,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -61,6 +71,12 @@ pub enum AnnotationError {
         directive: &'static str,
         expression: String,
     },
+    #[error("invalid extern declaration: {declaration}")]
+    InvalidExternDeclaration { declaration: String },
+    #[error("extern `{name}` uses unsupported type `{type_name}`")]
+    UnsupportedExternType { name: String, type_name: String },
+    #[error("extern `{name}` has an invalid expression: {expression}")]
+    InvalidExternExpression { name: String, expression: String },
 }
 
 pub fn parse_function_spec(
@@ -332,6 +348,114 @@ fn parse_expression(
     })
 }
 
+/// Parse a `# extern:` annotation line into an `ExternSpec`.
+///
+/// Format: `# extern: NAME (Type1, Type2) -> RetType pre: EXPR post: EXPR`
+/// The `pre:` and `post:` clauses are optional (default to `true`).
+pub fn parse_extern_line(line: &str) -> std::result::Result<ExternSpec, AnnotationError> {
+    let raw = line
+        .trim()
+        .strip_prefix(EXTERN_PREFIX)
+        .ok_or_else(|| AnnotationError::InvalidExternDeclaration {
+            declaration: line.to_string(),
+        })?
+        .trim();
+
+    // Split off optional `post:` clause first (so we don't confuse it with sig content)
+    let (before_post, postcondition) = if let Some(idx) = raw.find(" post:") {
+        let post_expr = raw[idx + " post:".len()..].trim();
+        (&raw[..idx], post_expr)
+        } else {
+        (raw, "")
+    };
+
+    // Split off optional `pre:` clause
+    let (before_pre, precondition) = if let Some(idx) = before_post.find(" pre:") {
+        let pre_expr = before_post[idx + " pre:".len()..].trim();
+        (&before_post[..idx], pre_expr)
+    } else {
+        (before_post, "")
+    };
+
+    // Now `before_pre` should be: NAME (Type1, Type2, ...) -> RetType
+    let sig_part = before_pre.trim();
+
+    // Extract function name (first token before '(')
+    let paren_start = sig_part.find('(').ok_or_else(|| {
+        AnnotationError::InvalidExternDeclaration {
+            declaration: line.to_string(),
+        }
+    })?;
+    let name = sig_part[..paren_start].trim().to_string();
+    if name.is_empty() {
+        return Err(AnnotationError::InvalidExternDeclaration {
+            declaration: line.to_string(),
+        });
+    }
+
+    // Parse signature: (Type1, Type2, ...) -> RetType
+    let sig_remainder = &sig_part[paren_start..];
+    let (raw_args, raw_ret) =
+        sig_remainder
+            .split_once("->")
+            .ok_or_else(|| AnnotationError::InvalidExternDeclaration {
+                declaration: line.to_string(),
+            })?;
+
+    let args = raw_args.trim();
+    if !args.starts_with('(') || !args.ends_with(')') {
+        return Err(AnnotationError::InvalidExternDeclaration {
+            declaration: line.to_string(),
+        });
+    }
+
+    let param_types = split_signature_types(&args[1..args.len() - 1])
+        .into_iter()
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            parse_type(&name, &part).map_err(|_| AnnotationError::UnsupportedExternType {
+                name: name.clone(),
+                type_name: part,
+            })
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let return_type =
+        parse_type(&name, raw_ret.trim()).map_err(|_| AnnotationError::UnsupportedExternType {
+            name: name.clone(),
+            type_name: raw_ret.trim().to_string(),
+        })?;
+
+    let pre = if precondition.is_empty() {
+        Expr::Bool(true)
+    } else {
+        parser::parse_expr(precondition).map_err(|_| AnnotationError::InvalidExternExpression {
+            name: name.clone(),
+            expression: precondition.to_string(),
+        })?
+    };
+
+    let post = if postcondition.is_empty() {
+        Expr::Bool(true)
+    } else {
+        parser::parse_expr(postcondition).map_err(|_| AnnotationError::InvalidExternExpression {
+            name: name.clone(),
+            expression: postcondition.to_string(),
+        })?
+    };
+
+    debug!(name = name, param_count = param_types.len(), "parsed extern declaration");
+
+    Ok(ExternSpec {
+        name,
+        param_types,
+        return_type,
+        precondition: pre,
+        postcondition: post,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -339,7 +463,55 @@ mod tests {
         extractor::ExtractedFunction,
     };
 
-    use super::{AnnotationError, parse_function_spec};
+    use super::{AnnotationError, parse_extern_line, parse_function_spec};
+
+    #[test]
+    fn parses_extern_with_postcondition_only() {
+        let ext = parse_extern_line("# extern: abs_val (Int) -> Int post: $result >= 0").unwrap();
+        assert_eq!(ext.name, "abs_val");
+        assert_eq!(ext.param_types, vec![Type::Int]);
+        assert_eq!(ext.return_type, Type::Int);
+        assert_eq!(ext.precondition, Expr::Bool(true));
+        assert_eq!(
+            ext.postcondition,
+            Expr::Binary {
+                left: Box::new(Expr::Variable("result".to_string())),
+                op: BinaryOp::Ge,
+                right: Box::new(Expr::Int(0)),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_extern_with_pre_and_post() {
+        let ext = parse_extern_line(
+            "# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c",
+        )
+        .unwrap();
+        assert_eq!(ext.name, "clamp");
+        assert_eq!(ext.param_types, vec![Type::Int, Type::Int, Type::Int]);
+        assert_eq!(ext.return_type, Type::Int);
+        // precondition: $b <= $c
+        assert!(ext.precondition != Expr::Bool(true));
+        // postcondition: $result >= $b && $result <= $c
+        assert!(ext.postcondition != Expr::Bool(true));
+    }
+
+    #[test]
+    fn parses_extern_with_no_conditions() {
+        let ext = parse_extern_line("# extern: noop (Int) -> Int").unwrap();
+        assert_eq!(ext.name, "noop");
+        assert_eq!(ext.param_types, vec![Type::Int]);
+        assert_eq!(ext.return_type, Type::Int);
+        assert_eq!(ext.precondition, Expr::Bool(true));
+        assert_eq!(ext.postcondition, Expr::Bool(true));
+    }
+
+    #[test]
+    fn rejects_extern_with_missing_arrow() {
+        let err = parse_extern_line("# extern: bad (Int) Int").unwrap_err();
+        assert!(matches!(err, AnnotationError::InvalidExternDeclaration { .. }));
+    }
 
     #[test]
     fn parses_valid_function_spec() {

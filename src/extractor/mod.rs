@@ -1,4 +1,4 @@
-use crate::annotations::SIG_PREFIX;
+use crate::annotations::{EXTERN_PREFIX, SIG_PREFIX};
 use thiserror::Error;
 use tracing::debug;
 
@@ -84,6 +84,21 @@ pub fn extract_annotated_functions(source: &str) -> Result<Vec<ExtractedFunction
     }
 
     Ok(extracted)
+}
+
+/// Extract standalone `# extern:` declaration lines from the source.
+/// These are lines that start with `# extern:` and are not part of an
+/// annotation block attached to a `sub` definition.
+pub fn extract_extern_lines(source: &str) -> Vec<String> {
+    let mut extern_lines = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with(EXTERN_PREFIX) {
+            extern_lines.push(line.to_string());
+        }
+    }
+    debug!(count = extern_lines.len(), "extracted extern declarations");
+    extern_lines
 }
 
 fn parse_sub_header(line: &str) -> Option<String> {

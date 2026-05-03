@@ -4,7 +4,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    annotations::{FunctionSpec, parse_function_spec},
+    annotations::{ExternSpec, FunctionSpec, parse_extern_line, parse_function_spec},
     ast::{AccessKind, Builtin, Expr, Type, type_check_function_with_signatures},
     extractor::ExtractedFunction,
     ir::{self, BlockStmt, ControlFlowGraph, SsaExpr, Terminator},
@@ -146,6 +146,7 @@ pub struct Program {
     pub order: Vec<String>,
     pub specs: BTreeMap<String, FunctionSpec>,
     pub cfgs: BTreeMap<String, ControlFlowGraph>,
+    pub externs: BTreeMap<String, ExternSpec>,
     pub limits: Limits,
 }
 
@@ -212,7 +213,15 @@ pub fn verify_extracted_functions(
     functions: &[ExtractedFunction],
     limits: Limits,
 ) -> crate::Result<Vec<VerificationResult>> {
-    let program = prepare_program(functions, limits)?;
+    verify_extracted_functions_with_externs(functions, &[], limits)
+}
+
+pub fn verify_extracted_functions_with_externs(
+    functions: &[ExtractedFunction],
+    extern_lines: &[String],
+    limits: Limits,
+) -> crate::Result<Vec<VerificationResult>> {
+    let program = prepare_program(functions, extern_lines, limits)?;
     program
         .order
         .iter()
@@ -506,10 +515,21 @@ pub fn verify_cfg(
     })
 }
 
-fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Result<Program> {
+fn prepare_program(
+    functions: &[ExtractedFunction],
+    extern_lines: &[String],
+    limits: Limits,
+) -> crate::Result<Program> {
     let mut order = Vec::new();
     let mut specs = BTreeMap::new();
     let mut asts = BTreeMap::new();
+
+    // Parse extern declarations
+    let mut externs = BTreeMap::new();
+    for line in extern_lines {
+        let ext = parse_extern_line(line)?;
+        externs.insert(ext.name.clone(), ext);
+    }
 
     for function in functions {
         let spec = parse_function_spec(function)?;
@@ -519,10 +539,17 @@ fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Re
         asts.insert(function.name.clone(), ast);
     }
 
-    let signatures = specs
+    // Build signatures map including both local functions and externs
+    let mut signatures = specs
         .iter()
         .map(|(name, spec)| (name.clone(), (spec.arg_types.clone(), spec.ret_type)))
         .collect::<BTreeMap<_, _>>();
+    for (name, ext) in &externs {
+        // Local functions take priority over externs
+        if !signatures.contains_key(name) {
+            signatures.insert(name.clone(), (ext.param_types.clone(), ext.return_type));
+        }
+    }
 
     for name in &order {
         let spec = specs.get(name).expect("spec must exist");
@@ -536,7 +563,8 @@ fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Re
         .collect::<BTreeMap<_, _>>();
     for (function, callees) in &call_graph {
         for callee in callees {
-            if !specs.contains_key(callee) {
+            // Allow callees that are either local specs or externs
+            if !specs.contains_key(callee) && !externs.contains_key(callee) {
                 return Err(crate::PerlcheckerError::from(SymExecError::UnknownCallee {
                     function: function.clone(),
                     callee: callee.clone(),
@@ -544,6 +572,7 @@ fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Re
             }
         }
     }
+    // Only detect recursion among local functions (externs have no body)
     detect_recursion(&call_graph)?;
 
     let mut cfgs = BTreeMap::new();
@@ -553,7 +582,7 @@ fn prepare_program(functions: &[ExtractedFunction], limits: Limits) -> crate::Re
         cfgs.insert(name.clone(), ir::build_cfg(&ssa));
     }
 
-    Ok(Program { order, specs, cfgs, limits })
+    Ok(Program { order, specs, cfgs, externs, limits })
 }
 
 fn collect_called_functions(function: &crate::ast::FunctionAst) -> Vec<String> {
@@ -679,6 +708,10 @@ fn detect_recursion(call_graph: &BTreeMap<String, Vec<String>>) -> crate::Result
     Ok(())
 }
 
+/// Counter for generating unique fresh variable names for extern return values.
+static EXTERN_FRESH_COUNTER: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 fn execute_call(
     program: &Program,
     caller: &str,
@@ -686,13 +719,21 @@ fn execute_call(
     args: Vec<SymValue>,
     caller_path_condition: BoolExpr,
 ) -> std::result::Result<Vec<CompletedState>, SymExecError> {
+    // Check for extern declaration first if callee is not a local function
+    if !program.specs.contains_key(callee) {
+        if let Some(ext) = program.externs.get(callee) {
+            return execute_extern_call(program, caller, ext, args, caller_path_condition);
+        }
+        return Err(SymExecError::UnknownCallee {
+            function: caller.to_string(),
+            callee: callee.to_string(),
+        });
+    }
+
     let spec = program
         .specs
         .get(callee)
-        .ok_or_else(|| SymExecError::UnknownCallee {
-            function: caller.to_string(),
-            callee: callee.to_string(),
-        })?;
+        .expect("callee spec must exist after check");
     let cfg = program
         .cfgs
         .get(callee)
@@ -733,6 +774,83 @@ fn execute_call(
             path_condition: initial_path_condition,
         },
     )
+}
+
+/// Execute a call to an extern function using its contract.
+///
+/// 1. Map actual argument values to synthetic parameter names ($a, $b, $c, ...)
+/// 2. Evaluate the precondition and add it to the path condition
+/// 3. Create a fresh symbolic return value
+/// 4. Evaluate the postcondition (with $result mapped to the fresh return value)
+/// 5. Add the postcondition as an assumption to the path condition
+/// 6. Return the fresh symbolic return value
+fn execute_extern_call(
+    _program: &Program,
+    caller: &str,
+    ext: &ExternSpec,
+    args: Vec<SymValue>,
+    caller_path_condition: BoolExpr,
+) -> std::result::Result<Vec<CompletedState>, SymExecError> {
+    // Build an environment mapping synthetic parameter names to actual argument values.
+    // The extern's pre/post conditions use variables like $a, $b, $c, ... or
+    // whatever was parsed from the expression. We use positional synthetic names
+    // matching common Perl conventions: a, b, c, d, ...
+    let param_names: Vec<String> = (0..ext.param_types.len())
+        .map(|i| {
+            // Use letters a, b, c, ... for parameter names
+            let ch = (b'a' + i as u8) as char;
+            ch.to_string()
+        })
+        .collect();
+
+    let mut annotation_env = BTreeMap::new();
+    for (name, arg_value) in param_names.iter().zip(args.iter()) {
+        annotation_env.insert(name.clone(), arg_value.clone());
+    }
+
+    // Evaluate precondition with the actual arguments substituted
+    let pre = eval_expr(&ext.name, &ext.precondition, &annotation_env)
+        .unwrap_or(SymValue::Bool(BoolExpr::Const(true)));
+    let pre_bool = match pre {
+        SymValue::Bool(b) => b,
+        _ => BoolExpr::Const(true),
+    };
+
+    // Create a fresh symbolic return value
+    let counter = EXTERN_FRESH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let fresh_name = format!("__extern_{}_{}", ext.name, counter);
+    let result_value = symbolic_value(&fresh_name, ext.return_type);
+
+    // Evaluate postcondition with $result mapped to the fresh return value
+    annotation_env.insert("result".to_string(), result_value.clone());
+    let post = eval_expr(&ext.name, &ext.postcondition, &annotation_env)
+        .unwrap_or(SymValue::Bool(BoolExpr::Const(true)));
+    let post_bool = match post {
+        SymValue::Bool(b) => b,
+        _ => BoolExpr::Const(true),
+    };
+
+    // Path condition: caller_pc AND precondition AND postcondition
+    let pc = BoolExpr::And(
+        Box::new(BoolExpr::And(
+            Box::new(caller_path_condition),
+            Box::new(pre_bool),
+        )),
+        Box::new(post_bool),
+    );
+
+    debug!(
+        caller = caller,
+        extern_name = ext.name,
+        fresh_var = fresh_name,
+        "executed extern call"
+    );
+
+    Ok(vec![CompletedState {
+        env: BTreeMap::new(),
+        path_condition: pc,
+        result: result_value,
+    }])
 }
 
 fn symbolic_value(name: &str, ty: Type) -> SymValue {
@@ -1710,7 +1828,7 @@ mod tests {
         crate::ast::type_check_function(&spec, &ast).unwrap();
         let ssa = crate::ir::lower_to_ssa(&ast).unwrap();
         let cfg = crate::ir::build_cfg(&ssa);
-        let program = prepare_program(std::slice::from_ref(&function), Default::default()).unwrap();
+        let program = prepare_program(std::slice::from_ref(&function), &[], Default::default()).unwrap();
         let states = execute_cfg(&program, &spec, &cfg).unwrap();
 
         assert_eq!(states.len(), 2);
@@ -1752,5 +1870,96 @@ mod tests {
 
         let error = verify_extracted_function(&function).unwrap_err();
         assert!(error.to_string().contains("die"));
+    }
+
+    #[test]
+    fn verifies_extern_call_with_postcondition() {
+        let functions = vec![ExtractedFunction {
+            name: "use_ext".to_string(),
+            annotations: vec![
+                "# sig: (Int) -> Int".to_string(),
+                "# post: $result >= 0".to_string(),
+            ],
+            body: "\n    my ($x) = @_;\n    return ext_abs($x);\n".to_string(),
+            start_line: 1,
+        }];
+
+        let extern_lines = vec![
+            "# extern: ext_abs (Int) -> Int post: $result >= 0".to_string(),
+        ];
+
+        let results = super::verify_extracted_functions_with_externs(
+            &functions,
+            &extern_lines,
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0], VerificationResult::Verified { .. }));
+    }
+
+    #[test]
+    fn extern_call_without_declaration_fails() {
+        let functions = vec![ExtractedFunction {
+            name: "use_missing".to_string(),
+            annotations: vec![
+                "# sig: (Int) -> Int".to_string(),
+                "# post: $result >= 0".to_string(),
+            ],
+            body: "\n    my ($x) = @_;\n    return missing($x);\n".to_string(),
+            start_line: 1,
+        }];
+
+        let error = super::verify_extracted_functions_with_externs(
+            &functions,
+            &[],
+            Default::default(),
+        )
+        .unwrap_err();
+        let msg = error.to_string();
+        // The type checker rejects calls to unknown functions as "undeclared variable"
+        assert!(
+            msg.contains("undeclared variable") || msg.contains("unknown callee"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn local_function_takes_priority_over_extern() {
+        let functions = vec![
+            ExtractedFunction {
+                name: "inc".to_string(),
+                annotations: vec![
+                    "# sig: (Int) -> Int".to_string(),
+                    "# post: $result == $x + 1".to_string(),
+                ],
+                body: "\n    my ($x) = @_;\n    return $x + 1;\n".to_string(),
+                start_line: 1,
+            },
+            ExtractedFunction {
+                name: "use_inc".to_string(),
+                annotations: vec![
+                    "# sig: (Int) -> Int".to_string(),
+                    "# post: $result == $x + 1".to_string(),
+                ],
+                body: "\n    my ($x) = @_;\n    return inc($x);\n".to_string(),
+                start_line: 6,
+            },
+        ];
+
+        // Extern declares inc returns x + 100 (wrong), but local inc returns x + 1 (correct)
+        let extern_lines = vec![
+            "# extern: inc (Int) -> Int post: $result == $a + 100".to_string(),
+        ];
+
+        let results = super::verify_extracted_functions_with_externs(
+            &functions,
+            &extern_lines,
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(matches!(results[0], VerificationResult::Verified { .. }));
+        assert!(matches!(results[1], VerificationResult::Verified { .. }));
     }
 }
