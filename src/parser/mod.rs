@@ -1485,9 +1485,17 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             | pest::pratt_parser::Op::prefix(Rule::op_low_not))
         .map_primary(|primary| match primary.as_rule() {
             Rule::int => {
-                Ok(Expr::Int(primary.as_str().parse().map_err(|_| {
-                    format!("invalid integer: {}", primary.as_str())
-                })?))
+                let s = primary.as_str();
+                let value = if let Some(hex) = s.strip_prefix("0x") {
+                    i64::from_str_radix(hex, 16).map_err(|_| {
+                        format!("invalid hex integer: {}", s)
+                    })?
+                } else {
+                    s.parse().map_err(|_| {
+                        format!("invalid integer: {}", s)
+                    })?
+                };
+                Ok(Expr::Int(value))
             }
             Rule::string => Ok(Expr::String(parse_string_literal(primary.as_str())?)),
             Rule::var => Ok(Expr::Variable(parse_variable(primary))),
@@ -1620,11 +1628,19 @@ fn parse_access_operand(pair: Pair<'_, Rule>) -> std::result::Result<Expr, Strin
         Rule::bare_ident => Ok(Expr::Variable(parse_bare_ident(pair))),
         Rule::expr => build_expr(pair),
         Rule::var => Ok(Expr::Variable(parse_variable(pair))),
-        Rule::int => Ok(Expr::Int(
-            pair.as_str()
-                .parse()
-                .map_err(|_| format!("invalid integer: {}", pair.as_str()))?,
-        )),
+        Rule::int => {
+            let s = pair.as_str();
+            let value = if let Some(hex) = s.strip_prefix("0x") {
+                i64::from_str_radix(hex, 16).map_err(|_| {
+                    format!("invalid hex integer: {}", s)
+                })?
+            } else {
+                s.parse().map_err(|_| {
+                    format!("invalid integer: {}", s)
+                })?
+            };
+            Ok(Expr::Int(value))
+        }
         Rule::string => Ok(Expr::String(parse_string_literal(pair.as_str())?)),
         other => Err(format!("unexpected access operand: {other:?}")),
     }
