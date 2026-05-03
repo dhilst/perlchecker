@@ -110,45 +110,46 @@ pub fn find_model_with_timeout(
                 let value = match variable.ty {
                     Type::Int => {
                         let symbol = Int::new_const(variable.name.clone());
-                        let value = model
+                        match model
                             .eval(&symbol, true)
                             .and_then(|value| value.as_i64())
-                            .unwrap_or(0);
-                        ModelValue::Int(value)
+                        {
+                            Some(value) => ModelValue::Int(value),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     Type::Str => {
                         let symbol = Z3String::new_const(variable.name.clone());
-                        let value = model
+                        match model
                             .eval(&symbol, true)
                             .and_then(|value| value.as_string())
-                            .unwrap_or_default();
-                        ModelValue::Str(value)
+                        {
+                            Some(value) => ModelValue::Str(value),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     Type::ArrayInt => {
                         let symbol = Array::new_const(variable.name.clone(), &Sort::int(), &Sort::int());
-                        let value = model
-                            .eval(&symbol, true)
-                            .map(|value| value.to_string())
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        ModelValue::Collection(value)
+                        match model.eval(&symbol, true) {
+                            Some(value) => ModelValue::Collection(value.to_string()),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     Type::ArrayStr => {
                         let symbol =
                             Array::new_const(variable.name.clone(), &Sort::int(), &Sort::string());
-                        let value = model
-                            .eval(&symbol, true)
-                            .map(|value| value.to_string())
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        ModelValue::Collection(value)
+                        match model.eval(&symbol, true) {
+                            Some(value) => ModelValue::Collection(value.to_string()),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     Type::HashInt => {
                         let symbol =
                             Array::new_const(variable.name.clone(), &Sort::string(), &Sort::int());
-                        let value = model
-                            .eval(&symbol, true)
-                            .map(|value| value.to_string())
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        ModelValue::Collection(value)
+                        match model.eval(&symbol, true) {
+                            Some(value) => ModelValue::Collection(value.to_string()),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     Type::HashStr => {
                         let symbol = Array::new_const(
@@ -156,17 +157,16 @@ pub fn find_model_with_timeout(
                             &Sort::string(),
                             &Sort::string(),
                         );
-                        let value = model
-                            .eval(&symbol, true)
-                            .map(|value| value.to_string())
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        ModelValue::Collection(value)
+                        match model.eval(&symbol, true) {
+                            Some(value) => ModelValue::Collection(value.to_string()),
+                            None => ModelValue::Unconstrained,
+                        }
                     }
                     // References are desugared before SMT; these should never appear.
                     Type::RefInt | Type::RefStr
                     | Type::RefArrayInt | Type::RefArrayStr
                     | Type::RefHashInt | Type::RefHashStr => {
-                        ModelValue::Int(0)
+                        ModelValue::Unconstrained
                     }
                 };
                 assignments.insert(variable.name.clone(), value);

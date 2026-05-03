@@ -127,6 +127,7 @@ fn print_counterexample(example: &Counterexample) {
             ModelValue::Int(value) => println!("  {name} = {value}"),
             ModelValue::Str(value) => println!("  {name} = \"{value}\""),
             ModelValue::Collection(value) => println!("  {name} = {value}"),
+            ModelValue::Unconstrained => println!("  {name} = <unconstrained>"),
         }
     }
 }

@@ -133,6 +133,7 @@ pub enum ModelValue {
     Int(i64),
     Str(String),
     Collection(String),
+    Unconstrained,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
