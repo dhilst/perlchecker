@@ -83,6 +83,8 @@ pub fn parse_function_ast_with_limits(
                     | Rule::return_stmt
                     | Rule::die_stmt
                     | Rule::warn_stmt
+                    | Rule::print_stmt
+                    | Rule::say_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
@@ -136,6 +138,8 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::return_stmt => vec![parse_return(pair)],
         Rule::die_stmt => vec![parse_die(pair)],
         Rule::warn_stmt => vec![], // warn is a no-op for verification
+        Rule::print_stmt => vec![], // print is a no-op for verification
+        Rule::say_stmt => vec![], // say is a no-op for verification
         Rule::last_stmt => vec![Stmt::Last],
         Rule::next_stmt => vec![Stmt::Next],
         Rule::push_stmt => vec![parse_push(pair)],
@@ -361,14 +365,58 @@ fn parse_return(pair: Pair<'_, Rule>) -> Stmt {
 }
 
 fn parse_die(pair: Pair<'_, Rule>) -> Stmt {
-    let expr = pair
-        .into_inner()
-        .find(|inner| inner.as_rule() == Rule::expr)
-        .map(build_expr)
-        .expect("die must contain an expression")
-        .expect("validated die expression");
+    let mut expr = None;
+    let mut modifier: Option<Pair<'_, Rule>> = None;
 
-    Stmt::Die(expr)
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::expr if expr.is_none() => {
+                expr = Some(build_expr(inner).expect("validated die expression"));
+            }
+            Rule::die_if | Rule::die_unless => {
+                modifier = Some(inner);
+            }
+            _ => {}
+        }
+    }
+
+    let die_expr = expr.expect("die must contain an expression");
+    let die_stmt = Stmt::Die(die_expr);
+
+    // Handle statement modifier (die EXPR if/unless COND)
+    if let Some(mod_pair) = modifier {
+        match mod_pair.as_rule() {
+            Rule::die_if => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("die_if must have a condition"),
+                )
+                .expect("validated die_if condition");
+                return Stmt::If {
+                    condition,
+                    then_branch: vec![die_stmt],
+                    else_branch: Vec::new(),
+                };
+            }
+            Rule::die_unless => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("die_unless must have a condition"),
+                )
+                .expect("validated die_unless condition");
+                let negated = Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(condition),
+                };
+                return Stmt::If {
+                    condition: negated,
+                    then_branch: vec![die_stmt],
+                    else_branch: Vec::new(),
+                };
+            }
+            _ => {}
+        }
+    }
+
+    die_stmt
 }
 
 fn parse_push(pair: Pair<'_, Rule>) -> Stmt {
@@ -438,6 +486,8 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::return_stmt
                     | Rule::die_stmt
                     | Rule::warn_stmt
+                    | Rule::print_stmt
+                    | Rule::say_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
