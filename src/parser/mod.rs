@@ -142,8 +142,8 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::warn_stmt => vec![], // warn is a no-op for verification
         Rule::print_stmt => vec![], // print is a no-op for verification
         Rule::say_stmt => vec![], // say is a no-op for verification
-        Rule::last_stmt => vec![Stmt::Last],
-        Rule::next_stmt => vec![Stmt::Next],
+        Rule::last_stmt => vec![parse_last(pair)],
+        Rule::next_stmt => vec![parse_next(pair)],
         Rule::push_stmt => vec![parse_push(pair)],
         Rule::inc_stmt => vec![parse_inc(pair)],
         Rule::dec_stmt => vec![parse_dec(pair)],
@@ -475,6 +475,100 @@ fn parse_die(pair: Pair<'_, Rule>) -> Stmt {
     }
 
     die_stmt
+}
+
+fn parse_last(pair: Pair<'_, Rule>) -> Stmt {
+    let mut modifier: Option<Pair<'_, Rule>> = None;
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::last_if | Rule::last_unless => {
+                modifier = Some(inner);
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(mod_pair) = modifier {
+        match mod_pair.as_rule() {
+            Rule::last_if => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("last_if must have a condition"),
+                )
+                .expect("validated last_if condition");
+                return Stmt::If {
+                    condition,
+                    then_branch: vec![Stmt::Last],
+                    else_branch: Vec::new(),
+                };
+            }
+            Rule::last_unless => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("last_unless must have a condition"),
+                )
+                .expect("validated last_unless condition");
+                let negated = Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(condition),
+                };
+                return Stmt::If {
+                    condition: negated,
+                    then_branch: vec![Stmt::Last],
+                    else_branch: Vec::new(),
+                };
+            }
+            _ => {}
+        }
+    }
+
+    Stmt::Last
+}
+
+fn parse_next(pair: Pair<'_, Rule>) -> Stmt {
+    let mut modifier: Option<Pair<'_, Rule>> = None;
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::next_if | Rule::next_unless => {
+                modifier = Some(inner);
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(mod_pair) = modifier {
+        match mod_pair.as_rule() {
+            Rule::next_if => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("next_if must have a condition"),
+                )
+                .expect("validated next_if condition");
+                return Stmt::If {
+                    condition,
+                    then_branch: vec![Stmt::Next],
+                    else_branch: Vec::new(),
+                };
+            }
+            Rule::next_unless => {
+                let condition = build_expr(
+                    mod_pair.into_inner().next().expect("next_unless must have a condition"),
+                )
+                .expect("validated next_unless condition");
+                let negated = Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(condition),
+                };
+                return Stmt::If {
+                    condition: negated,
+                    then_branch: vec![Stmt::Next],
+                    else_branch: Vec::new(),
+                };
+            }
+            _ => {}
+        }
+    }
+
+    Stmt::Next
 }
 
 fn parse_push(pair: Pair<'_, Rule>) -> Stmt {
