@@ -1441,3 +1441,91 @@ sub ghost_update {
     let stdout3 = String::from_utf8_lossy(&output3.stdout);
     assert!(stdout3.contains("✔ ghost_update: verified"));
 }
+
+#[test]
+fn check_defined_builtin() {
+    let tempdir = tempdir().unwrap();
+
+    // Test 1: defined() on uninitialized variable returns 0
+    let file = tempdir.path().join("defined_pass.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 0
+sub check_undefined {
+    my ($x) = @_;
+    my $y;
+    return defined($y);
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 1
+sub check_defined_after_assign {
+    my ($x) = @_;
+    my $y;
+    $y = $x + 1;
+    return defined($y);
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 1
+sub check_param_defined {
+    my ($x) = @_;
+    return defined($x);
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ check_undefined: verified"));
+    assert!(stdout.contains("✔ check_defined_after_assign: verified"));
+    assert!(stdout.contains("✔ check_param_defined: verified"));
+
+    // Test 2: defined() used in conditional logic
+    let file2 = tempdir.path().join("defined_branch.pl");
+    fs::write(
+        &file2,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result >= 0
+sub check_defined_branch {
+    my ($x) = @_;
+    my $y;
+    if ($x > 5) {
+        $y = $x;
+    } else {
+        $y = 0;
+    }
+    my $r = 0;
+    if (defined($y) == 1) {
+        $r = $y;
+    }
+    return $r;
+}
+"#,
+    )
+    .unwrap();
+
+    let output2 = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file2)
+        .output()
+        .unwrap();
+
+    assert!(output2.status.success());
+    let stdout2 = String::from_utf8_lossy(&output2.stdout);
+    assert!(stdout2.contains("✔ check_defined_branch: verified"));
+}

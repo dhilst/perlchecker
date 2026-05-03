@@ -1442,6 +1442,13 @@ fn eval_builtin(
                 Box::new(expect_int(index.clone(), function)?),
             ))
         }
+        Builtin::Defined => {
+            // In annotation expressions (pre/post), defined() always returns 1
+            // because annotation variables refer to parameters which are always defined.
+            // In SSA code, defined() is already resolved to the companion variable
+            // during IR lowering, so this branch is only reached for annotations.
+            SymValue::Int(IntExpr::Const(1))
+        }
     })
 }
 

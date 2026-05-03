@@ -233,6 +233,9 @@ struct SsaBuilder<'a> {
     /// Tracks the current SSA name for each array's length companion variable.
     /// Key: array base name (e.g., "arr"), Value: current SSA name (e.g., "arr__len__1").
     len_companions: BTreeMap<String, String>,
+    /// Tracks which variables have a definedness companion.
+    /// The companion is stored in env under the key "varname__defined".
+    defined_companions: BTreeSet<String>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -241,6 +244,7 @@ impl<'a> SsaBuilder<'a> {
             function,
             versions: BTreeMap::new(),
             len_companions: BTreeMap::new(),
+            defined_companions: BTreeSet::new(),
         }
     }
 
@@ -390,6 +394,20 @@ impl<'a> SsaBuilder<'a> {
                         }
                     }
                 }
+                // If this is a Defined call, look up the companion variable in env
+                if *function == crate::ast::Builtin::Defined {
+                    if let Some(Expr::Variable(var_name)) = args.first() {
+                        let def_key = format!("{var_name}__defined");
+                        if let Some(def_ssa) = env.get(&def_key) {
+                            return Ok(SsaExpr::Var(def_ssa.clone()));
+                        }
+                        // No companion found — variable is a function parameter or
+                        // was never tracked. Parameters are always defined.
+                        return Ok(SsaExpr::Int(1));
+                    }
+                    // defined() on a non-variable expression: always defined
+                    return Ok(SsaExpr::Int(1));
+                }
                 SsaExpr::Builtin {
                     function: *function,
                     args: args
@@ -453,7 +471,14 @@ impl<'a> SsaBuilder<'a> {
 
         for stmt in stmts {
             match stmt {
-                crate::ast::Stmt::Declare { .. } => {}
+                crate::ast::Stmt::Declare { name } => {
+                    // Emit companion definedness variable: name__defined = 0
+                    let def_base = format!("{name}__defined");
+                    let def_name = self.fresh_name(&def_base);
+                    lowered.push(SsaStmt::Assign(def_name.clone(), SsaExpr::Int(0)));
+                    env.insert(def_base, def_name);
+                    self.defined_companions.insert(name.clone());
+                }
                 crate::ast::Stmt::LoopBoundExceeded => lowered.push(SsaStmt::LoopBoundExceeded),
                 crate::ast::Stmt::Assign { name, expr, .. } => {
                     let mut prefix = Vec::new();
@@ -462,6 +487,13 @@ impl<'a> SsaBuilder<'a> {
                     let ssa_name = self.fresh_name(name);
                     env.insert(name.clone(), ssa_name.clone());
                     lowered.push(SsaStmt::Assign(ssa_name, rhs));
+                    // Emit companion definedness variable: name__defined = 1
+                    if self.defined_companions.contains(name) {
+                        let def_base = format!("{name}__defined");
+                        let def_name = self.fresh_name(&def_base);
+                        lowered.push(SsaStmt::Assign(def_name.clone(), SsaExpr::Int(1)));
+                        env.insert(def_base, def_name);
+                    }
                 }
                 crate::ast::Stmt::ArrayAssign { name, index, expr } => {
                     let collection_name = env
@@ -1318,8 +1350,16 @@ mod tests {
         };
 
         let ssa = lower_to_ssa(&function).unwrap();
-        assert_eq!(ssa.body.len(), 2);
+        // 4 statements: y__defined=0 (from Declare), y=x (Assign),
+        // y__defined=1 (Assign companion), return y
+        assert_eq!(ssa.body.len(), 4);
         assert!(matches!(ssa.body[0], super::SsaStmt::Assign(_, _)));
+        // First statement is the definedness companion init (y__defined = 0)
+        assert!(matches!(&ssa.body[0], super::SsaStmt::Assign(name, super::SsaExpr::Int(0)) if name.starts_with("y__defined")));
+        // Second statement is the actual assignment (y = x)
+        assert!(matches!(&ssa.body[1], super::SsaStmt::Assign(name, _) if name.starts_with("y__")));
+        // Third statement is the definedness companion update (y__defined = 1)
+        assert!(matches!(&ssa.body[2], super::SsaStmt::Assign(name, super::SsaExpr::Int(1)) if name.starts_with("y__defined")));
     }
 
     #[test]

@@ -47,6 +47,7 @@ pub enum Builtin {
     EndsWith,
     Replace,
     CharAt,
+    Defined,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1406,6 +1407,28 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Str)
+            }
+            Builtin::Defined => {
+                let [value] = args.as_slice() else {
+                    unreachable!("defined arity is enforced by the parser");
+                };
+                // defined() accepts any type (including uninitialized variables)
+                // and returns Int (1 or 0).
+                // For uninitialized variables, we skip the normal type inference
+                // since that would error with UninitializedVariable.
+                if let Expr::Variable(name) = value {
+                    let state = env.get(name).copied().ok_or_else(|| {
+                        TypeCheckError::UndeclaredVariable {
+                            function: function.to_string(),
+                            variable: name.clone(),
+                        }
+                    })?;
+                    // Allow both initialized and uninitialized variables
+                    let _ = state;
+                } else {
+                    let _arg_type = infer_expr_type(function, value, env, assumptions, signatures)?;
+                }
+                Ok(ExprType::Int)
             }
         },
         Expr::Ternary { condition, then_expr, else_expr } => {

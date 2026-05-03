@@ -2164,6 +2164,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::ends_with_call => parse_builtin_call(primary, Builtin::EndsWith),
             Rule::replace_call => parse_builtin_call(primary, Builtin::Replace),
             Rule::char_at_call => parse_builtin_call(primary, Builtin::CharAt),
+            Rule::defined_call => parse_builtin_call(primary, Builtin::Defined),
             Rule::regex_match => parse_regex_match(primary, false),
             Rule::regex_not_match => parse_regex_match(primary, true),
             other => Err(format!("unexpected primary rule: {other:?}")),
