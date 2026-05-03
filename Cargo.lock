@@ -441,6 +441,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "z3",
+ "z3-sys",
 ]
 
 [[package]]

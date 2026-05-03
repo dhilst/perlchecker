@@ -23,6 +23,7 @@ pub enum IntExpr {
     Div(Box<IntExpr>, Box<IntExpr>),
     Mod(Box<IntExpr>, Box<IntExpr>),
     Abs(Box<IntExpr>),
+    Ord(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
     Length(Box<StrExpr>),
     Index(Box<StrExpr>, Box<StrExpr>),
@@ -36,6 +37,7 @@ pub enum StrExpr {
     Var(String),
     Concat(Box<StrExpr>, Box<StrExpr>),
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
+    Chr(Box<IntExpr>),
     Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayStrExpr>, Box<IntExpr>),
     HashSelect(Box<HashStrExpr>, Box<StrExpr>),
@@ -1079,6 +1081,24 @@ fn eval_builtin(
                 Box::new(left_int),
                 Box::new(right_int),
             ))
+        }
+        Builtin::Ord => {
+            let [value] = args else {
+                unreachable!("ord arity is enforced by the parser");
+            };
+            SymValue::Int(IntExpr::Ord(Box::new(expect_str(
+                value.clone(),
+                function,
+            )?)))
+        }
+        Builtin::Chr => {
+            let [value] = args else {
+                unreachable!("chr arity is enforced by the parser");
+            };
+            SymValue::Str(StrExpr::Chr(Box::new(expect_int(
+                value.clone(),
+                function,
+            )?)))
         }
     })
 }

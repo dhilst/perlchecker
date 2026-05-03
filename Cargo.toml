@@ -11,6 +11,7 @@ thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 z3 = "0.20"
+z3-sys = "0.11"
 
 [dev-dependencies]
 assert_cmd = "2.0"

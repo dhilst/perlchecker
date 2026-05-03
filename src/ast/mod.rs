@@ -37,6 +37,8 @@ pub enum Builtin {
     Abs,
     Min,
     Max,
+    Ord,
+    Chr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -969,6 +971,36 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Int)
+            }
+            Builtin::Ord => {
+                let [value] = args.as_slice() else {
+                    unreachable!("ord arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "ord argument",
+                    value,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
+            Builtin::Chr => {
+                let [value] = args.as_slice() else {
+                    unreachable!("chr arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "chr argument",
+                    value,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
             }
         },
         Expr::Ternary { condition, then_expr, else_expr } => {

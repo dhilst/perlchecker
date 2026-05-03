@@ -3,10 +3,11 @@ use std::{collections::BTreeMap, str::FromStr};
 use thiserror::Error;
 use tracing::debug;
 use z3::{
+    Context,
     Params,
     Sort,
     Solver,
-    ast::{Array, Bool, Int, String as Z3String},
+    ast::{Ast as _, Array, Bool, Int, String as Z3String},
 };
 
 use crate::{
@@ -188,6 +189,13 @@ fn encode_int(expr: &IntExpr) -> Int {
             let is_nonnegative = encoded.ge(&Int::from_i64(0));
             is_nonnegative.ite(&encoded, &encoded.unary_minus())
         }
+        IntExpr::Ord(value) => {
+            let ctx = &Context::thread_local();
+            let encoded = encode_str(value);
+            unsafe {
+                Int::wrap(ctx, z3_sys::Z3_mk_string_to_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
+            }
+        }
         IntExpr::Ite(cond, then_int, else_int) => {
             let cond_bool = encode_bool(cond);
             let then_encoded = encode_int(then_int);
@@ -218,6 +226,13 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         StrExpr::Concat(left, right) => Z3String::concat(&[encode_str(left), encode_str(right)]),
         StrExpr::Substr(value, start, len) => {
             encode_str(value).substr(encode_int(start), encode_int(len))
+        }
+        StrExpr::Chr(value) => {
+            let ctx = &Context::thread_local();
+            let encoded = encode_int(value);
+            unsafe {
+                Z3String::wrap(ctx, z3_sys::Z3_mk_string_from_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
+            }
         }
         StrExpr::Ite(cond, then_str, else_str) => {
             let cond_bool = encode_bool(cond);
@@ -368,6 +383,7 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             &encode_int(right).eq(Int::from_i64(0)).not(),
         ]),
         IntExpr::Abs(value) => encode_int_safety(value),
+        IntExpr::Ord(value) => encode_str_safety(value),
         IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_int_safety(then_int),
@@ -399,6 +415,7 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
             &encode_int_safety(start),
             &encode_int_safety(len),
         ]),
+        StrExpr::Chr(value) => encode_int_safety(value),
         StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_str_safety(then_str),
@@ -498,6 +515,7 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(right, vars);
         }
         IntExpr::Abs(value) => collect_string_vars_from_int(value, vars),
+        IntExpr::Ord(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Ite(cond, then_int, else_int) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_int(then_int, vars);
@@ -530,6 +548,7 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(start, vars);
             collect_string_vars_from_int(len, vars);
         }
+        StrExpr::Chr(value) => collect_string_vars_from_int(value, vars),
         StrExpr::Ite(cond, then_str, else_str) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_str(then_str, vars);

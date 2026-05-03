@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod annotations;
 pub mod ast;
@@ -7,6 +7,7 @@ pub mod extractor;
 pub mod ir;
 pub mod limits;
 pub mod parser;
+#[allow(unsafe_code)]
 pub mod smt;
 pub mod symexec;
 
