@@ -951,3 +951,49 @@ sub bitwise_or_vals {
     assert!(stdout.contains("✔ bitwise_and_vals: verified"));
     assert!(stdout.contains("✔ bitwise_or_vals: verified"));
 }
+
+#[test]
+fn check_sound_reverse_encoding() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("reverse_sound.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 5
+# post: $result == 1
+sub reverse_preserves_length {
+    my ($s) = @_;
+    my $r = reverse($s);
+    if (length($r) == length($s)) {
+        return 1;
+    }
+    return 0;
+}
+
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 5
+# post: $result == 1
+sub double_reverse_identity {
+    my ($s) = @_;
+    my $r = reverse(reverse($s));
+    if ($r eq $s) {
+        return 1;
+    }
+    return 0;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ reverse_preserves_length: verified"));
+    assert!(stdout.contains("✔ double_reverse_identity: verified"));
+}

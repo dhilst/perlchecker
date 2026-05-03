@@ -355,14 +355,31 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             has_newline.ite(&trimmed, &encoded)
         }
         StrExpr::Reverse(value) => {
-            // Model reverse as an uninterpreted function: fresh variable with length axiom
+            let ctx = &Context::thread_local();
             let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
             let fresh_name = format!("__reverse_{n}");
             let fresh_var = Z3String::new_const(fresh_name);
             let encoded_inner = encode_str(value);
             // Assert: length(reverse(s)) == length(s)
-            let axiom = fresh_var.length().eq(&encoded_inner.length());
-            REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().push(axiom));
+            let len_axiom = fresh_var.length().eq(&encoded_inner.length());
+            REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().push(len_axiom));
+            // Assert character-level axioms: for each i in 0..MAX_STR_LEN,
+            // if i < length(s) then charAt(reverse, i) == charAt(s, length(s) - 1 - i)
+            let inner_len = encoded_inner.length();
+            for i in 0..MAX_STR_LEN {
+                let idx = Int::from_i64(i);
+                let rev_idx = Int::sub(&[&inner_len, &Int::from_i64(i + 1)]);
+                let char_at_fresh = unsafe {
+                    Z3String::wrap(ctx, z3_sys::Z3_mk_seq_at(ctx.get_z3_context(), fresh_var.get_z3_ast(), idx.get_z3_ast()).unwrap())
+                };
+                let char_at_inner = unsafe {
+                    Z3String::wrap(ctx, z3_sys::Z3_mk_seq_at(ctx.get_z3_context(), encoded_inner.get_z3_ast(), rev_idx.get_z3_ast()).unwrap())
+                };
+                let guard = idx.lt(&inner_len);
+                let char_eq = char_at_fresh.eq(&char_at_inner);
+                let axiom = guard.implies(&char_eq);
+                REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().push(axiom));
+            }
             fresh_var
         }
         StrExpr::Replace(string, from, to) => {
