@@ -79,6 +79,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::unless_stmt
                     | Rule::return_stmt
                     | Rule::last_stmt
+                    | Rule::next_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -123,6 +124,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
         Rule::last_stmt => vec![Stmt::Last],
+        Rule::next_stmt => vec![Stmt::Next],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -284,6 +286,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::unless_stmt
                     | Rule::return_stmt
                     | Rule::last_stmt
+                    | Rule::next_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -316,9 +319,16 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     }
 
     let condition = condition.expect("for must have a condition");
-    let mut loop_body = body;
-    loop_body.extend(step);
-    init.extend(unroll_while(condition, loop_body, max_loop_unroll));
+
+    // If the body contains `next`, we need to keep the step separate so it
+    // isn't guarded by the skip flag (Perl's `next` still executes the for-loop step).
+    if contains_next(&body) {
+        init.extend(unroll_for_with_next(condition, body, step, max_loop_unroll));
+    } else {
+        let mut loop_body = body;
+        loop_body.extend(step);
+        init.extend(unroll_while(condition, loop_body, max_loop_unroll));
+    }
     init
 }
 
@@ -382,8 +392,15 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
 }
 
 fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
-    if contains_last(&body) {
+    let has_last = contains_last(&body);
+    let has_next = contains_next(&body);
+    if has_last && has_next {
+        // Both last and next: use both flags
+        unroll_while_with_last_and_next(condition, body, remaining)
+    } else if has_last {
         unroll_while_with_last(condition, body, remaining)
+    } else if has_next {
+        unroll_while_with_next(condition, body, remaining)
     } else {
         unroll_while_simple(condition, body, remaining)
     }
@@ -561,6 +578,495 @@ fn contains_last(stmts: &[Stmt]) -> bool {
         } => contains_last(then_branch) || contains_last(else_branch),
         _ => false,
     })
+}
+
+/// Unroll a for loop whose body contains `next`, keeping the step outside
+/// the skip-flag guard so that it always executes (matching Perl semantics).
+fn unroll_for_with_next(
+    condition: Expr,
+    body: Vec<Stmt>,
+    step: Vec<Stmt>,
+    remaining: usize,
+) -> Vec<Stmt> {
+    static SKIP_FLAG: &str = "__skipped";
+
+    let declare = Stmt::Assign {
+        name: SKIP_FLAG.to_string(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+
+    let has_last = contains_last(&body);
+
+    if has_last {
+        static BREAK_FLAG: &str = "__broke";
+        let declare_broke = Stmt::Assign {
+            name: BREAK_FLAG.to_string(),
+            expr: Expr::Int(0),
+            declaration: true,
+        };
+        let mut result = vec![declare_broke, declare];
+        result.extend(unroll_for_with_both_flags(
+            condition, body, step, remaining, BREAK_FLAG, SKIP_FLAG,
+        ));
+        result
+    } else {
+        let mut result = vec![declare];
+        result.extend(unroll_for_with_skip_flag(
+            condition, body, step, remaining, SKIP_FLAG,
+        ));
+        result
+    }
+}
+
+fn unroll_for_with_skip_flag(
+    condition: Expr,
+    body: Vec<Stmt>,
+    step: Vec<Stmt>,
+    remaining: usize,
+    flag: &str,
+) -> Vec<Stmt> {
+    if remaining == 0 {
+        return vec![Stmt::If {
+            condition,
+            then_branch: vec![Stmt::LoopBoundExceeded],
+            else_branch: Vec::new(),
+        }];
+    }
+
+    // Reset skip flag at start of each iteration
+    let reset = Stmt::Assign {
+        name: flag.to_string(),
+        expr: Expr::Int(0),
+        declaration: false,
+    };
+
+    // Transform body (NOT step) for next
+    let transformed_body = transform_body_for_next(body.clone(), flag);
+
+    let mut then_branch = vec![reset];
+    then_branch.extend(transformed_body);
+    // Step always executes (outside the skip guard)
+    then_branch.extend(step.clone());
+    then_branch.extend(unroll_for_with_skip_flag(
+        condition.clone(),
+        body,
+        step,
+        remaining - 1,
+        flag,
+    ));
+
+    vec![Stmt::If {
+        condition,
+        then_branch,
+        else_branch: Vec::new(),
+    }]
+}
+
+fn unroll_for_with_both_flags(
+    condition: Expr,
+    body: Vec<Stmt>,
+    step: Vec<Stmt>,
+    remaining: usize,
+    break_flag: &str,
+    skip_flag: &str,
+) -> Vec<Stmt> {
+    let flag_check = Expr::Binary {
+        left: Box::new(Expr::Variable(break_flag.to_string())),
+        op: BinaryOp::Eq,
+        right: Box::new(Expr::Int(0)),
+    };
+    let effective_condition = Expr::Binary {
+        left: Box::new(condition.clone()),
+        op: BinaryOp::And,
+        right: Box::new(flag_check),
+    };
+
+    if remaining == 0 {
+        return vec![Stmt::If {
+            condition: effective_condition,
+            then_branch: vec![Stmt::LoopBoundExceeded],
+            else_branch: Vec::new(),
+        }];
+    }
+
+    // Reset skip flag at start of each iteration
+    let reset_skip = Stmt::Assign {
+        name: skip_flag.to_string(),
+        expr: Expr::Int(0),
+        declaration: false,
+    };
+
+    // Transform body for both last and next
+    let transformed_body = transform_body_for_last_and_next(body.clone(), break_flag, skip_flag);
+
+    let mut then_branch = vec![reset_skip];
+    then_branch.extend(transformed_body);
+    // Step always executes (outside the skip guard) but only if not broke
+    let break_check = Expr::Binary {
+        left: Box::new(Expr::Variable(break_flag.to_string())),
+        op: BinaryOp::Eq,
+        right: Box::new(Expr::Int(0)),
+    };
+    if !step.is_empty() {
+        then_branch.push(Stmt::If {
+            condition: break_check,
+            then_branch: step.clone(),
+            else_branch: Vec::new(),
+        });
+    }
+    then_branch.extend(unroll_for_with_both_flags(
+        condition,
+        body,
+        step,
+        remaining - 1,
+        break_flag,
+        skip_flag,
+    ));
+
+    vec![Stmt::If {
+        condition: effective_condition,
+        then_branch,
+        else_branch: Vec::new(),
+    }]
+}
+
+/// Recursively check whether any statement in the slice is `Stmt::Next`.
+fn contains_next(stmts: &[Stmt]) -> bool {
+    stmts.iter().any(|stmt| match stmt {
+        Stmt::Next => true,
+        Stmt::If {
+            then_branch,
+            else_branch,
+            ..
+        } => contains_next(then_branch) || contains_next(else_branch),
+        _ => false,
+    })
+}
+
+/// Unroll a while loop whose body contains `next` (but not `last`).
+///
+/// Produces:
+///   if (C) {
+///       $__skipped = 0;
+///       <body with next replaced by $__skipped=1, and subsequent stmts guarded>
+///       if (C) {
+///           $__skipped = 0;
+///           ...
+///       }
+///   }
+fn unroll_while_with_next(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
+    static SKIP_FLAG: &str = "__skipped";
+
+    // Declare the skip flag once before the loop
+    let declare = Stmt::Assign {
+        name: SKIP_FLAG.to_string(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+
+    let mut result = vec![declare];
+    result.extend(unroll_while_with_skip_flag(
+        condition, body, remaining, SKIP_FLAG,
+    ));
+    result
+}
+
+fn unroll_while_with_skip_flag(
+    condition: Expr,
+    body: Vec<Stmt>,
+    remaining: usize,
+    flag: &str,
+) -> Vec<Stmt> {
+    if remaining == 0 {
+        return vec![Stmt::If {
+            condition,
+            then_branch: vec![Stmt::LoopBoundExceeded],
+            else_branch: Vec::new(),
+        }];
+    }
+
+    // Reset the skip flag at the start of each iteration
+    let reset = Stmt::Assign {
+        name: flag.to_string(),
+        expr: Expr::Int(0),
+        declaration: false,
+    };
+
+    // Transform the body: replace `next` with flag assignment, guard subsequent stmts
+    let transformed_body = transform_body_for_next(body.clone(), flag);
+
+    let mut then_branch = vec![reset];
+    then_branch.extend(transformed_body);
+    then_branch.extend(unroll_while_with_skip_flag(
+        condition.clone(),
+        body,
+        remaining - 1,
+        flag,
+    ));
+
+    vec![Stmt::If {
+        condition,
+        then_branch,
+        else_branch: Vec::new(),
+    }]
+}
+
+/// Unroll a while loop whose body contains both `last` and `next`.
+fn unroll_while_with_last_and_next(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
+    static BREAK_FLAG: &str = "__broke";
+    static SKIP_FLAG: &str = "__skipped";
+
+    // Declare both flags
+    let declare_broke = Stmt::Assign {
+        name: BREAK_FLAG.to_string(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+    let declare_skipped = Stmt::Assign {
+        name: SKIP_FLAG.to_string(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+
+    let mut result = vec![declare_broke, declare_skipped];
+    result.extend(unroll_while_with_both_flags(
+        condition, body, remaining, BREAK_FLAG, SKIP_FLAG,
+    ));
+    result
+}
+
+fn unroll_while_with_both_flags(
+    condition: Expr,
+    body: Vec<Stmt>,
+    remaining: usize,
+    break_flag: &str,
+    skip_flag: &str,
+) -> Vec<Stmt> {
+    // The effective condition: original_condition && $break_flag == 0
+    let flag_check = Expr::Binary {
+        left: Box::new(Expr::Variable(break_flag.to_string())),
+        op: BinaryOp::Eq,
+        right: Box::new(Expr::Int(0)),
+    };
+    let effective_condition = Expr::Binary {
+        left: Box::new(condition.clone()),
+        op: BinaryOp::And,
+        right: Box::new(flag_check),
+    };
+
+    if remaining == 0 {
+        return vec![Stmt::If {
+            condition: effective_condition,
+            then_branch: vec![Stmt::LoopBoundExceeded],
+            else_branch: Vec::new(),
+        }];
+    }
+
+    // Reset skip flag at the start of each iteration
+    let reset_skip = Stmt::Assign {
+        name: skip_flag.to_string(),
+        expr: Expr::Int(0),
+        declaration: false,
+    };
+
+    // Transform the body for both last and next
+    let transformed_body = transform_body_for_last_and_next(body.clone(), break_flag, skip_flag);
+
+    let mut then_branch = vec![reset_skip];
+    then_branch.extend(transformed_body);
+    then_branch.extend(unroll_while_with_both_flags(
+        condition,
+        body,
+        remaining - 1,
+        break_flag,
+        skip_flag,
+    ));
+
+    vec![Stmt::If {
+        condition: effective_condition,
+        then_branch,
+        else_branch: Vec::new(),
+    }]
+}
+
+/// Transform a loop body to handle `next`:
+/// - Replace `Stmt::Next` with `$flag = 1`
+/// - After any statement that might set the flag (i.e., an if-block containing next),
+///   wrap remaining statements in `if ($flag == 0) { ... }`
+fn transform_body_for_next(stmts: Vec<Stmt>, flag: &str) -> Vec<Stmt> {
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < stmts.len() {
+        let stmt = stmts[i].clone();
+        i += 1;
+
+        match stmt {
+            Stmt::Next => {
+                // Replace with flag = 1
+                result.push(Stmt::Assign {
+                    name: flag.to_string(),
+                    expr: Expr::Int(1),
+                    declaration: false,
+                });
+                // Guard all remaining statements
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_next(remaining, flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } if contains_next(&then_branch) || contains_next(&else_branch) => {
+                // Recursively transform branches
+                let new_then = transform_body_for_next(then_branch, flag);
+                let new_else = transform_body_for_next(else_branch, flag);
+                result.push(Stmt::If {
+                    condition,
+                    then_branch: new_then,
+                    else_branch: new_else,
+                });
+                // Guard remaining statements since an if-branch may have set the flag
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_next(remaining, flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            other => {
+                result.push(other);
+            }
+        }
+    }
+
+    result
+}
+
+/// Transform a loop body to handle both `last` and `next`:
+fn transform_body_for_last_and_next(stmts: Vec<Stmt>, break_flag: &str, skip_flag: &str) -> Vec<Stmt> {
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < stmts.len() {
+        let stmt = stmts[i].clone();
+        i += 1;
+
+        match stmt {
+            Stmt::Last => {
+                result.push(Stmt::Assign {
+                    name: break_flag.to_string(),
+                    expr: Expr::Int(1),
+                    declaration: false,
+                });
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_last_and_next(remaining, break_flag, skip_flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(break_flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            Stmt::Next => {
+                result.push(Stmt::Assign {
+                    name: skip_flag.to_string(),
+                    expr: Expr::Int(1),
+                    declaration: false,
+                });
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_last_and_next(remaining, break_flag, skip_flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(skip_flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } if contains_last(&then_branch) || contains_last(&else_branch)
+                || contains_next(&then_branch) || contains_next(&else_branch) => {
+                let new_then = transform_body_for_last_and_next(then_branch, break_flag, skip_flag);
+                let new_else = transform_body_for_last_and_next(else_branch, break_flag, skip_flag);
+                result.push(Stmt::If {
+                    condition,
+                    then_branch: new_then,
+                    else_branch: new_else,
+                });
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_last_and_next(remaining, break_flag, skip_flag);
+                    // Guard with both flags: remaining runs only if neither broke nor skipped
+                    let break_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(break_flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    let skip_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(skip_flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    let combined_check = Expr::Binary {
+                        left: Box::new(break_check),
+                        op: BinaryOp::And,
+                        right: Box::new(skip_check),
+                    };
+                    result.push(Stmt::If {
+                        condition: combined_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            other => {
+                result.push(other);
+            }
+        }
+    }
+
+    result
 }
 fn parse_elsif_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> (Expr, Vec<Stmt>) {
     let mut inner = pair.into_inner();

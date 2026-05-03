@@ -3,8 +3,9 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
 
-stmt = _{ while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | last_stmt | hash_assign_stmt | array_assign_stmt | assign_stmt | declare_stmt }
+stmt = _{ while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | last_stmt | next_stmt | hash_assign_stmt | array_assign_stmt | assign_stmt | declare_stmt }
 last_stmt = { "last" ~ ";" }
+next_stmt = { "next" ~ ";" }
 unless_stmt = { "unless" ~ "(" ~ expr ~ ")" ~ block ~ else_clause? }
 parameter_binding = { "my" ~ "(" ~ var_list? ~ ")" ~ "=" ~ "@_" ~ ";" }
 var_list = { var ~ ("," ~ var)* }

@@ -389,6 +389,9 @@ impl<'a> SsaBuilder<'a> {
                 crate::ast::Stmt::Last => {
                     unreachable!("`last` should be desugared by the parser before IR lowering")
                 }
+                crate::ast::Stmt::Next => {
+                    unreachable!("`next` should be desugared by the parser before IR lowering")
+                }
             }
         }
 
