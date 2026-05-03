@@ -3,7 +3,9 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
 
-stmt = _{ do_while_stmt | until_stmt | while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | assign_stmt | declare_stmt }
+stmt = _{ do_while_stmt | until_stmt | while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | inc_stmt | dec_stmt | assign_stmt | declare_stmt }
+inc_stmt = { var ~ "++" ~ ";" }
+dec_stmt = { var ~ "--" ~ ";" }
 do_while_stmt = { "do" ~ block ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 push_stmt = { "push" ~ "(" ~ "@" ~ ident ~ "," ~ expr ~ ")" ~ ";" }
 last_stmt = { "last" ~ ";" }
@@ -34,7 +36,9 @@ return_stmt = { "return" ~ expr ~ return_modifier? ~ ";" }
 return_modifier = _{ return_if | return_unless }
 return_if = { "if" ~ "(" ~ expr ~ ")" }
 return_unless = { "unless" ~ "(" ~ expr ~ ")" }
-for_assign = { for_hash_assign | for_array_assign | for_scalar_assign }
+for_assign = { for_hash_assign | for_array_assign | for_inc | for_dec | for_scalar_assign }
+for_inc = { var ~ "++" }
+for_dec = { var ~ "--" }
 for_scalar_assign = { var ~ assign_op ~ expr }
 for_array_assign = { var ~ "[" ~ access_index ~ "]" ~ "=" ~ expr }
 for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }

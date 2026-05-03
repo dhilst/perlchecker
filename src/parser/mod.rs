@@ -85,6 +85,8 @@ pub fn parse_function_ast_with_limits(
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
+                    | Rule::inc_stmt
+                    | Rule::dec_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -135,6 +137,8 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::last_stmt => vec![Stmt::Last],
         Rule::next_stmt => vec![Stmt::Next],
         Rule::push_stmt => vec![parse_push(pair)],
+        Rule::inc_stmt => vec![parse_inc(pair)],
+        Rule::dec_stmt => vec![parse_dec(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -379,6 +383,40 @@ fn parse_push(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Push { array, value }
 }
 
+fn parse_inc(pair: Pair<'_, Rule>) -> Stmt {
+    let name = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::var)
+        .map(parse_variable)
+        .expect("inc_stmt must have a variable");
+    Stmt::Assign {
+        name: name.clone(),
+        expr: Expr::Binary {
+            left: Box::new(Expr::Variable(name)),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Int(1)),
+        },
+        declaration: false,
+    }
+}
+
+fn parse_dec(pair: Pair<'_, Rule>) -> Stmt {
+    let name = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::var)
+        .map(parse_variable)
+        .expect("dec_stmt must have a variable");
+    Stmt::Assign {
+        name: name.clone(),
+        expr: Expr::Binary {
+            left: Box::new(Expr::Variable(name)),
+            op: BinaryOp::Sub,
+            right: Box::new(Expr::Int(1)),
+        },
+        declaration: false,
+    }
+}
+
 fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     pair.into_inner()
         .filter(|inner| {
@@ -400,6 +438,8 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::last_stmt
                     | Rule::next_stmt
                     | Rule::push_stmt
+                    | Rule::inc_stmt
+                    | Rule::dec_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -532,6 +572,38 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
             let expr = build_expr(inner.next().expect("for hash assignment must have an expr"))
                 .expect("validated for hash assignment");
             Stmt::HashAssign { name, key, expr }
+        }
+        Rule::for_inc => {
+            let name = inner
+                .into_inner()
+                .find(|p| p.as_rule() == Rule::var)
+                .map(parse_variable)
+                .expect("for_inc must have a variable");
+            Stmt::Assign {
+                name: name.clone(),
+                expr: Expr::Binary {
+                    left: Box::new(Expr::Variable(name)),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Int(1)),
+                },
+                declaration: false,
+            }
+        }
+        Rule::for_dec => {
+            let name = inner
+                .into_inner()
+                .find(|p| p.as_rule() == Rule::var)
+                .map(parse_variable)
+                .expect("for_dec must have a variable");
+            Stmt::Assign {
+                name: name.clone(),
+                expr: Expr::Binary {
+                    left: Box::new(Expr::Variable(name)),
+                    op: BinaryOp::Sub,
+                    right: Box::new(Expr::Int(1)),
+                },
+                declaration: false,
+            }
         }
         other => unreachable!("unexpected for assignment rule: {other:?}"),
     }
