@@ -40,6 +40,7 @@ pub enum Builtin {
     Ord,
     Chr,
     Chomp,
+    Reverse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1098,6 +1099,21 @@ fn infer_expr_type(
                 expect_expr_type(
                     function,
                     "chomp argument",
+                    value,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
+            }
+            Builtin::Reverse => {
+                let [value] = args.as_slice() else {
+                    unreachable!("reverse arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "reverse argument",
                     value,
                     env,
                     assumptions,

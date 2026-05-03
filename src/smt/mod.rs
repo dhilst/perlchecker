@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{cell::RefCell, collections::BTreeMap, str::FromStr, sync::atomic::{AtomicUsize, Ordering}};
 
 use thiserror::Error;
 use tracing::debug;
@@ -18,6 +18,12 @@ use crate::{
         StrExpr,
     },
 };
+
+static REVERSE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+thread_local! {
+    static REVERSE_AXIOMS: RefCell<Vec<Bool>> = RefCell::new(Vec::new());
+}
 
 pub const MAX_STR_LEN: i64 = 32;
 
@@ -41,8 +47,10 @@ pub fn is_satisfiable_with_timeout(function: &str, condition: &BoolExpr, timeout
     let solver = Solver::new();
     apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
+    reset_reverse_axioms();
     solver.assert(&encode_safety_constraints(condition));
     solver.assert(&encode_bool(condition));
+    assert_reverse_axioms(&solver);
     let result = solver.check();
     debug!(function, ?result, "checked satisfiability");
 
@@ -78,8 +86,10 @@ pub fn find_model_with_timeout(
     let solver = Solver::new();
     apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
+    reset_reverse_axioms();
     solver.assert(&encode_safety_constraints(condition));
     solver.assert(&encode_bool(condition));
+    assert_reverse_axioms(&solver);
     let result = solver.check();
     debug!(function, ?result, "checked counterexample query");
 
@@ -158,6 +168,18 @@ pub fn find_model_with_timeout(
             Ok(Some(assignments))
         }
     }
+}
+
+fn reset_reverse_axioms() {
+    REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().clear());
+}
+
+fn assert_reverse_axioms(solver: &Solver) {
+    REVERSE_AXIOMS.with(|axioms| {
+        for axiom in axioms.borrow().iter() {
+            solver.assert(axiom);
+        }
+    });
 }
 
 fn assert_string_bounds(solver: &Solver, condition: &BoolExpr) {
@@ -279,6 +301,17 @@ fn encode_str(expr: &StrExpr) -> Z3String {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), newline.get_z3_ast(), encoded.get_z3_ast()).unwrap())
             };
             has_newline.ite(&trimmed, &encoded)
+        }
+        StrExpr::Reverse(value) => {
+            // Model reverse as an uninterpreted function: fresh variable with length axiom
+            let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let fresh_name = format!("__reverse_{n}");
+            let fresh_var = Z3String::new_const(fresh_name);
+            let encoded_inner = encode_str(value);
+            // Assert: length(reverse(s)) == length(s)
+            let axiom = fresh_var.length().eq(&encoded_inner.length());
+            REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().push(axiom));
+            fresh_var
         }
         StrExpr::Ite(cond, then_str, else_str) => {
             let cond_bool = encode_bool(cond);
@@ -470,6 +503,7 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
         ]),
         StrExpr::Chr(value) => encode_int_safety(value),
         StrExpr::Chomp(value) => encode_str_safety(value),
+        StrExpr::Reverse(value) => encode_str_safety(value),
         StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_str_safety(then_str),
@@ -611,6 +645,7 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
         }
         StrExpr::Chr(value) => collect_string_vars_from_int(value, vars),
         StrExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
+        StrExpr::Reverse(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Ite(cond, then_str, else_str) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_str(then_str, vars);

@@ -46,6 +46,7 @@ pub enum StrExpr {
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
     Chr(Box<IntExpr>),
     Chomp(Box<StrExpr>),
+    Reverse(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayStrExpr>, Box<IntExpr>),
     HashSelect(Box<HashStrExpr>, Box<StrExpr>),
@@ -1167,6 +1168,15 @@ fn eval_builtin(
                 unreachable!("chomp arity is enforced by the parser");
             };
             SymValue::Str(StrExpr::Chomp(Box::new(expect_str(
+                value.clone(),
+                function,
+            )?)))
+        }
+        Builtin::Reverse => {
+            let [value] = args else {
+                unreachable!("reverse arity is enforced by the parser");
+            };
+            SymValue::Str(StrExpr::Reverse(Box::new(expect_str(
                 value.clone(),
                 function,
             )?)))
