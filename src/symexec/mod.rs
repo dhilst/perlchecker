@@ -28,6 +28,7 @@ pub enum IntExpr {
     BitXor(Box<IntExpr>, Box<IntExpr>),
     Shl(Box<IntExpr>, Box<IntExpr>),
     Shr(Box<IntExpr>, Box<IntExpr>),
+    BitNot(Box<IntExpr>),
     Abs(Box<IntExpr>),
     Ord(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
@@ -702,6 +703,10 @@ fn eval_ssa_expr(
                 let value = expect_bool(eval_ssa_expr(function, expr, env)?, function)?;
                 SymValue::Bool(BoolExpr::Not(Box::new(value)))
             }
+            crate::ast::UnaryOp::BitNot => {
+                let value = expect_int(eval_ssa_expr(function, expr, env)?, function)?;
+                SymValue::Int(IntExpr::BitNot(Box::new(value)))
+            }
         },
         SsaExpr::Binary { left, op, right } => eval_binary(
             function,
@@ -800,6 +805,10 @@ fn eval_expr(
             crate::ast::UnaryOp::Not => {
                 let value = expect_bool(eval_expr(function, expr, env)?, function)?;
                 SymValue::Bool(BoolExpr::Not(Box::new(value)))
+            }
+            crate::ast::UnaryOp::BitNot => {
+                let value = expect_int(eval_expr(function, expr, env)?, function)?;
+                SymValue::Int(IntExpr::BitNot(Box::new(value)))
             }
         },
         Expr::Binary { left, op, right } => eval_binary(

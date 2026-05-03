@@ -1224,7 +1224,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             pest::pratt_parser::Assoc::Right,
         ))
         .op(pest::pratt_parser::Op::prefix(Rule::op_not)
-            | pest::pratt_parser::Op::prefix(Rule::op_neg))
+            | pest::pratt_parser::Op::prefix(Rule::op_neg)
+            | pest::pratt_parser::Op::prefix(Rule::op_bitnot))
         .map_primary(|primary| match primary.as_rule() {
             Rule::int => {
                 Ok(Expr::Int(primary.as_str().parse().map_err(|_| {
@@ -1253,6 +1254,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
                 op: match op.as_rule() {
                     Rule::op_not => UnaryOp::Not,
                     Rule::op_neg => UnaryOp::Neg,
+                    Rule::op_bitnot => UnaryOp::BitNot,
                     other => return Err(format!("unexpected prefix operator: {other:?}")),
                 },
                 expr: Box::new(rhs?),

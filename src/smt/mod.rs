@@ -212,6 +212,10 @@ fn encode_int(expr: &IntExpr) -> Int {
             let r_bv = BV::from_int(&encode_int(right), 32);
             l_bv.bvashr(&r_bv).to_int(false)
         }
+        IntExpr::BitNot(value) => {
+            let bv = BV::from_int(&encode_int(value), 32);
+            bv.bvnot().to_int(false)
+        }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
             let is_nonnegative = encoded.ge(&Int::from_i64(0));
@@ -416,6 +420,7 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             &encode_int_safety(right),
             &encode_int(right).eq(Int::from_i64(0)).not(),
         ]),
+        IntExpr::BitNot(value) => encode_int_safety(value),
         IntExpr::Abs(value) => encode_int_safety(value),
         IntExpr::Ord(value) => encode_str_safety(value),
         IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
@@ -554,6 +559,7 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(left, vars);
             collect_string_vars_from_int(right, vars);
         }
+        IntExpr::BitNot(value) => collect_string_vars_from_int(value, vars),
         IntExpr::Abs(value) => collect_string_vars_from_int(value, vars),
         IntExpr::Ord(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Ite(cond, then_int, else_int) => {

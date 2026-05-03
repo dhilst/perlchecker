@@ -86,6 +86,7 @@ pub enum Expr {
 pub enum UnaryOp {
     Neg,
     Not,
+    BitNot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -604,6 +605,18 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Bool)
+            }
+            UnaryOp::BitNot => {
+                expect_expr_type(
+                    function,
+                    "bitwise complement",
+                    expr,
+                    env,
+                    assumptions,
+                    ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
             }
         },
         Expr::Binary { left, op, right } => match op {
