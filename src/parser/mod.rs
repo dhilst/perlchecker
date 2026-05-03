@@ -1771,19 +1771,45 @@ fn parse_call_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
 
 fn parse_string_literal(raw: &str) -> std::result::Result<String, String> {
     let mut chars = raw.chars();
-    if chars.next() != Some('"') || chars.next_back() != Some('"') {
-        return Err(format!("invalid string literal: {raw}"));
-    }
+    let quote = chars.next();
+    let is_single = match quote {
+        Some('\'') => {
+            if chars.next_back() != Some('\'') {
+                return Err(format!("invalid string literal: {raw}"));
+            }
+            true
+        }
+        Some('"') => {
+            if chars.next_back() != Some('"') {
+                return Err(format!("invalid string literal: {raw}"));
+            }
+            false
+        }
+        _ => return Err(format!("invalid string literal: {raw}")),
+    };
 
     let mut value = String::new();
     let mut escaped = false;
     for ch in chars {
         if escaped {
-            match ch {
-                '"' | '\\' => value.push(ch),
-                'n' => value.push('\n'),
-                't' => value.push('\t'),
-                other => return Err(format!("unsupported escape sequence: \\{other}")),
+            if is_single {
+                // Single-quoted: only \\ and \' are escape sequences
+                match ch {
+                    '\'' | '\\' => value.push(ch),
+                    other => {
+                        // Not a recognized escape — emit the backslash literally
+                        value.push('\\');
+                        value.push(other);
+                    }
+                }
+            } else {
+                // Double-quoted: full escape processing
+                match ch {
+                    '"' | '\\' => value.push(ch),
+                    'n' => value.push('\n'),
+                    't' => value.push('\t'),
+                    other => return Err(format!("unsupported escape sequence: \\{other}")),
+                }
             }
             escaped = false;
         } else if ch == '\\' {

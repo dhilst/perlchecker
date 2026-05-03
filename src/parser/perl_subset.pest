@@ -110,7 +110,8 @@ op_low_or = { "or" }
 op_low_not = { "not" }
 
 int = @{ "0x" ~ (ASCII_HEX_DIGIT | "_")+ | "0o" ~ (ASCII_OCT_DIGIT | "_")+ | "0b" ~ ("0" | "1" | "_")+ | ASCII_DIGIT ~ (ASCII_DIGIT | "_")* }
-string = @{ "\"" ~ ( "\\\"" | "\\\\" | "\\n" | "\\t" | !("\"" | NEWLINE) ~ ANY )* ~ "\"" }
+string = @{ "\"" ~ ( "\\\"" | "\\\\" | "\\n" | "\\t" | !("\"" | NEWLINE) ~ ANY )* ~ "\""
+           | "'" ~ ( "\\'" | "\\\\" | !("'" | NEWLINE) ~ ANY )* ~ "'" }
 var = @{ "$" ~ ident }
 bare_ident = @{ ident }
 ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
