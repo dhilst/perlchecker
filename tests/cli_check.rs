@@ -903,3 +903,51 @@ sub lt_gt_consistent {
     assert!(stdout.contains("✔ le_reflexive: verified"));
     assert!(stdout.contains("✔ lt_gt_consistent: verified"));
 }
+
+#[test]
+fn check_64bit_bitvectors() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("bv64.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 255
+# post: $result >= 0
+sub shift_left_large {
+    my ($x) = @_;
+    my $result = $x << 33;
+    return $result;
+}
+
+# sig: (Int, Int) -> Int
+# pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
+# post: $result >= 0 && $result <= 255
+sub bitwise_and_vals {
+    my ($a, $b) = @_;
+    return $a & $b;
+}
+
+# sig: (Int, Int) -> Int
+# pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
+# post: $result >= 0
+sub bitwise_or_vals {
+    my ($a, $b) = @_;
+    return $a | $b;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ shift_left_large: verified"));
+    assert!(stdout.contains("✔ bitwise_and_vals: verified"));
+    assert!(stdout.contains("✔ bitwise_or_vals: verified"));
+}

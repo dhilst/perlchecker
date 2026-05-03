@@ -210,32 +210,32 @@ fn encode_int(expr: &IntExpr) -> Int {
         }
         IntExpr::Mod(left, right) => encode_int(left).rem(&encode_int(right)),
         IntExpr::BitAnd(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 32);
-            let r_bv = BV::from_int(&encode_int(right), 32);
+            let l_bv = BV::from_int(&encode_int(left), 64);
+            let r_bv = BV::from_int(&encode_int(right), 64);
             l_bv.bvand(&r_bv).to_int(false)
         }
         IntExpr::BitOr(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 32);
-            let r_bv = BV::from_int(&encode_int(right), 32);
+            let l_bv = BV::from_int(&encode_int(left), 64);
+            let r_bv = BV::from_int(&encode_int(right), 64);
             l_bv.bvor(&r_bv).to_int(false)
         }
         IntExpr::BitXor(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 32);
-            let r_bv = BV::from_int(&encode_int(right), 32);
+            let l_bv = BV::from_int(&encode_int(left), 64);
+            let r_bv = BV::from_int(&encode_int(right), 64);
             l_bv.bvxor(&r_bv).to_int(false)
         }
         IntExpr::Shl(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 32);
-            let r_bv = BV::from_int(&encode_int(right), 32);
+            let l_bv = BV::from_int(&encode_int(left), 64);
+            let r_bv = BV::from_int(&encode_int(right), 64);
             l_bv.bvshl(&r_bv).to_int(false)
         }
         IntExpr::Shr(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 32);
-            let r_bv = BV::from_int(&encode_int(right), 32);
-            l_bv.bvashr(&r_bv).to_int(false)
+            let l_bv = BV::from_int(&encode_int(left), 64);
+            let r_bv = BV::from_int(&encode_int(right), 64);
+            l_bv.bvashr(&r_bv).to_int(true)
         }
         IntExpr::BitNot(value) => {
-            let bv = BV::from_int(&encode_int(value), 32);
+            let bv = BV::from_int(&encode_int(value), 64);
             bv.bvnot().to_int(false)
         }
         IntExpr::Abs(value) => {
