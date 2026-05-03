@@ -78,6 +78,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::if_stmt
                     | Rule::unless_stmt
                     | Rule::return_stmt
+                    | Rule::last_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -121,6 +122,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::while_stmt => parse_while(pair, max_loop_unroll),
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
+        Rule::last_stmt => vec![Stmt::Last],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -281,6 +283,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::if_stmt
                     | Rule::unless_stmt
                     | Rule::return_stmt
+                    | Rule::last_stmt
             )
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
@@ -379,6 +382,14 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
 }
 
 fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
+    if contains_last(&body) {
+        unroll_while_with_last(condition, body, remaining)
+    } else {
+        unroll_while_simple(condition, body, remaining)
+    }
+}
+
+fn unroll_while_simple(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
     if remaining == 0 {
         return vec![Stmt::If {
             condition,
@@ -388,12 +399,168 @@ fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt>
     }
 
     let mut then_branch = body.clone();
-    then_branch.extend(unroll_while(condition.clone(), body, remaining - 1));
+    then_branch.extend(unroll_while_simple(condition.clone(), body, remaining - 1));
     vec![Stmt::If {
         condition,
         then_branch,
         else_branch: Vec::new(),
     }]
+}
+
+/// Unroll a while loop whose body contains `last`.
+///
+/// Produces:
+///   my $__broke = 0;
+///   if (C && $__broke == 0) {
+///       <body with last replaced by $__broke=1, and subsequent stmts guarded>
+///       if (C && $__broke == 0) { ... recurse ... }
+///   }
+fn unroll_while_with_last(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
+    static BREAK_FLAG: &str = "__broke";
+
+    // Declare and initialize the break flag
+    let declare = Stmt::Assign {
+        name: BREAK_FLAG.to_string(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+
+    let mut result = vec![declare];
+    result.extend(unroll_while_with_flag(condition, body, remaining, BREAK_FLAG));
+    result
+}
+
+fn unroll_while_with_flag(
+    condition: Expr,
+    body: Vec<Stmt>,
+    remaining: usize,
+    flag: &str,
+) -> Vec<Stmt> {
+    // The effective condition: original_condition && $flag == 0
+    let flag_check = Expr::Binary {
+        left: Box::new(Expr::Variable(flag.to_string())),
+        op: BinaryOp::Eq,
+        right: Box::new(Expr::Int(0)),
+    };
+    let effective_condition = Expr::Binary {
+        left: Box::new(condition.clone()),
+        op: BinaryOp::And,
+        right: Box::new(flag_check),
+    };
+
+    if remaining == 0 {
+        return vec![Stmt::If {
+            condition: effective_condition,
+            then_branch: vec![Stmt::LoopBoundExceeded],
+            else_branch: Vec::new(),
+        }];
+    }
+
+    // Transform the body: replace `last` with flag assignment, guard subsequent stmts
+    let transformed_body = transform_body_for_last(body.clone(), flag);
+
+    let mut then_branch = transformed_body;
+    then_branch.extend(unroll_while_with_flag(
+        condition,
+        body,
+        remaining - 1,
+        flag,
+    ));
+
+    vec![Stmt::If {
+        condition: effective_condition,
+        then_branch,
+        else_branch: Vec::new(),
+    }]
+}
+
+/// Transform a loop body to handle `last`:
+/// - Replace `Stmt::Last` with `$flag = 1`
+/// - After any statement that might set the flag (i.e., an if-block containing last),
+///   wrap remaining statements in `if ($flag == 0) { ... }`
+fn transform_body_for_last(stmts: Vec<Stmt>, flag: &str) -> Vec<Stmt> {
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < stmts.len() {
+        let stmt = stmts[i].clone();
+        i += 1;
+
+        match stmt {
+            Stmt::Last => {
+                // Replace with flag = 1
+                result.push(Stmt::Assign {
+                    name: flag.to_string(),
+                    expr: Expr::Int(1),
+                    declaration: false,
+                });
+                // Guard all remaining statements
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_last(remaining, flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } if contains_last(&then_branch) || contains_last(&else_branch) => {
+                // Recursively transform branches
+                let new_then = transform_body_for_last(then_branch, flag);
+                let new_else = transform_body_for_last(else_branch, flag);
+                result.push(Stmt::If {
+                    condition,
+                    then_branch: new_then,
+                    else_branch: new_else,
+                });
+                // Guard remaining statements since an if-branch may have set the flag
+                if i < stmts.len() {
+                    let remaining: Vec<Stmt> = stmts[i..].to_vec();
+                    let guarded = transform_body_for_last(remaining, flag);
+                    let flag_check = Expr::Binary {
+                        left: Box::new(Expr::Variable(flag.to_string())),
+                        op: BinaryOp::Eq,
+                        right: Box::new(Expr::Int(0)),
+                    };
+                    result.push(Stmt::If {
+                        condition: flag_check,
+                        then_branch: guarded,
+                        else_branch: Vec::new(),
+                    });
+                }
+                break;
+            }
+            other => {
+                result.push(other);
+            }
+        }
+    }
+
+    result
+}
+
+/// Recursively check whether any statement in the slice is `Stmt::Last`.
+fn contains_last(stmts: &[Stmt]) -> bool {
+    stmts.iter().any(|stmt| match stmt {
+        Stmt::Last => true,
+        Stmt::If {
+            then_branch,
+            else_branch,
+            ..
+        } => contains_last(then_branch) || contains_last(else_branch),
+        _ => false,
+    })
 }
 fn parse_elsif_clause(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> (Expr, Vec<Stmt>) {
     let mut inner = pair.into_inner();

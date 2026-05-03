@@ -144,6 +144,7 @@ pub enum Stmt {
         expr: Expr,
     },
     LoopBoundExceeded,
+    Last,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -426,6 +427,7 @@ fn type_check_stmts(
                 )?;
             }
             Stmt::LoopBoundExceeded => {}
+            Stmt::Last => {}
         }
     }
 

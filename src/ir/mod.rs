@@ -386,6 +386,9 @@ impl<'a> SsaBuilder<'a> {
                     lowered.extend(prefix);
                     lowered.push(SsaStmt::Return(value));
                 }
+                crate::ast::Stmt::Last => {
+                    unreachable!("`last` should be desugared by the parser before IR lowering")
+                }
             }
         }
 

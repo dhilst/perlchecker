@@ -502,7 +502,7 @@ fn collect_called_functions(function: &crate::ast::FunctionAst) -> Vec<String> {
 fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>) {
     for stmt in stmts {
         match stmt {
-            crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded => {}
+            crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded | crate::ast::Stmt::Last => {}
             crate::ast::Stmt::Assign { expr, .. } | crate::ast::Stmt::Return(expr) => {
                 collect_calls_from_expr(expr, calls);
             }
