@@ -45,6 +45,7 @@ pub enum StrExpr {
     Concat(Box<StrExpr>, Box<StrExpr>),
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
     Chr(Box<IntExpr>),
+    FromInt(Box<IntExpr>),
     Chomp(Box<StrExpr>),
     Reverse(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
@@ -938,10 +939,11 @@ fn eval_binary(
             Box::new(expect_int(left, function)?),
             Box::new(expect_int(right, function)?),
         )),
-        crate::ast::BinaryOp::Concat => SymValue::Str(StrExpr::Concat(
-            Box::new(expect_str(left, function)?),
-            Box::new(expect_str(right, function)?),
-        )),
+        crate::ast::BinaryOp::Concat => {
+            let left_str = coerce_to_str(left, function)?;
+            let right_str = coerce_to_str(right, function)?;
+            SymValue::Str(StrExpr::Concat(Box::new(left_str), Box::new(right_str)))
+        }
         crate::ast::BinaryOp::Lt => SymValue::Bool(BoolExpr::IntCmp(
             CmpOp::Lt,
             Box::new(expect_int(left, function)?),
@@ -1314,6 +1316,17 @@ fn expect_str(value: SymValue, function: &str) -> std::result::Result<StrExpr, S
         | SymValue::ArrayStr(_)
         | SymValue::HashInt(_)
         | SymValue::HashStr(_) => Err(SymExecError::TypeMismatch {
+            function: function.to_string(),
+        }),
+    }
+}
+
+/// Coerce a SymValue to StrExpr: Str passes through, Int is wrapped via FromInt.
+fn coerce_to_str(value: SymValue, function: &str) -> std::result::Result<StrExpr, SymExecError> {
+    match value {
+        SymValue::Str(s) => Ok(s),
+        SymValue::Int(i) => Ok(StrExpr::FromInt(Box::new(i))),
+        _ => Err(SymExecError::TypeMismatch {
             function: function.to_string(),
         }),
     }

@@ -669,24 +669,24 @@ fn infer_expr_type(
                 Ok(ExprType::Int)
             }
             BinaryOp::Concat => {
-                expect_expr_type(
-                    function,
-                    "string operand",
-                    left,
-                    env,
-                    assumptions,
-                    ExprType::Str,
-                    signatures,
-                )?;
-                expect_expr_type(
-                    function,
-                    "string operand",
-                    right,
-                    env,
-                    assumptions,
-                    ExprType::Str,
-                    signatures,
-                )?;
+                let left_ty = infer_expr_type(function, left, env, assumptions, signatures)?;
+                if left_ty != ExprType::Str && left_ty != ExprType::Int {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "concat operand",
+                        expected: "Str or Int",
+                        found: render_expr_type(left_ty),
+                    });
+                }
+                let right_ty = infer_expr_type(function, right, env, assumptions, signatures)?;
+                if right_ty != ExprType::Str && right_ty != ExprType::Int {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "concat operand",
+                        expected: "Str or Int",
+                        found: render_expr_type(right_ty),
+                    });
+                }
                 Ok(ExprType::Str)
             }
             BinaryOp::Repeat => {

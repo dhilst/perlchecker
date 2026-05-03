@@ -288,6 +288,22 @@ fn encode_str(expr: &StrExpr) -> Z3String {
                 Z3String::wrap(ctx, z3_sys::Z3_mk_string_from_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
             }
         }
+        StrExpr::FromInt(value) => {
+            let ctx = &Context::thread_local();
+            let encoded = encode_int(value);
+            let zero = Int::from_i64(0);
+            let is_nonneg = encoded.ge(&zero);
+            let pos_str = unsafe {
+                Z3String::wrap(ctx, z3_sys::Z3_mk_int_to_str(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
+            };
+            let neg_val = encoded.unary_minus();
+            let neg_digits = unsafe {
+                Z3String::wrap(ctx, z3_sys::Z3_mk_int_to_str(ctx.get_z3_context(), neg_val.get_z3_ast()).unwrap())
+            };
+            let minus_sign = Z3String::from_str("-").expect("minus literal");
+            let neg_str = Z3String::concat(&[minus_sign, neg_digits]);
+            is_nonneg.ite(&pos_str, &neg_str)
+        }
         StrExpr::Chomp(value) => {
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
@@ -502,6 +518,7 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
             &encode_int_safety(len),
         ]),
         StrExpr::Chr(value) => encode_int_safety(value),
+        StrExpr::FromInt(value) => encode_int_safety(value),
         StrExpr::Chomp(value) => encode_str_safety(value),
         StrExpr::Reverse(value) => encode_str_safety(value),
         StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
@@ -644,6 +661,7 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(len, vars);
         }
         StrExpr::Chr(value) => collect_string_vars_from_int(value, vars),
+        StrExpr::FromInt(value) => collect_string_vars_from_int(value, vars),
         StrExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Reverse(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Ite(cond, then_str, else_str) => {
