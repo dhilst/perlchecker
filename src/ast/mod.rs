@@ -178,6 +178,17 @@ pub enum Stmt {
         name: String,
         elements: Vec<Expr>,
     },
+    While {
+        condition: Expr,
+        body: Vec<Stmt>,
+        /// Optional step statements (from C-style for loops).
+        /// These execute after the body and before the next iteration check.
+        /// When `next` is present, the step must NOT be guarded by the skip flag.
+        step: Vec<Stmt>,
+        has_last: bool,
+        has_next: bool,
+        max_unroll: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -504,6 +515,43 @@ fn type_check_stmts(
                         initialized: true,
                     },
                 );
+            }
+            Stmt::While {
+                condition,
+                body: loop_body,
+                step,
+                ..
+            } => {
+                // Type-check the condition (must be Bool)
+                expect_expr_type(
+                    function,
+                    "while condition",
+                    condition,
+                    &env,
+                    &assumptions,
+                    ExprType::Bool,
+                    signatures,
+                )?;
+                // Type-check the body
+                let (body_env, _) = type_check_stmts(
+                    function,
+                    loop_body,
+                    &env,
+                    &assumptions,
+                    return_type,
+                    signatures,
+                )?;
+                // Type-check the step (if any)
+                if !step.is_empty() {
+                    type_check_stmts(
+                        function,
+                        step,
+                        &body_env,
+                        &assumptions,
+                        return_type,
+                        signatures,
+                    )?;
+                }
             }
             Stmt::LoopBoundExceeded => {}
             Stmt::Last => {}

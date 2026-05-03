@@ -685,78 +685,87 @@ fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
 
-    if has_last && has_next {
-        // Both last and next: declare both flags, transform first body, then unroll rest
-        static BREAK_FLAG: &str = "__broke";
-        static SKIP_FLAG: &str = "__skipped";
-        let declare_broke = Stmt::Assign {
-            name: BREAK_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let declare_skipped = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let reset_skip = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: false,
-        };
-        let transformed_first = transform_body_for_last_and_next(body.clone(), BREAK_FLAG, SKIP_FLAG);
-        let mut result = vec![declare_broke, declare_skipped, reset_skip];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_both_flags(
-                condition, body, max_loop_unroll - 1, BREAK_FLAG, SKIP_FLAG,
-            ));
+    if has_last || has_next {
+        // For do-while with last/next, the first body iteration needs flag handling.
+        // Desugar the first body with flags, then emit a While for remaining iterations.
+        if has_last && has_next {
+            static BREAK_FLAG: &str = "__broke";
+            static SKIP_FLAG: &str = "__skipped";
+            let declare_broke = Stmt::Assign {
+                name: BREAK_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let declare_skipped = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let reset_skip = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: false,
+            };
+            let transformed_first = transform_body_for_last_and_next(body.clone(), BREAK_FLAG, SKIP_FLAG);
+            let mut result = vec![declare_broke, declare_skipped, reset_skip];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_both_flags(
+                    condition, body, max_loop_unroll - 1, BREAK_FLAG, SKIP_FLAG,
+                ));
+            }
+            result
+        } else if has_last {
+            static BREAK_FLAG: &str = "__broke";
+            let declare = Stmt::Assign {
+                name: BREAK_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let transformed_first = transform_body_for_last(body.clone(), BREAK_FLAG);
+            let mut result = vec![declare];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_flag(
+                    condition, body, max_loop_unroll - 1, BREAK_FLAG,
+                ));
+            }
+            result
+        } else {
+            // has_next only
+            static SKIP_FLAG: &str = "__skipped";
+            let declare = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let reset_skip = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: false,
+            };
+            let transformed_first = transform_body_for_next(body.clone(), SKIP_FLAG);
+            let mut result = vec![declare, reset_skip];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_skip_flag(
+                    condition, body, max_loop_unroll - 1, SKIP_FLAG,
+                ));
+            }
+            result
         }
-        result
-    } else if has_last {
-        // Only last: declare break flag, transform first body, then unroll rest
-        static BREAK_FLAG: &str = "__broke";
-        let declare = Stmt::Assign {
-            name: BREAK_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let transformed_first = transform_body_for_last(body.clone(), BREAK_FLAG);
-        let mut result = vec![declare];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_flag(
-                condition, body, max_loop_unroll - 1, BREAK_FLAG,
-            ));
-        }
-        result
-    } else if has_next {
-        // Only next: declare skip flag, transform first body, then unroll rest
-        static SKIP_FLAG: &str = "__skipped";
-        let declare = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let reset_skip = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: false,
-        };
-        let transformed_first = transform_body_for_next(body.clone(), SKIP_FLAG);
-        let mut result = vec![declare, reset_skip];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_skip_flag(
-                condition, body, max_loop_unroll - 1, SKIP_FLAG,
-            ));
-        }
-        result
     } else {
-        // No last or next: execute body once unconditionally, then unroll as while
+        // No last or next: execute body once unconditionally, then emit While
         let mut result = body.clone();
         if max_loop_unroll > 0 {
-            result.extend(unroll_while_simple(condition, body, max_loop_unroll - 1));
+            result.push(Stmt::While {
+                condition,
+                body,
+                step: Vec::new(),
+                has_last: false,
+                has_next: false,
+                max_unroll: max_loop_unroll - 1,
+            });
         }
         result
     }
@@ -776,74 +785,85 @@ fn parse_do_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
 
-    if has_last && has_next {
-        static BREAK_FLAG: &str = "__broke";
-        static SKIP_FLAG: &str = "__skipped";
-        let declare_broke = Stmt::Assign {
-            name: BREAK_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let declare_skipped = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let reset_skip = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: false,
-        };
-        let transformed_first = transform_body_for_last_and_next(body.clone(), BREAK_FLAG, SKIP_FLAG);
-        let mut result = vec![declare_broke, declare_skipped, reset_skip];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_both_flags(
-                negated_condition, body, max_loop_unroll - 1, BREAK_FLAG, SKIP_FLAG,
-            ));
+    if has_last || has_next {
+        // For do-until with last/next, keep old desugaring for the first body
+        if has_last && has_next {
+            static BREAK_FLAG: &str = "__broke";
+            static SKIP_FLAG: &str = "__skipped";
+            let declare_broke = Stmt::Assign {
+                name: BREAK_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let declare_skipped = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let reset_skip = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: false,
+            };
+            let transformed_first = transform_body_for_last_and_next(body.clone(), BREAK_FLAG, SKIP_FLAG);
+            let mut result = vec![declare_broke, declare_skipped, reset_skip];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_both_flags(
+                    negated_condition, body, max_loop_unroll - 1, BREAK_FLAG, SKIP_FLAG,
+                ));
+            }
+            result
+        } else if has_last {
+            static BREAK_FLAG: &str = "__broke";
+            let declare = Stmt::Assign {
+                name: BREAK_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let transformed_first = transform_body_for_last(body.clone(), BREAK_FLAG);
+            let mut result = vec![declare];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_flag(
+                    negated_condition, body, max_loop_unroll - 1, BREAK_FLAG,
+                ));
+            }
+            result
+        } else {
+            // has_next only
+            static SKIP_FLAG: &str = "__skipped";
+            let declare = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: true,
+            };
+            let reset_skip = Stmt::Assign {
+                name: SKIP_FLAG.to_string(),
+                expr: Expr::Int(0),
+                declaration: false,
+            };
+            let transformed_first = transform_body_for_next(body.clone(), SKIP_FLAG);
+            let mut result = vec![declare, reset_skip];
+            result.extend(transformed_first);
+            if max_loop_unroll > 0 {
+                result.extend(unroll_while_with_skip_flag(
+                    negated_condition, body, max_loop_unroll - 1, SKIP_FLAG,
+                ));
+            }
+            result
         }
-        result
-    } else if has_last {
-        static BREAK_FLAG: &str = "__broke";
-        let declare = Stmt::Assign {
-            name: BREAK_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let transformed_first = transform_body_for_last(body.clone(), BREAK_FLAG);
-        let mut result = vec![declare];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_flag(
-                negated_condition, body, max_loop_unroll - 1, BREAK_FLAG,
-            ));
-        }
-        result
-    } else if has_next {
-        static SKIP_FLAG: &str = "__skipped";
-        let declare = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: true,
-        };
-        let reset_skip = Stmt::Assign {
-            name: SKIP_FLAG.to_string(),
-            expr: Expr::Int(0),
-            declaration: false,
-        };
-        let transformed_first = transform_body_for_next(body.clone(), SKIP_FLAG);
-        let mut result = vec![declare, reset_skip];
-        result.extend(transformed_first);
-        if max_loop_unroll > 0 {
-            result.extend(unroll_while_with_skip_flag(
-                negated_condition, body, max_loop_unroll - 1, SKIP_FLAG,
-            ));
-        }
-        result
     } else {
         let mut result = body.clone();
         if max_loop_unroll > 0 {
-            result.extend(unroll_while_simple(negated_condition, body, max_loop_unroll - 1));
+            result.push(Stmt::While {
+                condition: negated_condition,
+                body,
+                step: Vec::new(),
+                has_last: false,
+                has_next: false,
+                max_unroll: max_loop_unroll - 1,
+            });
         }
         result
     }
@@ -854,7 +874,9 @@ fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     let condition = build_expr(inner.next().expect("while must have a condition"))
         .expect("validated while condition");
     let body = parse_block(inner.next().expect("while must have a body"), max_loop_unroll);
-    unroll_while(condition, body, max_loop_unroll)
+    let has_last = contains_last(&body);
+    let has_next = contains_next(&body);
+    vec![Stmt::While { condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll }]
 }
 
 fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
@@ -868,7 +890,9 @@ fn parse_until(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         op: UnaryOp::Not,
         expr: Box::new(condition),
     };
-    unroll_while(negated_condition, body, max_loop_unroll)
+    let has_last = contains_last(&body);
+    let has_next = contains_next(&body);
+    vec![Stmt::While { condition: negated_condition, body, step: Vec::new(), has_last, has_next, max_unroll: max_loop_unroll }]
 }
 
 fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
@@ -890,15 +914,9 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
 
     let condition = condition.expect("for must have a condition");
 
-    // If the body contains `next`, we need to keep the step separate so it
-    // isn't guarded by the skip flag (Perl's `next` still executes the for-loop step).
-    if contains_next(&body) {
-        init.extend(unroll_for_with_next(condition, body, step, max_loop_unroll));
-    } else {
-        let mut loop_body = body;
-        loop_body.extend(step);
-        init.extend(unroll_while(condition, loop_body, max_loop_unroll));
-    }
+    let has_last = contains_last(&body);
+    let has_next = contains_next(&body);
+    init.push(Stmt::While { condition, body, step, has_last, has_next, max_unroll: max_loop_unroll });
     init
 }
 
@@ -967,14 +985,18 @@ fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
 
     let step_stmts = vec![step];
 
-    // Reuse the same for-loop unrolling logic as parse_for
+    let has_last = contains_last(&full_body);
+    let has_next = contains_next(&full_body);
+
     let mut result = vec![init];
-    if contains_next(&full_body) {
-        result.extend(unroll_for_with_next(condition, full_body, step_stmts, max_loop_unroll));
-    } else {
-        full_body.extend(step_stmts);
-        result.extend(unroll_while(condition, full_body, max_loop_unroll));
-    }
+    result.push(Stmt::While {
+        condition,
+        body: full_body,
+        step: step_stmts,
+        has_last,
+        has_next,
+        max_unroll: max_loop_unroll,
+    });
     result
 }
 
@@ -1075,7 +1097,7 @@ fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {
     }
 }
 
-fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
+pub fn unroll_while(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
     let has_last = contains_last(&body);
     let has_next = contains_next(&body);
     if has_last && has_next {
@@ -1260,13 +1282,15 @@ fn contains_last(stmts: &[Stmt]) -> bool {
             else_branch,
             ..
         } => contains_last(then_branch) || contains_last(else_branch),
+        // Don't recurse into nested While -- `last` inside a nested loop
+        // applies to that inner loop, not the outer one.
         _ => false,
     })
 }
 
 /// Unroll a for loop whose body contains `next`, keeping the step outside
 /// the skip-flag guard so that it always executes (matching Perl semantics).
-fn unroll_for_with_next(
+pub fn unroll_for_with_next(
     condition: Expr,
     body: Vec<Stmt>,
     step: Vec<Stmt>,
@@ -2443,7 +2467,7 @@ mod tests {
     }
 
     #[test]
-    fn lowers_while_and_for_into_conditionals() {
+    fn lowers_while_and_for_into_while_nodes() {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: Vec::new(),
@@ -2463,8 +2487,11 @@ mod tests {
         };
 
         let ast = parse_function_ast(&function).unwrap();
-        assert!(matches!(ast.body[1], Stmt::If { .. }));
-        assert!(matches!(ast.body[3], Stmt::If { .. }));
+        // while loop becomes Stmt::While
+        assert!(matches!(ast.body[1], Stmt::While { .. }));
+        // for loop becomes: Stmt::Assign (init) + Stmt::While
+        assert!(matches!(ast.body[2], Stmt::Assign { .. }));
+        assert!(matches!(ast.body[3], Stmt::While { .. }));
     }
 
     #[test]

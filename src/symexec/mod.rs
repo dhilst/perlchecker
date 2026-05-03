@@ -558,6 +558,16 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
                 collect_calls_from_stmts(then_branch, calls);
                 collect_calls_from_stmts(else_branch, calls);
             }
+            crate::ast::Stmt::While {
+                condition,
+                body,
+                step,
+                ..
+            } => {
+                collect_calls_from_expr(condition, calls);
+                collect_calls_from_stmts(body, calls);
+                collect_calls_from_stmts(step, calls);
+            }
         }
     }
 }

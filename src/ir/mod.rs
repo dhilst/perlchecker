@@ -641,6 +641,41 @@ impl<'a> SsaBuilder<'a> {
                     lowered.push(SsaStmt::Assign(len_init_name.clone(), SsaExpr::Int(elements.len() as i64)));
                     self.len_companions.insert(name.clone(), len_init_name);
                 }
+                crate::ast::Stmt::While {
+                    condition,
+                    body: loop_body,
+                    step,
+                    has_next,
+                    max_unroll,
+                    ..
+                } => {
+                    // Unroll the While node back into Stmt::If chains, then lower those.
+                    // This preserves the exact same behavior as the old parser-level unrolling.
+                    let unrolled = if !step.is_empty() && *has_next {
+                        // For-loop with `next`: step must execute outside skip-flag guard
+                        crate::parser::unroll_for_with_next(
+                            condition.clone(),
+                            loop_body.clone(),
+                            step.clone(),
+                            *max_unroll,
+                        )
+                    } else if !step.is_empty() {
+                        // For-loop without `next`: append step to body, unroll as while
+                        let mut full_body = loop_body.clone();
+                        full_body.extend(step.clone());
+                        crate::parser::unroll_while(condition.clone(), full_body, *max_unroll)
+                    } else {
+                        // Simple while loop
+                        crate::parser::unroll_while(
+                            condition.clone(),
+                            loop_body.clone(),
+                            *max_unroll,
+                        )
+                    };
+                    let (unrolled_ssa, unrolled_env) = self.lower_stmts(&unrolled, &env)?;
+                    lowered.extend(unrolled_ssa);
+                    env = unrolled_env;
+                }
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);
                 }
