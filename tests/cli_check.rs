@@ -759,3 +759,71 @@ sub sum_first_n {
     assert!(stdout.contains("✔ lookup_table: verified"));
     assert!(stdout.contains("✔ sum_first_n: verified"));
 }
+
+#[test]
+fn check_regex_match_desugaring() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("regex.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 10
+# post: $result >= 0 && $result <= 1
+sub starts_with_hello {
+    my ($s) = @_;
+    if ($s =~ /^hello/) {
+        return 1;
+    }
+    return 0;
+}
+
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 10
+# post: $result >= 0 && $result <= 1
+sub contains_test {
+    my ($s) = @_;
+    if ($s =~ /test/) {
+        return 1;
+    }
+    return 0;
+}
+
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 10
+# post: $result >= 0 && $result <= 1
+sub not_ending_with_x {
+    my ($s) = @_;
+    if ($s !~ /x$/) {
+        return 1;
+    }
+    return 0;
+}
+
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 10
+# post: $result >= 0 && $result <= 1
+sub exact_match {
+    my ($s) = @_;
+    if ($s =~ /^ok$/) {
+        return 1;
+    }
+    return 0;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ starts_with_hello: verified"));
+    assert!(stdout.contains("✔ contains_test: verified"));
+    assert!(stdout.contains("✔ not_ending_with_x: verified"));
+    assert!(stdout.contains("✔ exact_match: verified"));
+}

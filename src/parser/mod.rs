@@ -1926,6 +1926,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::ends_with_call => parse_builtin_call(primary, Builtin::EndsWith),
             Rule::replace_call => parse_builtin_call(primary, Builtin::Replace),
             Rule::char_at_call => parse_builtin_call(primary, Builtin::CharAt),
+            Rule::regex_match => parse_regex_match(primary, false),
+            Rule::regex_not_match => parse_regex_match(primary, true),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {
@@ -2166,6 +2168,96 @@ fn parse_string_literal(raw: &str) -> std::result::Result<String, String> {
     }
 
     Ok(value)
+}
+
+fn parse_regex_match(pair: Pair<'_, Rule>, negated: bool) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let var_pair = inner.next().expect("regex match must have a variable");
+    let var_expr = Expr::Variable(parse_variable(var_pair));
+    let regex_pair = inner.next().expect("regex match must have a regex literal");
+    let raw = regex_pair.as_str();
+    desugar_regex(var_expr, raw, negated)
+}
+
+fn desugar_regex(var_expr: Expr, raw: &str, negated: bool) -> std::result::Result<Expr, String> {
+    // Strip leading and trailing slashes
+    let pattern = raw
+        .strip_prefix('/')
+        .and_then(|s| s.strip_suffix('/'))
+        .ok_or_else(|| format!("invalid regex literal: {raw}"))?;
+
+    // Check for unsupported metacharacters
+    let metacharacters = ['.', '*', '+', '?', '[', ']', '(', ')', '{', '}', '|', '\\'];
+    for ch in pattern.chars() {
+        if metacharacters.contains(&ch) {
+            return Err(format!(
+                "unsupported regex metacharacter `{ch}` in pattern /{pattern}/ — only literal patterns with ^ and $ anchors are supported"
+            ));
+        }
+    }
+
+    let starts_with_caret = pattern.starts_with('^');
+    let ends_with_dollar = pattern.ends_with('$');
+
+    let literal = pattern
+        .strip_prefix('^')
+        .unwrap_or(pattern);
+    let literal = literal
+        .strip_suffix('$')
+        .unwrap_or(literal);
+
+    let result = match (starts_with_caret, ends_with_dollar) {
+        (true, true) => {
+            // ^pattern$ => string equality (already Bool)
+            Expr::Binary {
+                left: Box::new(var_expr),
+                op: BinaryOp::StrEq,
+                right: Box::new(Expr::String(literal.to_string())),
+            }
+        }
+        (true, false) => {
+            // ^pattern => starts_with (returns Int, wrap in == 1 for Bool)
+            Expr::Binary {
+                left: Box::new(Expr::Builtin {
+                    function: Builtin::StartsWith,
+                    args: vec![var_expr, Expr::String(literal.to_string())],
+                }),
+                op: BinaryOp::Eq,
+                right: Box::new(Expr::Int(1)),
+            }
+        }
+        (false, true) => {
+            // pattern$ => ends_with (returns Int, wrap in == 1 for Bool)
+            Expr::Binary {
+                left: Box::new(Expr::Builtin {
+                    function: Builtin::EndsWith,
+                    args: vec![var_expr, Expr::String(literal.to_string())],
+                }),
+                op: BinaryOp::Eq,
+                right: Box::new(Expr::Int(1)),
+            }
+        }
+        (false, false) => {
+            // pattern => contains (returns Int, wrap in == 1 for Bool)
+            Expr::Binary {
+                left: Box::new(Expr::Builtin {
+                    function: Builtin::Contains,
+                    args: vec![var_expr, Expr::String(literal.to_string())],
+                }),
+                op: BinaryOp::Eq,
+                right: Box::new(Expr::Int(1)),
+            }
+        }
+    };
+
+    if negated {
+        Ok(Expr::Unary {
+            op: UnaryOp::Not,
+            expr: Box::new(result),
+        })
+    } else {
+        Ok(result)
+    }
 }
 
 fn render_expr_error(error: pest::error::Error<Rule>) -> String {
