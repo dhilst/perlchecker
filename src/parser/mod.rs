@@ -79,6 +79,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::if_stmt
                     | Rule::unless_stmt
                     | Rule::return_stmt
+                    | Rule::die_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
             )
@@ -125,6 +126,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::until_stmt => parse_until(pair, max_loop_unroll),
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
+        Rule::die_stmt => vec![parse_die(pair)],
         Rule::last_stmt => vec![Stmt::Last],
         Rule::next_stmt => vec![Stmt::Next],
         other => unreachable!("unexpected statement rule: {other:?}"),
@@ -273,6 +275,17 @@ fn parse_return(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::Return(expr)
 }
 
+fn parse_die(pair: Pair<'_, Rule>) -> Stmt {
+    let expr = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::expr)
+        .map(build_expr)
+        .expect("die must contain an expression")
+        .expect("validated die expression");
+
+    Stmt::Die(expr)
+}
+
 fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
     pair.into_inner()
         .filter(|inner| {
@@ -288,6 +301,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::if_stmt
                     | Rule::unless_stmt
                     | Rule::return_stmt
+                    | Rule::die_stmt
                     | Rule::last_stmt
                     | Rule::next_stmt
             )

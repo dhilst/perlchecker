@@ -34,6 +34,7 @@ pub enum SsaStmt {
     },
     Return(SsaExpr),
     LoopBoundExceeded,
+    Die,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +127,7 @@ pub enum Terminator {
     },
     Return(SsaExpr),
     LoopBoundExceeded,
+    Die,
     Unreachable,
 }
 
@@ -386,6 +388,9 @@ impl<'a> SsaBuilder<'a> {
                     lowered.extend(prefix);
                     lowered.push(SsaStmt::Return(value));
                 }
+                crate::ast::Stmt::Die(_) => {
+                    lowered.push(SsaStmt::Die);
+                }
                 crate::ast::Stmt::Last => {
                     unreachable!("`last` should be desugared by the parser before IR lowering")
                 }
@@ -473,6 +478,10 @@ impl<'a> CfgBuilder<'a> {
                 }
                 SsaStmt::LoopBoundExceeded => {
                     self.blocks[current].terminator = Terminator::LoopBoundExceeded;
+                    return BlockExit::terminated(env);
+                }
+                SsaStmt::Die => {
+                    self.blocks[current].terminator = Terminator::Die;
                     return BlockExit::terminated(env);
                 }
                 SsaStmt::If {
@@ -624,6 +633,7 @@ mod tests {
                     }
                     super::SsaStmt::Return(_) => {}
                     super::SsaStmt::LoopBoundExceeded => {}
+                    super::SsaStmt::Die => {}
                 }
             }
         }

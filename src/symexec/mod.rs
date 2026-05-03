@@ -158,6 +158,8 @@ pub enum SymExecError {
     PathLimitExceeded { function: String, max_paths: usize },
     #[error("function `{function}` exceeded the loop unroll bound on a feasible path")]
     LoopBoundExceeded { function: String },
+    #[error("function `{function}` can reach a `die` statement on a feasible path")]
+    DieReached { function: String },
     #[error("function `{function}` has no valid execution paths after discarding invalid arithmetic paths")]
     NoValidPaths { function: String },
     #[error(transparent)]
@@ -372,6 +374,13 @@ fn execute_cfg_from_state(
                         });
                     }
                 }
+                Terminator::Die => {
+                    if smt::is_satisfiable_with_timeout(&cfg.name, &state.path_condition, program.limits.solver_timeout_ms)? {
+                        return Err(SymExecError::DieReached {
+                            function: cfg.name.clone(),
+                        });
+                    }
+                }
                 Terminator::Unreachable => {}
             }
         }
@@ -507,7 +516,7 @@ fn collect_called_functions(function: &crate::ast::FunctionAst) -> Vec<String> {
 fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>) {
     for stmt in stmts {
         match stmt {
-            crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded | crate::ast::Stmt::Last | crate::ast::Stmt::Next => {}
+            crate::ast::Stmt::Declare { .. } | crate::ast::Stmt::LoopBoundExceeded | crate::ast::Stmt::Last | crate::ast::Stmt::Next | crate::ast::Stmt::Die(_) => {}
             crate::ast::Stmt::Assign { expr, .. } | crate::ast::Stmt::Return(expr) => {
                 collect_calls_from_expr(expr, calls);
             }
@@ -1492,5 +1501,39 @@ mod tests {
             verify_cfg(&program, &spec, &cfg).unwrap(),
             VerificationResult::Verified { .. }
         ));
+    }
+
+    #[test]
+    fn verifies_die_unreachable_guarded_by_precondition() {
+        let function = ExtractedFunction {
+            name: "guarded_positive".to_string(),
+            annotations: vec![
+                "# sig: (Int) -> Int".to_string(),
+                "# pre: $x >= 1 && $x <= 100".to_string(),
+                "# post: $result >= 1".to_string(),
+            ],
+            body: "\n    my ($x) = @_;\n    if ($x <= 0) {\n        die \"must be positive\";\n    }\n    return $x;\n".to_string(),
+            start_line: 1,
+        };
+
+        let result = verify_extracted_function(&function).unwrap();
+        assert!(matches!(result, VerificationResult::Verified { .. }));
+    }
+
+    #[test]
+    fn rejects_reachable_die_statement() {
+        let function = ExtractedFunction {
+            name: "die_is_reachable".to_string(),
+            annotations: vec![
+                "# sig: (Int) -> Int".to_string(),
+                "# pre: $x >= 0 && $x <= 10".to_string(),
+                "# post: $result >= 0".to_string(),
+            ],
+            body: "\n    my ($x) = @_;\n    if ($x == 0) {\n        die \"zero!\";\n    }\n    return $x;\n".to_string(),
+            start_line: 1,
+        };
+
+        let error = verify_extracted_function(&function).unwrap_err();
+        assert!(error.to_string().contains("die"));
     }
 }
