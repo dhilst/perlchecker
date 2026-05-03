@@ -74,6 +74,7 @@ pub fn parse_function_ast_with_limits(
                     | Rule::while_stmt
                     | Rule::until_stmt
                     | Rule::for_stmt
+                    | Rule::foreach_stmt
                     | Rule::assign_stmt
                     | Rule::array_assign_stmt
                     | Rule::hash_assign_stmt
@@ -137,6 +138,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::while_stmt => parse_while(pair, max_loop_unroll),
         Rule::until_stmt => parse_until(pair, max_loop_unroll),
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
+        Rule::foreach_stmt => parse_foreach(pair, max_loop_unroll),
         Rule::return_stmt => vec![parse_return(pair)],
         Rule::die_stmt => vec![parse_die(pair)],
         Rule::warn_stmt => vec![], // warn is a no-op for verification
@@ -629,6 +631,7 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
                     | Rule::while_stmt
                     | Rule::until_stmt
                     | Rule::for_stmt
+                    | Rule::foreach_stmt
                     | Rule::assign_stmt
                     | Rule::array_assign_stmt
                     | Rule::hash_assign_stmt
@@ -876,6 +879,82 @@ fn parse_for(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         init.extend(unroll_while(condition, loop_body, max_loop_unroll));
     }
     init
+}
+
+fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+    let mut inner = pair.into_inner();
+    let loop_var = parse_variable(inner.next().expect("foreach must have a loop variable"));
+    let array_name = inner
+        .next()
+        .expect("foreach must have an array name")
+        .as_str()
+        .to_string();
+    let user_body = parse_block(inner.next().expect("foreach must have a body"), max_loop_unroll);
+
+    // Desugar: foreach my $x (@arr) { BODY }
+    // =>
+    // my $__foreach_i = 0;
+    // while ($__foreach_i < scalar(@arr)) {
+    //     my $x = $arr[$__foreach_i];
+    //     BODY
+    //     $__foreach_i = $__foreach_i + 1;
+    // }
+
+    let idx = "__foreach_i".to_string();
+
+    // Init: my $__foreach_i = 0;
+    let init = Stmt::Assign {
+        name: idx.clone(),
+        expr: Expr::Int(0),
+        declaration: true,
+    };
+
+    // Condition: $__foreach_i < scalar(@arr)
+    let condition = Expr::Binary {
+        left: Box::new(Expr::Variable(idx.clone())),
+        op: BinaryOp::Lt,
+        right: Box::new(Expr::Builtin {
+            function: Builtin::Scalar,
+            args: vec![Expr::Variable(array_name.clone())],
+        }),
+    };
+
+    // Body prepend: my $x = $arr[$__foreach_i];
+    let element_assign = Stmt::Assign {
+        name: loop_var,
+        expr: Expr::Access {
+            kind: AccessKind::Array,
+            collection: array_name,
+            index: Box::new(Expr::Variable(idx.clone())),
+        },
+        declaration: true,
+    };
+
+    // Step: $__foreach_i = $__foreach_i + 1;
+    let step = Stmt::Assign {
+        name: idx.clone(),
+        expr: Expr::Binary {
+            left: Box::new(Expr::Variable(idx)),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Int(1)),
+        },
+        declaration: false,
+    };
+
+    let mut full_body = vec![element_assign];
+    full_body.extend(user_body);
+
+    let step_stmts = vec![step];
+
+    // Reuse the same for-loop unrolling logic as parse_for
+    let mut result = vec![init];
+    if contains_next(&full_body) {
+        result.extend(unroll_for_with_next(condition, full_body, step_stmts, max_loop_unroll));
+    } else {
+        full_body.extend(step_stmts);
+        result.extend(unroll_while(condition, full_body, max_loop_unroll));
+    }
+    result
 }
 
 fn parse_for_assign(pair: Pair<'_, Rule>) -> Stmt {

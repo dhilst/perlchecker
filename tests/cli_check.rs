@@ -663,3 +663,53 @@ sub multiple_calls_in_expr {
     assert!(stdout.contains("✔ call_in_condition: verified"));
     assert!(stdout.contains("✔ multiple_calls_in_expr: verified"));
 }
+
+#[test]
+fn check_foreach_loop_support() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("foreach.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Array<Int>) -> Int
+# pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
+# post: $result >= 0
+sub sum_positive {
+    my ($arr) = @_;
+    my $sum = 0;
+    foreach my $x (@arr) {
+        if ($x > 0) {
+            $sum = $sum + $x;
+        }
+    }
+    return $sum;
+}
+
+# sig: (Array<Int>) -> Int
+# pre: scalar(@arr) >= 0 && scalar(@arr) <= 4
+# post: $result >= 0 && $result <= 4
+sub count_positive {
+    my ($arr) = @_;
+    my $count = 0;
+    foreach my $val (@arr) {
+        if ($val > 0) {
+            $count = $count + 1;
+        }
+    }
+    return $count;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ sum_positive: verified"));
+    assert!(stdout.contains("✔ count_positive: verified"));
+}

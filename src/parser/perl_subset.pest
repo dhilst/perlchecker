@@ -3,7 +3,7 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 function_body = { SOI ~ parameter_binding ~ stmt* ~ EOI }
 annotation_expr = { SOI ~ expr ~ EOI }
 
-stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | list_assign_stmt | inc_stmt | dec_stmt | assign_stmt | declare_stmt }
+stmt = _{ do_until_stmt | do_while_stmt | until_stmt | while_stmt | foreach_stmt | for_stmt | unless_stmt | if_stmt | return_stmt | die_stmt | warn_stmt | print_stmt | say_stmt | last_stmt | next_stmt | push_stmt | hash_assign_stmt | array_assign_stmt | list_assign_stmt | inc_stmt | dec_stmt | assign_stmt | declare_stmt }
 inc_stmt = { var ~ "++" ~ ";" }
 dec_stmt = { var ~ "--" ~ ";" }
 do_while_stmt = { "do" ~ block ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
@@ -42,6 +42,7 @@ if_stmt = { "if" ~ "(" ~ expr ~ ")" ~ block ~ elsif_clause* ~ else_clause? }
 while_stmt = { "while" ~ "(" ~ expr ~ ")" ~ block }
 until_stmt = { "until" ~ "(" ~ expr ~ ")" ~ block }
 for_stmt = { "for" ~ "(" ~ for_assign? ~ ";" ~ expr ~ ";" ~ for_assign? ~ ")" ~ block }
+foreach_stmt = { "foreach" ~ "my" ~ var ~ "(" ~ "@" ~ ident ~ ")" ~ block }
 elsif_clause = { "elsif" ~ "(" ~ expr ~ ")" ~ block }
 else_clause = { "else" ~ block }
 block = { "{" ~ stmt* ~ "}" }
