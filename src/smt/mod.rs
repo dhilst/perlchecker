@@ -264,8 +264,8 @@ fn encode_int(expr: &IntExpr) -> Int {
             cond_bool.ite(&then_encoded, &else_encoded)
         }
         IntExpr::Length(value) => encode_str(value).length(),
-        IntExpr::Index(haystack, needle) => {
-            encode_index_of(&encode_str(haystack), &encode_str(needle))
+        IntExpr::Index(haystack, needle, start) => {
+            encode_index_of(&encode_str(haystack), &encode_str(needle), &encode_int(start))
         }
         IntExpr::ArraySelect(array, index) => encode_array_int(array)
             .select(&encode_int(index))
@@ -389,7 +389,7 @@ fn encode_hash_str(expr: &HashStrExpr) -> Array {
     }
 }
 
-fn encode_index_of(haystack: &Z3String, needle: &Z3String) -> Int {
+fn encode_index_of(haystack: &Z3String, needle: &Z3String, start: &Int) -> Int {
     let needle_len = needle.length();
     let haystack_len = haystack.length();
     let mut result = Int::from_i64(-1);
@@ -397,6 +397,7 @@ fn encode_index_of(haystack: &Z3String, needle: &Z3String) -> Int {
         let offset = Int::from_i64(index);
         let matches = Bool::and(&[
             &haystack_len.ge(index),
+            &offset.ge(start),
             &haystack
                 .substr(offset.clone(), needle_len.clone())
                 .eq(needle),
@@ -500,8 +501,8 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             &encode_int_safety(else_int),
         ]),
         IntExpr::Length(value) => encode_str_safety(value),
-        IntExpr::Index(haystack, needle) => {
-            Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle)])
+        IntExpr::Index(haystack, needle, start) => {
+            Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle), &encode_int_safety(start)])
         }
         IntExpr::ArraySelect(array, index) => Bool::and(&[
             &encode_array_int_safety(array),
@@ -643,9 +644,10 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(else_int, vars);
         }
         IntExpr::Length(value) => collect_string_vars_from_str(value, vars),
-        IntExpr::Index(haystack, needle) => {
+        IntExpr::Index(haystack, needle, start) => {
             collect_string_vars_from_str(haystack, vars);
             collect_string_vars_from_str(needle, vars);
+            collect_string_vars_from_int(start, vars);
         }
         IntExpr::ArraySelect(_, index) => {
             collect_string_vars_from_int(index, vars);
@@ -738,6 +740,7 @@ mod tests {
             Box::new(IntExpr::Index(
                 Box::new(StrExpr::Const("hello".to_string())),
                 Box::new(StrExpr::Const("ll".to_string())),
+                Box::new(IntExpr::Const(0)),
             )),
             Box::new(IntExpr::Const(2)),
         );

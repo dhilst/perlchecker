@@ -33,7 +33,7 @@ pub enum IntExpr {
     Ord(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
     Length(Box<StrExpr>),
-    Index(Box<StrExpr>, Box<StrExpr>),
+    Index(Box<StrExpr>, Box<StrExpr>, Box<IntExpr>),
     StrToInt(Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
     HashSelect(Box<HashIntExpr>, Box<StrExpr>),
@@ -1069,12 +1069,19 @@ fn eval_builtin(
             ))
         }
         Builtin::Index => {
-            let [haystack, needle] = args else {
-                unreachable!("index arity is enforced by the parser");
+            let (haystack, needle, start) = match args {
+                [haystack, needle] => (haystack, needle, None),
+                [haystack, needle, start] => (haystack, needle, Some(start)),
+                _ => unreachable!("index arity is enforced by the parser"),
+            };
+            let start_expr = match start {
+                Some(s) => expect_int(s.clone(), function)?,
+                None => IntExpr::Const(0),
             };
             SymValue::Int(IntExpr::Index(
                 Box::new(expect_str(haystack.clone(), function)?),
                 Box::new(expect_str(needle.clone(), function)?),
+                Box::new(start_expr),
             ))
         }
         Builtin::Scalar => {

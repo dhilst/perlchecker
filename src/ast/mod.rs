@@ -985,8 +985,10 @@ fn infer_expr_type(
                 Ok(ExprType::Str)
             }
             Builtin::Index => {
-                let [haystack, needle] = args.as_slice() else {
-                    unreachable!("index arity is enforced by the parser");
+                let (haystack, needle, start) = match args.as_slice() {
+                    [haystack, needle] => (haystack, needle, None),
+                    [haystack, needle, start] => (haystack, needle, Some(start)),
+                    _ => unreachable!("index arity is enforced by the parser"),
                 };
                 expect_expr_type(
                     function,
@@ -1006,6 +1008,17 @@ fn infer_expr_type(
                     ExprType::Str,
                     signatures,
                 )?;
+                if let Some(start) = start {
+                    expect_expr_type(
+                        function,
+                        "index start position",
+                        start,
+                        env,
+                        assumptions,
+                        ExprType::Int,
+                        signatures,
+                    )?;
+                }
                 Ok(ExprType::Int)
             }
             Builtin::Scalar => {
