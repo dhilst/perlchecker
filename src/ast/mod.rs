@@ -171,6 +171,10 @@ pub enum Stmt {
     Next,
     Die(Expr),
     Assert(Expr),
+    GhostAssign {
+        name: String,
+        expr: Expr,
+    },
     Push {
         array: String,
         value: Expr,
@@ -571,6 +575,18 @@ fn type_check_stmts(
                     ExprType::Bool,
                     signatures,
                 )?;
+            }
+            Stmt::GhostAssign { name, expr } => {
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures)?;
+                let assign_type = expect_assignable_type(function, "ghost assignment", expr_type)?;
+                env.insert(
+                    name.clone(),
+                    VariableState {
+                        ty: Some(assign_type),
+                        initialized: true,
+                    },
+                );
+                assumptions = remove_variable_assumptions(&assumptions, name);
             }
         }
     }

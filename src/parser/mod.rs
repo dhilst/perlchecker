@@ -52,6 +52,9 @@ pub fn parse_function_ast_with_limits(
     // Extract # assert: annotations with their line numbers (1-based within body).
     let assert_annotations = extract_assert_annotations(&function.name, &function.body)?;
 
+    // Extract # ghost: annotations with their line numbers (1-based within body).
+    let ghost_annotations = extract_ghost_annotations(&function.name, &function.body)?;
+
     let mut pairs =
         PerlSubsetParser::parse(Rule::function_body, &function.body).map_err(|error| {
             let ((line, column), message) = render_body_error(error);
@@ -105,28 +108,38 @@ pub fn parse_function_ast_with_limits(
         })
         .collect();
 
-    // Interleave assert annotations into the statement list based on line numbers.
-    let stmts = if assert_annotations.is_empty() {
+    // Build a unified list of comment-based annotations (assert + ghost) sorted by line number.
+    let mut comment_annotations: Vec<(usize, Stmt)> = Vec::new();
+    for (line, expr) in &assert_annotations {
+        comment_annotations.push((*line, Stmt::Assert(expr.clone())));
+    }
+    for (line, name, expr) in &ghost_annotations {
+        comment_annotations.push((*line, Stmt::GhostAssign { name: name.clone(), expr: expr.clone() }));
+    }
+    comment_annotations.sort_by_key(|(line, _)| *line);
+
+    // Interleave comment annotations into the statement list based on line numbers.
+    let stmts = if comment_annotations.is_empty() {
         stmt_pairs
             .into_iter()
             .flat_map(|pair| parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations))
             .collect()
     } else {
         let mut stmts = Vec::new();
-        let mut assert_idx = 0;
+        let mut ann_idx = 0;
         for pair in stmt_pairs {
             let stmt_line = pair.as_span().start_pos().line_col().0;
-            while assert_idx < assert_annotations.len()
-                && assert_annotations[assert_idx].0 < stmt_line
+            while ann_idx < comment_annotations.len()
+                && comment_annotations[ann_idx].0 < stmt_line
             {
-                stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
-                assert_idx += 1;
+                stmts.push(comment_annotations[ann_idx].1.clone());
+                ann_idx += 1;
             }
             stmts.extend(parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations));
         }
-        while assert_idx < assert_annotations.len() {
-            stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
-            assert_idx += 1;
+        while ann_idx < comment_annotations.len() {
+            stmts.push(comment_annotations[ann_idx].1.clone());
+            ann_idx += 1;
         }
         stmts
     };
@@ -190,6 +203,45 @@ fn extract_assert_annotations(
         }
     }
     Ok(asserts)
+}
+
+/// Extract `# ghost: $varname = EXPR` annotations from the function body text.
+/// Returns the parsed ghost assignments with their 1-based line numbers in the body.
+fn extract_ghost_annotations(
+    function: &str,
+    body: &str,
+) -> std::result::Result<Vec<(usize, String, Expr)>, ParseError> {
+    let mut ghosts = Vec::new();
+    for (line_idx, line) in body.lines().enumerate() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("# ghost:") {
+            let rest = rest.trim();
+            // Expected format: $varname = EXPR
+            let rest = rest.strip_prefix('$').ok_or_else(|| ParseError::InvalidSyntax {
+                function: function.to_string(),
+                line: line_idx + 1,
+                column: 0,
+                message: format!("ghost annotation must start with $variable: {}", rest),
+            })?;
+            let eq_pos = rest.find('=').ok_or_else(|| ParseError::InvalidSyntax {
+                function: function.to_string(),
+                line: line_idx + 1,
+                column: 0,
+                message: format!("ghost annotation must contain '=': {}", rest),
+            })?;
+            let var_name = rest[..eq_pos].trim().to_string();
+            let expr_str = rest[eq_pos + 1..].trim();
+            let expr = parse_expr(expr_str).map_err(|_| ParseError::InvalidSyntax {
+                function: function.to_string(),
+                line: line_idx + 1,
+                column: 0,
+                message: format!("invalid ghost expression: {}", expr_str),
+            })?;
+            // Line numbers are 1-based to match pest's line_col()
+            ghosts.push((line_idx + 1, var_name, expr));
+        }
+    }
+    Ok(ghosts)
 }
 
 /// Walk the statement tree and attach invariant expressions to While nodes

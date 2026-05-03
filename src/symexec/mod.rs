@@ -605,7 +605,7 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
                     collect_calls_from_expr(elem, calls);
                 }
             }
-            crate::ast::Stmt::Assign { expr, .. } | crate::ast::Stmt::Return(expr) => {
+            crate::ast::Stmt::GhostAssign { expr, .. } | crate::ast::Stmt::Assign { expr, .. } | crate::ast::Stmt::Return(expr) => {
                 collect_calls_from_expr(expr, calls);
             }
             crate::ast::Stmt::ArrayAssign { index, expr, .. } => {

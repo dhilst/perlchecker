@@ -1333,3 +1333,111 @@ sub use_missing {
         "expected error about missing function, got: {stderr}"
     );
 }
+
+#[test]
+fn check_ghost_variable_annotations() {
+    let tempdir = tempdir().unwrap();
+
+    // Test 1: Ghost variables that pass verification
+    let file = tempdir.path().join("ghost_pass.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int, Int) -> Int
+# pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
+# post: $result == $x + $y
+sub sum_with_ghost {
+    my ($x, $y) = @_;
+    # ghost: $expected = $x + $y
+    my $sum = $x + $y;
+    # assert: $sum == $expected
+    return $sum;
+}
+
+# sig: (Int) -> Int
+# pre: $n >= 1 && $n <= 5
+# post: $result >= $n
+sub double_ghost {
+    my ($n) = @_;
+    # ghost: $original = $n
+    my $result = $n * 2;
+    # assert: $result >= $original
+    return $result;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ sum_with_ghost: verified"));
+    assert!(stdout.contains("✔ double_ghost: verified"));
+
+    // Test 2: Ghost variable with failing assertion
+    let file2 = tempdir.path().join("ghost_fail.pl");
+    fs::write(
+        &file2,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 10
+# post: $result >= 0
+sub bad_ghost {
+    my ($x) = @_;
+    # ghost: $g = $x + 100
+    my $y = $x;
+    # assert: $y >= $g
+    return $y;
+}
+"#,
+    )
+    .unwrap();
+
+    let output2 = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file2)
+        .output()
+        .unwrap();
+
+    assert!(!output2.status.success());
+    let stderr2 = String::from_utf8_lossy(&output2.stderr);
+    assert!(
+        stderr2.contains("assertion failed"),
+        "expected assertion failure, got: {stderr2}"
+    );
+
+    // Test 3: Ghost variable updated mid-function
+    let file3 = tempdir.path().join("ghost_update.pl");
+    fs::write(
+        &file3,
+        r#"
+# sig: (Int, Int) -> Int
+# pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
+# post: $result >= 0
+sub ghost_update {
+    my ($a, $b) = @_;
+    my $x = $a + 1;
+    # ghost: $snapshot = $x
+    my $y = $x + $b;
+    # assert: $y >= $snapshot
+    return $y;
+}
+"#,
+    )
+    .unwrap();
+
+    let output3 = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file3)
+        .output()
+        .unwrap();
+
+    assert!(output3.status.success());
+    let stdout3 = String::from_utf8_lossy(&output3.stdout);
+    assert!(stdout3.contains("✔ ghost_update: verified"));
+}

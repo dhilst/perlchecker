@@ -916,6 +916,15 @@ impl<'a> SsaBuilder<'a> {
                 crate::ast::Stmt::Die(_) => {
                     lowered.push(SsaStmt::Die);
                 }
+                crate::ast::Stmt::GhostAssign { name, expr } => {
+                    // Ghost variables are lowered to regular SSA assignments.
+                    let mut prefix = Vec::new();
+                    let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+                    let ssa_name = self.fresh_name(name);
+                    env.insert(name.clone(), ssa_name.clone());
+                    lowered.push(SsaStmt::Assign(ssa_name, rhs));
+                }
                 crate::ast::Stmt::Assert(expr) => {
                     let mut prefix = Vec::new();
                     let assert_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
