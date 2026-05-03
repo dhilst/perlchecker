@@ -42,13 +42,39 @@ All functions called by a verified function must be defined in the same
 source file. There is no support for modules, imports, or cross-file
 verification.
 
+Soundness Guarantees
+--------------------
+
+perlchecker enforces the following soundness invariants:
+
+- **Extern contracts are strict.** If an extern function's precondition or
+  postcondition cannot be evaluated (e.g., references an undefined variable),
+  verification fails with an error rather than silently assuming the contract
+  is satisfied.
+
+- **Array lengths are non-negative.** Symbolic array length companions
+  (``scalar(@arr)``) are constrained to be ≥ 0, matching Perl semantics.
+
+- **Reference aliases propagate.** Aliases created in the function body are
+  visible in the postcondition type-check, and aliases created in both
+  branches of an ``if``/``else`` are preserved after the merge.
+
+- **Collection well-definedness.** Array and hash return values undergo the
+  same reflexivity check as scalar results, ensuring the SMT expression is
+  evaluable.
+
+- **Counterexample accuracy.** When the solver cannot extract a concrete
+  value for a variable in a counterexample, it is reported as
+  ``<unconstrained>`` rather than an arbitrary default like 0 or "".
+
+
 Unsupported Perl Features
 --------------------------
 
 The following Perl features are **not** supported:
 
 - Regular expressions (``=~``, ``m/pattern/``, ``s/from/to/``)
-- References (``\$x``, ``\@arr``, dereferencing)
+- References beyond scalar refs (``\@arr``, ``\%hash``, nested refs)
 - ``eval`` and runtime code generation
 - Implicit variables (``$_``, ``@ARGV``)
 - ``@_`` outside of the initial parameter binding ``my (...) = @_;``

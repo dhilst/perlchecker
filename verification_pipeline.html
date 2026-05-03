@@ -367,6 +367,9 @@ up to <code class="docutils literal notranslate"><span class="pre">max_loop_unro
 <li><p>String operators require <code class="docutils literal notranslate"><span class="pre">Str</span></code> operands</p></li>
 <li><p>Array indices must be <code class="docutils literal notranslate"><span class="pre">Int</span></code>; hash keys must be <code class="docutils literal notranslate"><span class="pre">Str</span></code></p></li>
 <li><p>Precondition and postcondition expressions are type-checked too</p></li>
+<li><p>Reference aliases are tracked through branches and propagated to the
+postcondition (aliases created in both branches of an <code class="docutils literal notranslate"><span class="pre">if</span></code>/<code class="docutils literal notranslate"><span class="pre">else</span></code> are
+preserved after the merge)</p></li>
 </ul>
 </section>
 <section id="stage-5-ssa-ir-lowering">
@@ -404,9 +407,15 @@ unconstrained symbolic variables:</p>
 <li><p>At each <code class="docutils literal notranslate"><span class="pre">Branch</span></code> terminator, forks into two states (then/else)</p></li>
 <li><p>Only explores <strong>feasible</strong> paths (path condition is satisfiable)</p></li>
 <li><p>Tracks a <strong>path budget</strong> (default: 1024 paths) to prevent explosion</p></li>
+<li><p><strong>Array length invariants</strong> are injected: all array length companions are
+constrained to be ≥ 0</p></li>
+<li><p><strong>Extern contracts</strong> are strictly evaluated: if a precondition or
+postcondition expression cannot be evaluated, it is an error (not
+silently assumed true)</p></li>
 <li><p>For each path reaching a <code class="docutils literal notranslate"><span class="pre">Return</span></code>:</p>
 <ul>
-<li><p>Checks if the path is <em>valid</em> (no division by zero, etc.)</p></li>
+<li><p>Checks if the path is <em>valid</em> via a well-definedness condition
+(reflexivity check on the result expression, including collections)</p></li>
 <li><p>Encodes the verification query for the SMT solver</p></li>
 </ul>
 </li>

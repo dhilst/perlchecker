@@ -131,6 +131,15 @@ These occur during path exploration and verification.
    * - ``no valid execution paths``
      - Every execution path hits an arithmetic error (like division by
        zero). The function has no valid behavior to verify.
+   * - ``extern contract evaluation failed``
+     - An extern function's precondition or postcondition expression could
+       not be evaluated (e.g., it references an undefined variable or
+       has a type error). Check that the extern annotations are correct
+       and that all referenced variables are in scope.
+   * - ``assertion failed on a feasible path``
+     - An ``assert`` statement evaluates to false on at least one feasible
+       execution path. Either the assertion is wrong or the precondition
+       needs tightening.
 
 
 SMT Errors

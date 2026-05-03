@@ -140,6 +140,9 @@ Performs flow-sensitive type checking on the AST:
 - String operators require ``Str`` operands
 - Array indices must be ``Int``; hash keys must be ``Str``
 - Precondition and postcondition expressions are type-checked too
+- Reference aliases are tracked through branches and propagated to the
+  postcondition (aliases created in both branches of an ``if``/``else`` are
+  preserved after the merge)
 
 
 Stage 5: SSA / IR Lowering
@@ -183,9 +186,15 @@ unconstrained symbolic variables:
 - At each ``Branch`` terminator, forks into two states (then/else)
 - Only explores **feasible** paths (path condition is satisfiable)
 - Tracks a **path budget** (default: 1024 paths) to prevent explosion
+- **Array length invariants** are injected: all array length companions are
+  constrained to be ≥ 0
+- **Extern contracts** are strictly evaluated: if a precondition or
+  postcondition expression cannot be evaluated, it is an error (not
+  silently assumed true)
 - For each path reaching a ``Return``:
 
-  - Checks if the path is *valid* (no division by zero, etc.)
+  - Checks if the path is *valid* via a well-definedness condition
+    (reflexivity check on the result expression, including collections)
   - Encodes the verification query for the SMT solver
 
 **Path pruning:** If the path condition conjoined with a branch condition

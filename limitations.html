@@ -276,12 +276,33 @@ grows with the number of paths.</p>
 source file. There is no support for modules, imports, or cross-file
 verification.</p>
 </section>
+<section id="soundness-guarantees">
+<h2>Soundness Guarantees<a class="headerlink" href="#soundness-guarantees" title="Link to this heading">¶</a></h2>
+<p>perlchecker enforces the following soundness invariants:</p>
+<ul class="simple">
+<li><p><strong>Extern contracts are strict.</strong> If an extern function’s precondition or
+postcondition cannot be evaluated (e.g., references an undefined variable),
+verification fails with an error rather than silently assuming the contract
+is satisfied.</p></li>
+<li><p><strong>Array lengths are non-negative.</strong> Symbolic array length companions
+(<code class="docutils literal notranslate"><span class="pre">scalar(&#64;arr)</span></code>) are constrained to be ≥ 0, matching Perl semantics.</p></li>
+<li><p><strong>Reference aliases propagate.</strong> Aliases created in the function body are
+visible in the postcondition type-check, and aliases created in both
+branches of an <code class="docutils literal notranslate"><span class="pre">if</span></code>/<code class="docutils literal notranslate"><span class="pre">else</span></code> are preserved after the merge.</p></li>
+<li><p><strong>Collection well-definedness.</strong> Array and hash return values undergo the
+same reflexivity check as scalar results, ensuring the SMT expression is
+evaluable.</p></li>
+<li><p><strong>Counterexample accuracy.</strong> When the solver cannot extract a concrete
+value for a variable in a counterexample, it is reported as
+<code class="docutils literal notranslate"><span class="pre">&lt;unconstrained&gt;</span></code> rather than an arbitrary default like 0 or “”.</p></li>
+</ul>
+</section>
 <section id="unsupported-perl-features">
 <h2>Unsupported Perl Features<a class="headerlink" href="#unsupported-perl-features" title="Link to this heading">¶</a></h2>
 <p>The following Perl features are <strong>not</strong> supported:</p>
 <ul class="simple">
 <li><p>Regular expressions (<code class="docutils literal notranslate"><span class="pre">=~</span></code>, <code class="docutils literal notranslate"><span class="pre">m/pattern/</span></code>, <code class="docutils literal notranslate"><span class="pre">s/from/to/</span></code>)</p></li>
-<li><p>References (<code class="docutils literal notranslate"><span class="pre">\$x</span></code>, <code class="docutils literal notranslate"><span class="pre">\&#64;arr</span></code>, dereferencing)</p></li>
+<li><p>References beyond scalar refs (<code class="docutils literal notranslate"><span class="pre">\&#64;arr</span></code>, <code class="docutils literal notranslate"><span class="pre">\%hash</span></code>, nested refs)</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">eval</span></code> and runtime code generation</p></li>
 <li><p>Implicit variables (<code class="docutils literal notranslate"><span class="pre">$_</span></code>, <code class="docutils literal notranslate"><span class="pre">&#64;ARGV</span></code>)</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&#64;_</span></code> outside of the initial parameter binding <code class="docutils literal notranslate"><span class="pre">my</span> <span class="pre">(...)</span> <span class="pre">=</span> <span class="pre">&#64;_;</span></code></p></li>
@@ -372,6 +393,7 @@ rather than the query being undecidable.</p>
 <li><a class="reference internal" href="#string-length-bound">String Length Bound</a></li>
 <li><a class="reference internal" href="#path-explosion">Path Explosion</a></li>
 <li><a class="reference internal" href="#single-file-scope">Single-File Scope</a></li>
+<li><a class="reference internal" href="#soundness-guarantees">Soundness Guarantees</a></li>
 <li><a class="reference internal" href="#unsupported-perl-features">Unsupported Perl Features</a></li>
 <li><a class="reference internal" href="#solver-timeouts">Solver Timeouts</a></li>
 </ul>

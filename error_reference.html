@@ -420,6 +420,17 @@ is intentional and should be guarded more tightly.</p></td>
 <td><p>Every execution path hits an arithmetic error (like division by
 zero). The function has no valid behavior to verify.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">extern</span> <span class="pre">contract</span> <span class="pre">evaluation</span> <span class="pre">failed</span></code></p></td>
+<td><p>An extern function’s precondition or postcondition expression could
+not be evaluated (e.g., it references an undefined variable or
+has a type error). Check that the extern annotations are correct
+and that all referenced variables are in scope.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">assertion</span> <span class="pre">failed</span> <span class="pre">on</span> <span class="pre">a</span> <span class="pre">feasible</span> <span class="pre">path</span></code></p></td>
+<td><p>An <code class="docutils literal notranslate"><span class="pre">assert</span></code> statement evaluates to false on at least one feasible
+execution path. Either the assertion is wrong or the precondition
+needs tightening.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
