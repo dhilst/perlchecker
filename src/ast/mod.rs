@@ -17,6 +17,10 @@ pub enum Type {
     HashStr,
     RefInt,
     RefStr,
+    RefArrayInt,
+    RefArrayStr,
+    RefHashInt,
+    RefHashStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,6 +34,10 @@ enum ExprType {
     HashStr,
     RefInt,
     RefStr,
+    RefArrayInt,
+    RefArrayStr,
+    RefHashInt,
+    RefHashStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -104,6 +112,20 @@ pub enum Expr {
     Ref(String),
     /// Reference dereference: `$$ref` — stores the ref variable name.
     Deref(String),
+    /// Array reference creation: `\@arr` — stores the array name.
+    RefArray(String),
+    /// Hash reference creation: `\%hash` — stores the hash name.
+    RefHash(String),
+    /// Arrow array access: `$aref->[expr]` — stores ref var name and index.
+    ArrowArrayAccess {
+        ref_var: String,
+        index: Box<Expr>,
+    },
+    /// Arrow hash access: `$href->{"key"}` — stores ref var name and key.
+    ArrowHashAccess {
+        ref_var: String,
+        key: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -199,6 +221,18 @@ pub enum Stmt {
     /// Dereference assignment: `$$ref = expr`
     DerefAssign {
         ref_name: String,
+        expr: Expr,
+    },
+    /// Arrow array assignment: `$aref->[i] = expr`
+    ArrowArrayAssign {
+        ref_var: String,
+        index: Expr,
+        expr: Expr,
+    },
+    /// Arrow hash assignment: `$href->{"key"} = expr`
+    ArrowHashAssign {
+        ref_var: String,
+        key: Expr,
         expr: Expr,
     },
     While {
@@ -368,7 +402,7 @@ fn type_check_stmts(
                 expr,
                 declaration,
             } => {
-                // Check if this is a reference assignment: my $ref = \$x
+                // Check if this is a reference assignment: my $ref = \$x / \@arr / \%hash
                 if let Expr::Ref(target) = expr {
                     // Look up the target variable's type
                     let target_state = env.get(target).copied().ok_or_else(|| {
@@ -392,6 +426,76 @@ fn type_check_stmts(
                                 function: function.to_string(),
                                 context: "reference creation",
                                 expected: "Int or Str",
+                                found: render_expr_type(expr_type_from_type(target_type)),
+                            });
+                        }
+                    };
+                    env.insert(
+                        name.clone(),
+                        VariableState {
+                            ty: Some(ref_type),
+                            initialized: true,
+                        },
+                    );
+                    alias_map.insert(name.clone(), target.clone());
+                    assumptions = remove_variable_assumptions(&assumptions, name);
+                } else if let Expr::RefArray(target) = expr {
+                    let target_state = env.get(target).copied().ok_or_else(|| {
+                        TypeCheckError::UndeclaredVariable {
+                            function: function.to_string(),
+                            variable: target.clone(),
+                        }
+                    })?;
+                    if !target_state.initialized {
+                        return Err(TypeCheckError::UninitializedVariable {
+                            function: function.to_string(),
+                            variable: target.clone(),
+                        });
+                    }
+                    let target_type = target_state.ty.expect("initialized variables must have a type");
+                    let ref_type = match target_type {
+                        Type::ArrayInt => Type::RefArrayInt,
+                        Type::ArrayStr => Type::RefArrayStr,
+                        _ => {
+                            return Err(TypeCheckError::TypeMismatch {
+                                function: function.to_string(),
+                                context: "array reference creation",
+                                expected: "Array<Int> or Array<Str>",
+                                found: render_expr_type(expr_type_from_type(target_type)),
+                            });
+                        }
+                    };
+                    env.insert(
+                        name.clone(),
+                        VariableState {
+                            ty: Some(ref_type),
+                            initialized: true,
+                        },
+                    );
+                    alias_map.insert(name.clone(), target.clone());
+                    assumptions = remove_variable_assumptions(&assumptions, name);
+                } else if let Expr::RefHash(target) = expr {
+                    let target_state = env.get(target).copied().ok_or_else(|| {
+                        TypeCheckError::UndeclaredVariable {
+                            function: function.to_string(),
+                            variable: target.clone(),
+                        }
+                    })?;
+                    if !target_state.initialized {
+                        return Err(TypeCheckError::UninitializedVariable {
+                            function: function.to_string(),
+                            variable: target.clone(),
+                        });
+                    }
+                    let target_type = target_state.ty.expect("initialized variables must have a type");
+                    let ref_type = match target_type {
+                        Type::HashInt => Type::RefHashInt,
+                        Type::HashStr => Type::RefHashStr,
+                        _ => {
+                            return Err(TypeCheckError::TypeMismatch {
+                                function: function.to_string(),
+                                context: "hash reference creation",
+                                expected: "Hash<Str, Int> or Hash<Str, Str>",
                                 found: render_expr_type(expr_type_from_type(target_type)),
                             });
                         }
@@ -596,6 +700,66 @@ fn type_check_stmts(
                     },
                 );
             }
+            Stmt::ArrowArrayAssign { ref_var, index, expr } => {
+                // Resolve the alias to find the target array
+                let target = alias_map.get(ref_var).ok_or_else(|| {
+                    TypeCheckError::UndeclaredVariable {
+                        function: function.to_string(),
+                        variable: format!("{}->[] (not a known reference)", ref_var),
+                    }
+                })?;
+                expect_expr_type(
+                    function,
+                    "arrow array index",
+                    index,
+                    &env,
+                    &assumptions,
+                    ExprType::Int,
+                    signatures,
+                    &alias_map,
+                )?;
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
+                let element_type = collection_element_type(function, &env, target, AccessKind::Array)?;
+                if expr_type != element_type {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "arrow array assignment",
+                        expected: render_expr_type(element_type),
+                        found: render_expr_type(expr_type),
+                    });
+                }
+                assumptions = remove_variable_assumptions(&assumptions, target);
+            }
+            Stmt::ArrowHashAssign { ref_var, key, expr } => {
+                // Resolve the alias to find the target hash
+                let target = alias_map.get(ref_var).ok_or_else(|| {
+                    TypeCheckError::UndeclaredVariable {
+                        function: function.to_string(),
+                        variable: format!("{}->{{}} (not a known reference)", ref_var),
+                    }
+                })?;
+                expect_expr_type(
+                    function,
+                    "arrow hash key",
+                    key,
+                    &env,
+                    &assumptions,
+                    ExprType::Str,
+                    signatures,
+                    &alias_map,
+                )?;
+                let expr_type = infer_expr_type(function, expr, &env, &assumptions, signatures, &alias_map)?;
+                let element_type = collection_element_type(function, &env, target, AccessKind::Hash)?;
+                if expr_type != element_type {
+                    return Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "arrow hash assignment",
+                        expected: render_expr_type(element_type),
+                        found: render_expr_type(expr_type),
+                    });
+                }
+                assumptions = remove_variable_assumptions(&assumptions, target);
+            }
             Stmt::DerefAssign { ref_name, expr } => {
                 // Look up the alias to find the target variable
                 let target = alias_map.get(ref_name).ok_or_else(|| {
@@ -783,6 +947,10 @@ fn references_variable(expr: &Expr, name: &str) -> bool {
         Expr::Exists { hash, key } => hash == name || references_variable(key, name),
         Expr::Ref(target) => target == name,
         Expr::Deref(ref_name) => ref_name == name,
+        Expr::RefArray(target) => target == name,
+        Expr::RefHash(target) => target == name,
+        Expr::ArrowArrayAccess { ref_var, index } => ref_var == name || references_variable(index, name),
+        Expr::ArrowHashAccess { ref_var, key } => ref_var == name || references_variable(key, name),
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) => false,
     }
 }
@@ -1680,6 +1848,98 @@ fn infer_expr_type(
                 }),
             }
         }
+        Expr::RefArray(target) => {
+            let target_state = env
+                .get(target)
+                .copied()
+                .ok_or_else(|| TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                })?;
+            if !target_state.initialized {
+                return Err(TypeCheckError::UninitializedVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                });
+            }
+            let target_type = target_state.ty.expect("initialized variables must have a type");
+            match target_type {
+                Type::ArrayInt => Ok(ExprType::RefArrayInt),
+                Type::ArrayStr => Ok(ExprType::RefArrayStr),
+                _ => Err(TypeCheckError::TypeMismatch {
+                    function: function.to_string(),
+                    context: "array reference creation",
+                    expected: "Array<Int> or Array<Str>",
+                    found: render_expr_type(expr_type_from_type(target_type)),
+                }),
+            }
+        }
+        Expr::RefHash(target) => {
+            let target_state = env
+                .get(target)
+                .copied()
+                .ok_or_else(|| TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                })?;
+            if !target_state.initialized {
+                return Err(TypeCheckError::UninitializedVariable {
+                    function: function.to_string(),
+                    variable: target.clone(),
+                });
+            }
+            let target_type = target_state.ty.expect("initialized variables must have a type");
+            match target_type {
+                Type::HashInt => Ok(ExprType::RefHashInt),
+                Type::HashStr => Ok(ExprType::RefHashStr),
+                _ => Err(TypeCheckError::TypeMismatch {
+                    function: function.to_string(),
+                    context: "hash reference creation",
+                    expected: "Hash<Str, Int> or Hash<Str, Str>",
+                    found: render_expr_type(expr_type_from_type(target_type)),
+                }),
+            }
+        }
+        Expr::ArrowArrayAccess { ref_var, index } => {
+            // $aref->[i] — resolve alias, check types
+            let target = alias_map.get(ref_var).ok_or_else(|| {
+                TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: format!("{}->[] (not a known reference)", ref_var),
+                }
+            })?;
+            expect_expr_type(
+                function,
+                "arrow array index",
+                index,
+                env,
+                assumptions,
+                ExprType::Int,
+                signatures,
+                alias_map,
+            )?;
+            collection_element_type(function, env, target, AccessKind::Array)
+        }
+        Expr::ArrowHashAccess { ref_var, key } => {
+            // $href->{"k"} — resolve alias, check types
+            let target = alias_map.get(ref_var).ok_or_else(|| {
+                TypeCheckError::UndeclaredVariable {
+                    function: function.to_string(),
+                    variable: format!("{}->{{}} (not a known reference)", ref_var),
+                }
+            })?;
+            expect_expr_type(
+                function,
+                "arrow hash key",
+                key,
+                env,
+                assumptions,
+                ExprType::Str,
+                signatures,
+                alias_map,
+            )?;
+            collection_element_type(function, env, target, AccessKind::Hash)
+        }
         Expr::Deref(ref_name) => {
             // $$ref — dereference: resolve alias to target variable's type
             let target = alias_map.get(ref_name).ok_or_else(|| {
@@ -1721,6 +1981,10 @@ fn expect_assignable_type(
         ExprType::HashStr => Ok(Type::HashStr),
         ExprType::RefInt => Ok(Type::RefInt),
         ExprType::RefStr => Ok(Type::RefStr),
+        ExprType::RefArrayInt => Ok(Type::RefArrayInt),
+        ExprType::RefArrayStr => Ok(Type::RefArrayStr),
+        ExprType::RefHashInt => Ok(Type::RefHashInt),
+        ExprType::RefHashStr => Ok(Type::RefHashStr),
         ExprType::Bool => Err(TypeCheckError::TypeMismatch {
             function: function.to_string(),
             context,
@@ -1970,6 +2234,10 @@ fn expr_type_from_type(ty: Type) -> ExprType {
         Type::HashStr => ExprType::HashStr,
         Type::RefInt => ExprType::RefInt,
         Type::RefStr => ExprType::RefStr,
+        Type::RefArrayInt => ExprType::RefArrayInt,
+        Type::RefArrayStr => ExprType::RefArrayStr,
+        Type::RefHashInt => ExprType::RefHashInt,
+        Type::RefHashStr => ExprType::RefHashStr,
     }
 }
 
@@ -1984,6 +2252,10 @@ fn render_expr_type(ty: ExprType) -> &'static str {
         ExprType::HashStr => "Hash<Str, Str>",
         ExprType::RefInt => "Ref<Int>",
         ExprType::RefStr => "Ref<Str>",
+        ExprType::RefArrayInt => "Ref<Array<Int>>",
+        ExprType::RefArrayStr => "Ref<Array<Str>>",
+        ExprType::RefHashInt => "Ref<Hash<Str, Int>>",
+        ExprType::RefHashStr => "Ref<Hash<Str, Str>>",
     }
 }
 

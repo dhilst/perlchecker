@@ -1641,3 +1641,58 @@ sub ref_chain {
     assert!(stdout.contains("✔ ref_read: verified"));
     assert!(stdout.contains("✔ ref_chain: verified"));
 }
+
+#[test]
+fn check_arrow_dereference() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("arrow_deref.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 42
+sub arrow_array_write {
+    my ($x) = @_;
+    my @data = (1, 2, 3);
+    my $aref = \@data;
+    $aref->[0] = 42;
+    return $data[0];
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0
+# post: $result == 2
+sub arrow_array_read {
+    my ($x) = @_;
+    my @data = (10, 20, 30);
+    my $aref = \@data;
+    my $val = $aref->[1];
+    return $val / 10;
+}
+
+# sig: (Hash<Str, Int>, Str) -> Int
+# pre: $key eq "name"
+# post: $result == 1
+sub arrow_hash_write {
+    my ($h, $key) = @_;
+    my $href = \%h;
+    $href->{"name"} = 99;
+    return exists($h{"name"});
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ arrow_array_write: verified"));
+    assert!(stdout.contains("✔ arrow_array_read: verified"));
+    assert!(stdout.contains("✔ arrow_hash_write: verified"));
+}

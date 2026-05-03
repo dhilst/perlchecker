@@ -641,6 +641,14 @@ fn collect_calls_from_stmts(stmts: &[crate::ast::Stmt], calls: &mut Vec<String>)
             crate::ast::Stmt::DerefAssign { expr, .. } => {
                 collect_calls_from_expr(expr, calls);
             }
+            crate::ast::Stmt::ArrowArrayAssign { index, expr, .. } => {
+                collect_calls_from_expr(index, calls);
+                collect_calls_from_expr(expr, calls);
+            }
+            crate::ast::Stmt::ArrowHashAssign { key, expr, .. } => {
+                collect_calls_from_expr(key, calls);
+                collect_calls_from_expr(expr, calls);
+            }
         }
     }
 }
@@ -671,7 +679,9 @@ fn collect_calls_from_expr(expr: &Expr, calls: &mut Vec<String>) {
         }
         Expr::Pop { .. } => {}
         Expr::Exists { key, .. } => collect_calls_from_expr(key, calls),
-        Expr::Ref(_) | Expr::Deref(_) => {}
+        Expr::Ref(_) | Expr::Deref(_) | Expr::RefArray(_) | Expr::RefHash(_) => {}
+        Expr::ArrowArrayAccess { ref_var: _, index } => collect_calls_from_expr(index, calls),
+        Expr::ArrowHashAccess { ref_var: _, key } => collect_calls_from_expr(key, calls),
         Expr::Int(_) | Expr::Bool(_) | Expr::String(_) | Expr::Variable(_) => {}
     }
 }
@@ -867,7 +877,9 @@ fn symbolic_value(name: &str, ty: Type) -> SymValue {
         Type::HashInt => SymValue::HashInt(HashIntExpr::Var(name.to_string())),
         Type::HashStr => SymValue::HashStr(HashStrExpr::Var(name.to_string())),
         // References are desugared before symbolic execution; these should never appear.
-        Type::RefInt | Type::RefStr => SymValue::Int(IntExpr::Const(0)),
+        Type::RefInt | Type::RefStr
+        | Type::RefArrayInt | Type::RefArrayStr
+        | Type::RefHashInt | Type::RefHashStr => SymValue::Int(IntExpr::Const(0)),
     }
 }
 
@@ -1076,7 +1088,10 @@ fn eval_expr(
                 })?,
             eval_expr(function, index, env)?,
         )?,
-        Expr::Call { .. } | Expr::Pop { .. } | Expr::Exists { .. } | Expr::Ref(_) | Expr::Deref(_) => {
+        Expr::Call { .. } | Expr::Pop { .. } | Expr::Exists { .. }
+        | Expr::Ref(_) | Expr::Deref(_)
+        | Expr::RefArray(_) | Expr::RefHash(_)
+        | Expr::ArrowArrayAccess { .. } | Expr::ArrowHashAccess { .. } => {
             return Err(SymExecError::TypeMismatch {
                 function: function.to_string(),
             });

@@ -163,7 +163,9 @@ pub fn find_model_with_timeout(
                         ModelValue::Collection(value)
                     }
                     // References are desugared before SMT; these should never appear.
-                    Type::RefInt | Type::RefStr => {
+                    Type::RefInt | Type::RefStr
+                    | Type::RefArrayInt | Type::RefArrayStr
+                    | Type::RefHashInt | Type::RefHashStr => {
                         ModelValue::Int(0)
                     }
                 };

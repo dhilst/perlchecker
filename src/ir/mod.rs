@@ -503,11 +503,43 @@ impl<'a> SsaBuilder<'a> {
                     index: Box::new(SsaExpr::Var(new_len_name)),
                 }
             }
-            Expr::Ref(_target) => {
+            Expr::Ref(_target) | Expr::RefArray(_target) | Expr::RefHash(_target) => {
                 // Reference creation is handled at the Stmt::Assign level.
                 // If we reach here, the ref is used in a non-assignment context,
                 // which shouldn't happen after type checking. Treat as a no-op.
                 SsaExpr::Int(0)
+            }
+            Expr::ArrowArrayAccess { ref_var, index } => {
+                // Resolve alias to find the target array, then emit Select
+                let target = self.alias_map.get(ref_var).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: format!("{}->[] (not a known reference)", ref_var),
+                })?;
+                let collection_name = env.get(&target).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: target,
+                })?;
+                SsaExpr::Access {
+                    kind: AccessKind::Array,
+                    collection: Box::new(SsaExpr::Var(collection_name)),
+                    index: Box::new(self.rewrite_expr(index, env, prefix)?),
+                }
+            }
+            Expr::ArrowHashAccess { ref_var, key } => {
+                // Resolve alias to find the target hash, then emit Select
+                let target = self.alias_map.get(ref_var).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: format!("{}->{{}} (not a known reference)", ref_var),
+                })?;
+                let collection_name = env.get(&target).cloned().ok_or_else(|| IrError::UnknownVariable {
+                    function: self.function.to_string(),
+                    variable: target,
+                })?;
+                SsaExpr::Access {
+                    kind: AccessKind::Hash,
+                    collection: Box::new(SsaExpr::Var(collection_name)),
+                    index: Box::new(self.rewrite_expr(key, env, prefix)?),
+                }
             }
             Expr::Deref(ref_name) => {
                 // Dereference: look up the alias in the alias_map to find the target,
@@ -544,10 +576,14 @@ impl<'a> SsaBuilder<'a> {
                 }
                 crate::ast::Stmt::LoopBoundExceeded => lowered.push(SsaStmt::LoopBoundExceeded),
                 crate::ast::Stmt::Assign { name, expr, .. } => {
-                    // Check if this is a reference assignment: $ref = \$target
+                    // Check if this is a reference assignment: $ref = \$target / \@arr / \%hash
                     if let crate::ast::Expr::Ref(target) = expr {
                         // Record the alias and skip emitting any SSA assignment.
                         // The reference variable doesn't exist at IR level.
+                        self.alias_map.insert(name.clone(), target.clone());
+                    } else if let crate::ast::Expr::RefArray(target) = expr {
+                        self.alias_map.insert(name.clone(), target.clone());
+                    } else if let crate::ast::Expr::RefHash(target) = expr {
                         self.alias_map.insert(name.clone(), target.clone());
                     } else {
                         let mut prefix = Vec::new();
@@ -1069,6 +1105,86 @@ impl<'a> SsaBuilder<'a> {
                         else_branch: Vec::new(),
                         merges: Vec::new(),
                     });
+                }
+                crate::ast::Stmt::ArrowArrayAssign { ref_var, index, expr } => {
+                    // Resolve alias to find the target array, then emit Store
+                    let target = self.alias_map.get(ref_var).cloned().ok_or_else(|| IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: format!("{}->[] (not a known reference)", ref_var),
+                    })?;
+                    let collection_name = env
+                        .get(&target)
+                        .cloned()
+                        .ok_or_else(|| IrError::UnknownVariable {
+                            function: self.function.to_string(),
+                            variable: target.clone(),
+                        })?;
+                    let mut prefix = Vec::new();
+                    let index_expr = self.rewrite_expr(index, &mut env, &mut prefix)?;
+                    let value_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+                    let store = SsaExpr::Store {
+                        kind: AccessKind::Array,
+                        collection: Box::new(SsaExpr::Var(collection_name)),
+                        index: Box::new(index_expr),
+                        value: Box::new(value_expr),
+                    };
+                    let ssa_name = self.fresh_name(&target);
+                    env.insert(target, ssa_name.clone());
+                    lowered.push(SsaStmt::Assign(ssa_name, store));
+                }
+                crate::ast::Stmt::ArrowHashAssign { ref_var, key, expr } => {
+                    // Resolve alias to find the target hash, then emit Store + exists companion
+                    let target = self.alias_map.get(ref_var).cloned().ok_or_else(|| IrError::UnknownVariable {
+                        function: self.function.to_string(),
+                        variable: format!("{}->{{}} (not a known reference)", ref_var),
+                    })?;
+                    let collection_name = env
+                        .get(&target)
+                        .cloned()
+                        .ok_or_else(|| IrError::UnknownVariable {
+                            function: self.function.to_string(),
+                            variable: target.clone(),
+                        })?;
+                    let mut prefix = Vec::new();
+                    let key_expr = self.rewrite_expr(key, &mut env, &mut prefix)?;
+                    let value_expr = self.rewrite_expr(expr, &mut env, &mut prefix)?;
+                    lowered.extend(prefix);
+                    let store = SsaExpr::Store {
+                        kind: AccessKind::Hash,
+                        collection: Box::new(SsaExpr::Var(collection_name)),
+                        index: Box::new(key_expr.clone()),
+                        value: Box::new(value_expr),
+                    };
+                    let ssa_name = self.fresh_name(&target);
+                    env.insert(target.clone(), ssa_name.clone());
+                    lowered.push(SsaStmt::Assign(ssa_name, store));
+
+                    // Update the exists companion: store 1 for this key
+                    let exists_base = format!("{target}__exists");
+                    let old_exists = if let Some(existing) = self.exists_companions.get(&target) {
+                        existing.clone()
+                    } else {
+                        let fresh_name = self.fresh_name(&exists_base);
+                        lowered.push(SsaStmt::Assign(
+                            fresh_name.clone(),
+                            SsaExpr::FreshHash {
+                                value_int: true,
+                                name: fresh_name.clone(),
+                            },
+                        ));
+                        self.exists_companions.insert(target.clone(), fresh_name.clone());
+                        fresh_name
+                    };
+                    let exists_store = SsaExpr::Store {
+                        kind: AccessKind::Hash,
+                        collection: Box::new(SsaExpr::Var(old_exists)),
+                        index: Box::new(key_expr),
+                        value: Box::new(SsaExpr::Int(1)),
+                    };
+                    let new_exists_name = self.fresh_name(&exists_base);
+                    lowered.push(SsaStmt::Assign(new_exists_name.clone(), exists_store));
+                    self.exists_companions.insert(target, new_exists_name);
                 }
                 crate::ast::Stmt::DerefAssign { ref_name, expr } => {
                     // Desugar $$ref = expr to target = expr using the alias map

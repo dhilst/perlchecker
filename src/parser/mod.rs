@@ -105,6 +105,8 @@ pub fn parse_function_ast_with_limits(
                     | Rule::dec_stmt
                     | Rule::array_init_stmt
                     | Rule::deref_assign_stmt
+                    | Rule::arrow_array_assign_stmt
+                    | Rule::arrow_hash_assign_stmt
             )
         })
         .collect();
@@ -338,6 +340,8 @@ fn parse_stmt_with_asserts(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_
         Rule::dec_stmt => vec![parse_dec(pair)],
         Rule::array_init_stmt => vec![parse_array_init(pair)],
         Rule::deref_assign_stmt => vec![parse_deref_assign(pair)],
+        Rule::arrow_array_assign_stmt => vec![parse_arrow_array_assign(pair)],
+        Rule::arrow_hash_assign_stmt => vec![parse_arrow_hash_assign(pair)],
         other => unreachable!("unexpected statement rule: {other:?}"),
     }
 }
@@ -805,6 +809,64 @@ fn parse_deref_assign(pair: Pair<'_, Rule>) -> Stmt {
     Stmt::DerefAssign { ref_name, expr }
 }
 
+fn parse_arrow_array_assign(pair: Pair<'_, Rule>) -> Stmt {
+    let mut inner = pair.into_inner();
+    let ref_var = parse_variable(inner.next().expect("arrow_array_assign must have a variable"));
+    let index = parse_access_operand(inner.next().expect("arrow_array_assign must have an index"))
+        .expect("validated arrow array index");
+    let expr = build_expr(inner.next().expect("arrow_array_assign must have an expression"))
+        .expect("validated arrow array assign expression");
+    Stmt::ArrowArrayAssign { ref_var, index, expr }
+}
+
+fn parse_arrow_hash_assign(pair: Pair<'_, Rule>) -> Stmt {
+    let mut inner = pair.into_inner();
+    let ref_var = parse_variable(inner.next().expect("arrow_hash_assign must have a variable"));
+    let key = parse_access_operand(inner.next().expect("arrow_hash_assign must have a key"))
+        .expect("validated arrow hash key");
+    let expr = build_expr(inner.next().expect("arrow_hash_assign must have an expression"))
+        .expect("validated arrow hash assign expression");
+    Stmt::ArrowHashAssign { ref_var, key, expr }
+}
+
+fn parse_arrow_array_access(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let ref_var = parse_variable(inner.next().ok_or("arrow_array_access must have a variable")?);
+    let index = parse_access_operand(inner.next().ok_or("arrow_array_access must have an index")?)?;
+    Ok(Expr::ArrowArrayAccess {
+        ref_var,
+        index: Box::new(index),
+    })
+}
+
+fn parse_arrow_hash_access(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut inner = pair.into_inner();
+    let ref_var = parse_variable(inner.next().ok_or("arrow_hash_access must have a variable")?);
+    let key = parse_access_operand(inner.next().ok_or("arrow_hash_access must have a key")?)?;
+    Ok(Expr::ArrowHashAccess {
+        ref_var,
+        key: Box::new(key),
+    })
+}
+
+fn parse_ref_array_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let ident = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::ident)
+        .ok_or_else(|| "ref_array_expr must contain an identifier".to_string())?;
+    let target = parse_bare_ident(ident);
+    Ok(Expr::RefArray(target))
+}
+
+fn parse_ref_hash_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let ident = pair
+        .into_inner()
+        .find(|inner| inner.as_rule() == Rule::ident)
+        .ok_or_else(|| "ref_hash_expr must contain an identifier".to_string())?;
+    let target = parse_bare_ident(ident);
+    Ok(Expr::RefHash(target))
+}
+
 fn parse_ref_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
     let var = pair
         .into_inner()
@@ -889,6 +951,8 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations:
                     | Rule::dec_stmt
                     | Rule::array_init_stmt
                     | Rule::deref_assign_stmt
+                    | Rule::arrow_array_assign_stmt
+                    | Rule::arrow_hash_assign_stmt
             )
         })
         .collect();
@@ -2201,6 +2265,10 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::exists_call => parse_exists_call(primary),
             Rule::regex_match => parse_regex_match(primary, false),
             Rule::regex_not_match => parse_regex_match(primary, true),
+            Rule::arrow_array_access => parse_arrow_array_access(primary),
+            Rule::arrow_hash_access => parse_arrow_hash_access(primary),
+            Rule::ref_array_expr => parse_ref_array_expr(primary),
+            Rule::ref_hash_expr => parse_ref_hash_expr(primary),
             Rule::ref_expr => parse_ref_expr(primary),
             Rule::deref_var => parse_deref_var(primary),
             other => Err(format!("unexpected primary rule: {other:?}")),
