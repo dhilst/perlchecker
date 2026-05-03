@@ -69,7 +69,8 @@ pub fn parse_function_ast_with_limits(
         .filter(|pair| {
             matches!(
                 pair.as_rule(),
-                Rule::while_stmt
+                Rule::do_while_stmt
+                    | Rule::while_stmt
                     | Rule::until_stmt
                     | Rule::for_stmt
                     | Rule::assign_stmt
@@ -123,6 +124,7 @@ fn parse_stmt(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         Rule::declare_stmt => vec![parse_declare(pair)],
         Rule::if_stmt => vec![parse_if(pair, max_loop_unroll)],
         Rule::unless_stmt => vec![parse_unless(pair, max_loop_unroll)],
+        Rule::do_while_stmt => parse_do_while(pair, max_loop_unroll),
         Rule::while_stmt => parse_while(pair, max_loop_unroll),
         Rule::until_stmt => parse_until(pair, max_loop_unroll),
         Rule::for_stmt => parse_for(pair, max_loop_unroll),
@@ -313,7 +315,8 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         .filter(|inner| {
             matches!(
                 inner.as_rule(),
-                Rule::while_stmt
+                Rule::do_while_stmt
+                    | Rule::while_stmt
                     | Rule::until_stmt
                     | Rule::for_stmt
                     | Rule::assign_stmt
@@ -331,6 +334,19 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
         })
         .flat_map(|pair| parse_stmt(pair, max_loop_unroll))
         .collect()
+}
+
+fn parse_do_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
+    let mut inner = pair.into_inner();
+    let body = parse_block(inner.next().expect("do-while must have a body"), max_loop_unroll);
+    let condition = build_expr(inner.next().expect("do-while must have a condition"))
+        .expect("validated do-while condition");
+    // Execute body once unconditionally, then unroll remaining iterations as a while loop
+    let mut result = body.clone();
+    if max_loop_unroll > 0 {
+        result.extend(unroll_while(condition, body, max_loop_unroll - 1));
+    }
+    result
 }
 
 fn parse_while(pair: Pair<'_, Rule>, max_loop_unroll: usize) -> Vec<Stmt> {
