@@ -365,6 +365,16 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             REVERSE_AXIOMS.with(|axioms| axioms.borrow_mut().push(axiom));
             fresh_var
         }
+        StrExpr::Replace(string, from, to) => {
+            let ctx = &Context::thread_local();
+            let s = encode_str(string);
+            let f = encode_str(from);
+            let t = encode_str(to);
+            unsafe {
+                let args = [s.get_z3_ast(), f.get_z3_ast(), t.get_z3_ast()];
+                Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
+            }
+        }
         StrExpr::Ite(cond, then_str, else_str) => {
             let cond_bool = encode_bool(cond);
             let then_encoded = encode_str(then_str);
@@ -568,6 +578,11 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
         StrExpr::FromInt(value) => encode_int_safety(value),
         StrExpr::Chomp(value) => encode_str_safety(value),
         StrExpr::Reverse(value) => encode_str_safety(value),
+        StrExpr::Replace(string, from, to) => Bool::and(&[
+            &encode_str_safety(string),
+            &encode_str_safety(from),
+            &encode_str_safety(to),
+        ]),
         StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_str_safety(then_str),
@@ -725,6 +740,11 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
         StrExpr::FromInt(value) => collect_string_vars_from_int(value, vars),
         StrExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Reverse(value) => collect_string_vars_from_str(value, vars),
+        StrExpr::Replace(string, from, to) => {
+            collect_string_vars_from_str(string, vars);
+            collect_string_vars_from_str(from, vars);
+            collect_string_vars_from_str(to, vars);
+        }
         StrExpr::Ite(cond, then_str, else_str) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_str(then_str, vars);

@@ -52,6 +52,7 @@ pub enum StrExpr {
     FromInt(Box<IntExpr>),
     Chomp(Box<StrExpr>),
     Reverse(Box<StrExpr>),
+    Replace(Box<StrExpr>, Box<StrExpr>, Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayStrExpr>, Box<IntExpr>),
     HashSelect(Box<HashStrExpr>, Box<StrExpr>),
@@ -1233,6 +1234,16 @@ fn eval_builtin(
             SymValue::Int(IntExpr::EndsWith(
                 Box::new(expect_str(string.clone(), function)?),
                 Box::new(expect_str(suffix.clone(), function)?),
+            ))
+        }
+        Builtin::Replace => {
+            let [string, from, to] = args else {
+                unreachable!("replace arity is enforced by the parser");
+            };
+            SymValue::Str(StrExpr::Replace(
+                Box::new(expect_str(string.clone(), function)?),
+                Box::new(expect_str(from.clone(), function)?),
+                Box::new(expect_str(to.clone(), function)?),
             ))
         }
     })

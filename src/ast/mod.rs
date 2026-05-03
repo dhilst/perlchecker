@@ -45,6 +45,7 @@ pub enum Builtin {
     Contains,
     StartsWith,
     EndsWith,
+    Replace,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1230,6 +1231,39 @@ fn infer_expr_type(
                     signatures,
                 )?;
                 Ok(ExprType::Int)
+            }
+            Builtin::Replace => {
+                let [string, from, to] = args.as_slice() else {
+                    unreachable!("replace arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "replace string",
+                    string,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "replace from",
+                    from,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "replace to",
+                    to,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
             }
         },
         Expr::Ternary { condition, then_expr, else_expr } => {
