@@ -254,10 +254,24 @@ pub fn execute_cfg(
             _ => {}
         }
     }
-    let initial_path = expect_bool(
+
+    // Add non-negativity constraints for array length companions
+    let precondition = expect_bool(
         eval_expr(&cfg.name, &function.pre, &annotation_env)?,
         &cfg.name,
     )?;
+    let mut initial_path = precondition;
+    for (cfg_param, ty) in cfg.params.iter().zip(function.arg_types.iter()) {
+        if matches!(ty, Type::ArrayInt | Type::ArrayStr) {
+            let len_var = format!("{}__len", cfg_param.source);
+            let non_neg = BoolExpr::IntCmp(
+                CmpOp::Ge,
+                Box::new(IntExpr::Var(len_var)),
+                Box::new(IntExpr::Const(0)),
+            );
+            initial_path = BoolExpr::And(Box::new(initial_path), Box::new(non_neg));
+        }
+    }
     execute_cfg_from_state(
         program,
         function,
