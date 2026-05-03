@@ -1679,6 +1679,8 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::reverse_call => parse_builtin_call(primary, Builtin::Reverse),
             Rule::int_call => parse_builtin_call(primary, Builtin::Int),
             Rule::contains_call => parse_builtin_call(primary, Builtin::Contains),
+            Rule::starts_with_call => parse_builtin_call(primary, Builtin::StartsWith),
+            Rule::ends_with_call => parse_builtin_call(primary, Builtin::EndsWith),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {

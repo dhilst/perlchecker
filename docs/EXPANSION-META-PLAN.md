@@ -103,21 +103,24 @@ Run verification:
 
 ## Phase 5: ORCHESTRATOR MODE
 
-**Agent:** Main session (coordinates the other agents).
+**Agent:** Dedicated subagent (spawned fresh for each round by the main session).
 
-**Task per round:**
-1. Spawn shared Opus agent for PERL DEV + CHECKER + JUDGE
-2. Receive GO/NO-GO decision
-3. If GO: spawn Haiku agent for IMPLEMENTER+QA with the approved feature
-4. Receive implementation result
-5. Verify commit-readiness: run `cargo test` in main session
+Each round gets its own ORCHESTRATOR subagent. The main session spawns one subagent per round and waits for it to complete before spawning the next.
+
+**The ORCHESTRATOR subagent executes all phases internally:**
+1. Run PERL DEV MODE — propose a feature
+2. Run CHECKER MODE — validate feasibility
+3. Run JUDGE MODE — GO/NO-GO decision (loop back to step 1 if NO-GO)
+4. Run IMPLEMENTER+QA MODE — PLAN → IMPLEMENT → QA loop until passing
+5. Run final `cargo test` to confirm nothing is broken
 6. Commit with message: `Round <ROUND>: <one-line feature description>`
-7. Report round outcome in one sentence
+7. Report round outcome in one sentence back to main session
 
-**Across rounds:**
-- Run rounds sequentially (one at a time)
-- Track cumulative feature list
-- If a round fails after 3 IMPLEMENTER retries, mark as NOT IMPLEMENTED and move on
+**Main session responsibilities:**
+- Spawn one ORCHESTRATOR subagent per round, sequentially
+- Pass the round number, current feature list, and grammar to the subagent
+- Collect results and track cumulative progress
+- If a round fails after 3 QA retries, mark as NOT IMPLEMENTED and move on
 
 ---
 

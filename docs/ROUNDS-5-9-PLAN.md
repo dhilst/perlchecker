@@ -174,12 +174,51 @@ sub distance_from_origin {
 
 ## Execution Order
 
-| Round | Feature | Complexity | Risk |
-|-------|---------|-----------|------|
-| 5 | Compound assignment (+=, -=, etc.) | Low (parser only) | Low |
-| 6 | `unless` statement | Low (parser only) | Low |
-| 7 | min()/max() builtins | Medium (parser+AST+IR) | Low |
-| 8 | `last` loop break | High (unroll redesign) | Medium-High |
-| 9 | Negative integer literals | Low (validation/grammar) | Low |
-
-Rounds 5, 6, 9 are near-certain to succeed. Round 7 is moderate. Round 8 is the stretch goal.
+| Round | Feature | Complexity | Risk | Status |
+|-------|---------|-----------|------|--------|
+| 5 | Compound assignment (+=, -=, etc.) | Low (parser only) | Low | DONE |
+| 6 | `unless` statement | Low (parser only) | Low | DONE |
+| 7 | min()/max() builtins | Medium (parser+AST+IR) | Low | DONE |
+| 8 | `last` loop break | High (unroll redesign) | Medium-High | DONE |
+| 9 | Negative integer literals | Low (validation) | Low | DONE |
+| 10 | `next` loop continue | Medium (flag approach like `last`) | Medium | DONE |
+| 11 | `until` loop (negated while) | Low (parser desugaring) | Low | DONE |
+| 12 | chr()/ord() builtins | Medium (parser+AST+IR+SMT) | Low | DONE |
+| 13 | Bitwise AND/OR/XOR (`&`, `|`, `^`) | Medium (new BinaryOps + SMT bv) | Medium | DONE |
+| 14 | `die` as reachability assertion | Low (parser+AST+symexec) | Low | DONE |
+| 15 | Exponentiation (`**`) | Medium (parser+AST+IR+SMT) | Medium | DONE |
+| 16 | Shift operators (`<<`, `>>`) | Medium (bv encoding) | Low | DONE |
+| 17 | Extended compound assign (**=, &=, \|=, ^=, <<=, >>=) | Low (parser) | Low | DONE |
+| 18 | Bitwise NOT (`~`) | Medium (unary + bv) | Low | DONE |
+| 19 | Array `push`/`pop` builtins | High (length tracking) | Medium-High | PENDING |
+| 20 | `exists()` for hash key checking | High (separate key-set model) | High | PENDING |
+| 21 | `unless` with `elsif` → NO-GO; use `do { } while` loop | Low-Med | Low | PENDING |
+| 22 | Numeric comparison `<=>` (spaceship) | Low (desugar to -1/0/1) | Low | PENDING |
+| 23 | String spaceship `cmp` operator | Low (desugar to -1/0/1) | Low | PENDING |
+| 24 | `sprintf "%d"` / `sprintf "%s"` (limited) | Medium | Medium | PENDING |
+| 25 | `chomp()` as pure function (returns trimmed) | Medium (string + conditional) | Medium | PENDING |
+| 26 | Ternary chains in annotations | Low (validation) | Low | PENDING |
+| 27 | `wantarray` — NO-GO; context sensitivity | — | — | PENDING |
+| 28 | `lc()`/`uc()` approx (uninterpreted + axioms) | Medium | Medium | PENDING |
+| 29 | Multiline string literals (heredoc) — NO-GO | — | — | PENDING |
+| 30 | Array slice `@arr[0..2]` | High | High | PENDING |
+| 31 | `reverse()` on strings (uninterpreted + length) | Medium | Medium | PENDING |
+| 32 | `defined()`/`undef` semantics | High (optional types) | High | PENDING |
+| 33 | Logical `and`/`or`/`not` (low-precedence) | Low (parser) | Low | PENDING |
+| 34 | `do { } while` loop | Medium (parser + unroll) | Medium | PENDING |
+| 35 | Statement modifiers (`return $x if $cond;`) | Medium (parser) | Low | PENDING |
+| 36 | `grep { COND } @arr` (bounded) | High | High | PENDING |
+| 37 | `map { EXPR } @arr` (bounded) | High | High | PENDING |
+| 38 | Hash slice `@hash{@keys}` | High | High | PENDING |
+| 39 | `sort` on arrays (uninterpreted + permutation) | High | High | PENDING |
+| 40 | `join(sep, @arr)` | Medium (string + loop) | Medium | PENDING |
+| 41 | `split(sep, $str)` | High (unbounded) | High | PENDING |
+| 42 | Multiple `return` validation round | Low (validation) | Low | PENDING |
+| 43 | `ref()` type checking — NO-GO (no references) | — | — | PENDING |
+| 44 | Constant folding optimization | Low (IR pass) | Low | PENDING |
+| 45 | `warn` as no-op (ignore in verification) | Low | Low | PENDING |
+| 46 | String `x` repetition (const count only) | Medium | Medium | PENDING |
+| 47 | Nested function definitions — NO-GO (flat only) | — | — | PENDING |
+| 48 | `local` variable scoping — NO-GO | — | — | PENDING |
+| 49 | Compound bitwise-not assign `~=` — NO-GO (not valid Perl) | — | — | PENDING |
+| 50 | Summary and consolidation round | Low | Low | PENDING |

@@ -266,6 +266,26 @@ fn encode_int(expr: &IntExpr) -> Int {
             };
             contains_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
         }
+        IntExpr::StartsWith(string, prefix) => {
+            let ctx = &Context::thread_local();
+            let s = encode_str(string);
+            let p = encode_str(prefix);
+            // Z3's str.prefixof takes (prefix, string)
+            let prefix_bool = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_prefix(ctx.get_z3_context(), p.get_z3_ast(), s.get_z3_ast()).unwrap())
+            };
+            prefix_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+        }
+        IntExpr::EndsWith(string, suffix) => {
+            let ctx = &Context::thread_local();
+            let s = encode_str(string);
+            let sfx = encode_str(suffix);
+            // Z3's str.suffixof takes (suffix, string)
+            let suffix_bool = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), sfx.get_z3_ast(), s.get_z3_ast()).unwrap())
+            };
+            suffix_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+        }
         IntExpr::Ite(cond, then_int, else_int) => {
             let cond_bool = encode_bool(cond);
             let then_encoded = encode_int(then_int);
@@ -507,6 +527,12 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Contains(haystack, needle) => {
             Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle)])
         }
+        IntExpr::StartsWith(string, prefix) => {
+            Bool::and(&[&encode_str_safety(string), &encode_str_safety(prefix)])
+        }
+        IntExpr::EndsWith(string, suffix) => {
+            Bool::and(&[&encode_str_safety(string), &encode_str_safety(suffix)])
+        }
         IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_int_safety(then_int),
@@ -652,6 +678,14 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
         IntExpr::Contains(haystack, needle) => {
             collect_string_vars_from_str(haystack, vars);
             collect_string_vars_from_str(needle, vars);
+        }
+        IntExpr::StartsWith(string, prefix) => {
+            collect_string_vars_from_str(string, vars);
+            collect_string_vars_from_str(prefix, vars);
+        }
+        IntExpr::EndsWith(string, suffix) => {
+            collect_string_vars_from_str(string, vars);
+            collect_string_vars_from_str(suffix, vars);
         }
         IntExpr::Ord(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Ite(cond, then_int, else_int) => {

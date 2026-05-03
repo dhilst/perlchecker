@@ -43,6 +43,8 @@ pub enum Builtin {
     Reverse,
     Int,
     Contains,
+    StartsWith,
+    EndsWith,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1174,6 +1176,54 @@ fn infer_expr_type(
                     function,
                     "contains needle",
                     needle,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
+            Builtin::StartsWith => {
+                let [string, prefix] = args.as_slice() else {
+                    unreachable!("starts_with arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "starts_with string",
+                    string,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "starts_with prefix",
+                    prefix,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Int)
+            }
+            Builtin::EndsWith => {
+                let [string, suffix] = args.as_slice() else {
+                    unreachable!("ends_with arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "ends_with string",
+                    string,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "ends_with suffix",
+                    suffix,
                     env,
                     assumptions,
                     ExprType::Str,

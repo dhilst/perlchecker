@@ -36,6 +36,8 @@ pub enum IntExpr {
     Index(Box<StrExpr>, Box<StrExpr>, Box<IntExpr>),
     StrToInt(Box<StrExpr>),
     Contains(Box<StrExpr>, Box<StrExpr>),
+    StartsWith(Box<StrExpr>, Box<StrExpr>),
+    EndsWith(Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
     HashSelect(Box<HashIntExpr>, Box<StrExpr>),
 }
@@ -1213,6 +1215,24 @@ fn eval_builtin(
             SymValue::Int(IntExpr::Contains(
                 Box::new(expect_str(haystack.clone(), function)?),
                 Box::new(expect_str(needle.clone(), function)?),
+            ))
+        }
+        Builtin::StartsWith => {
+            let [string, prefix] = args else {
+                unreachable!("starts_with arity is enforced by the parser");
+            };
+            SymValue::Int(IntExpr::StartsWith(
+                Box::new(expect_str(string.clone(), function)?),
+                Box::new(expect_str(prefix.clone(), function)?),
+            ))
+        }
+        Builtin::EndsWith => {
+            let [string, suffix] = args else {
+                unreachable!("ends_with arity is enforced by the parser");
+            };
+            SymValue::Int(IntExpr::EndsWith(
+                Box::new(expect_str(string.clone(), function)?),
+                Box::new(expect_str(suffix.clone(), function)?),
             ))
         }
     })
