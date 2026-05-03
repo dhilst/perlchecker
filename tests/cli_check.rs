@@ -827,3 +827,79 @@ sub exact_match {
     assert!(stdout.contains("✔ not_ending_with_x: verified"));
     assert!(stdout.contains("✔ exact_match: verified"));
 }
+
+#[test]
+fn check_string_ordering_fixed() {
+    // Verify that string ordering (lt/gt/le/ge) uses real Z3 lexicographic
+    // comparison rather than the old vacuous-true encoding.
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("str_order.pl");
+    fs::write(
+        &file,
+        r#"
+# "a" lt "b" is always true lexicographically
+# sig: (Int) -> Int
+# post: $result == 1
+sub a_lt_b {
+    my ($dummy) = @_;
+    if ("a" lt "b") {
+        return 1;
+    }
+    return 0;
+}
+
+# "b" lt "a" is always false — with the old always-true bug this would
+# incorrectly verify the postcondition $result == 1
+# sig: (Int) -> Int
+# post: $result == 0
+sub b_not_lt_a {
+    my ($dummy) = @_;
+    if ("b" lt "a") {
+        return 1;
+    }
+    return 0;
+}
+
+# le is reflexive: any string is le itself
+# sig: (Str) -> Int
+# pre: length($s) >= 1 && length($s) <= 5
+# post: $result == 1
+sub le_reflexive {
+    my ($s) = @_;
+    if ($s le $s) {
+        return 1;
+    }
+    return 0;
+}
+
+# If a lt b then NOT (b lt a)
+# sig: (Str, Str) -> Int
+# pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
+# post: $result >= 0 && $result <= 1
+sub lt_gt_consistent {
+    my ($a, $b) = @_;
+    if ($a lt $b) {
+        if ($b gt $a) {
+            return 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ a_lt_b: verified"));
+    assert!(stdout.contains("✔ b_not_lt_a: verified"));
+    assert!(stdout.contains("✔ le_reflexive: verified"));
+    assert!(stdout.contains("✔ lt_gt_consistent: verified"));
+}

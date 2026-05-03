@@ -485,13 +485,40 @@ fn encode_bool(expr: &BoolExpr) -> Bool {
         }
         BoolExpr::StrEq(left, right) => encode_str(left).eq(encode_str(right)),
         BoolExpr::StrCmp(op, left, right) => {
+            let ctx = &Context::thread_local();
             let left_encoded = encode_str(left);
             let right_encoded = encode_str(right);
             match op {
-                crate::symexec::CmpOp::Lt | crate::symexec::CmpOp::Le
-                | crate::symexec::CmpOp::Gt | crate::symexec::CmpOp::Ge => {
-                    Bool::from_bool(true)
-                }
+                crate::symexec::CmpOp::Lt => unsafe {
+                    Bool::wrap(ctx, z3_sys::Z3_mk_str_lt(
+                        ctx.get_z3_context(),
+                        left_encoded.get_z3_ast(),
+                        right_encoded.get_z3_ast(),
+                    ).unwrap())
+                },
+                crate::symexec::CmpOp::Le => unsafe {
+                    Bool::wrap(ctx, z3_sys::Z3_mk_str_le(
+                        ctx.get_z3_context(),
+                        left_encoded.get_z3_ast(),
+                        right_encoded.get_z3_ast(),
+                    ).unwrap())
+                },
+                crate::symexec::CmpOp::Gt => unsafe {
+                    // a gt b  ≡  b lt a
+                    Bool::wrap(ctx, z3_sys::Z3_mk_str_lt(
+                        ctx.get_z3_context(),
+                        right_encoded.get_z3_ast(),
+                        left_encoded.get_z3_ast(),
+                    ).unwrap())
+                },
+                crate::symexec::CmpOp::Ge => unsafe {
+                    // a ge b  ≡  b le a
+                    Bool::wrap(ctx, z3_sys::Z3_mk_str_le(
+                        ctx.get_z3_context(),
+                        right_encoded.get_z3_ast(),
+                        left_encoded.get_z3_ast(),
+                    ).unwrap())
+                },
                 crate::symexec::CmpOp::Eq => left_encoded.eq(&right_encoded),
                 crate::symexec::CmpOp::Ne => left_encoded.eq(&right_encoded).not(),
             }
