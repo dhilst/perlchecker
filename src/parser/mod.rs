@@ -1486,20 +1486,21 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
         .map_primary(|primary| match primary.as_rule() {
             Rule::int => {
                 let s = primary.as_str();
-                let value = if let Some(hex) = s.strip_prefix("0x") {
+                let stripped: String = s.chars().filter(|&c| c != '_').collect();
+                let value = if let Some(hex) = stripped.strip_prefix("0x") {
                     i64::from_str_radix(hex, 16).map_err(|_| {
                         format!("invalid hex integer: {}", s)
                     })?
-                } else if let Some(oct) = s.strip_prefix("0o") {
+                } else if let Some(oct) = stripped.strip_prefix("0o") {
                     i64::from_str_radix(oct, 8).map_err(|_| {
                         format!("invalid octal integer: {}", s)
                     })?
-                } else if let Some(bin) = s.strip_prefix("0b") {
+                } else if let Some(bin) = stripped.strip_prefix("0b") {
                     i64::from_str_radix(bin, 2).map_err(|_| {
                         format!("invalid binary integer: {}", s)
                     })?
                 } else {
-                    s.parse().map_err(|_| {
+                    stripped.parse().map_err(|_| {
                         format!("invalid integer: {}", s)
                     })?
                 };
@@ -1666,20 +1667,21 @@ fn parse_access_operand(pair: Pair<'_, Rule>) -> std::result::Result<Expr, Strin
         Rule::var => Ok(Expr::Variable(parse_variable(pair))),
         Rule::int => {
             let s = pair.as_str();
-            let value = if let Some(hex) = s.strip_prefix("0x") {
+            let stripped: String = s.chars().filter(|&c| c != '_').collect();
+            let value = if let Some(hex) = stripped.strip_prefix("0x") {
                 i64::from_str_radix(hex, 16).map_err(|_| {
                     format!("invalid hex integer: {}", s)
                 })?
-            } else if let Some(oct) = s.strip_prefix("0o") {
+            } else if let Some(oct) = stripped.strip_prefix("0o") {
                 i64::from_str_radix(oct, 8).map_err(|_| {
                     format!("invalid octal integer: {}", s)
                 })?
-            } else if let Some(bin) = s.strip_prefix("0b") {
+            } else if let Some(bin) = stripped.strip_prefix("0b") {
                 i64::from_str_radix(bin, 2).map_err(|_| {
                     format!("invalid binary integer: {}", s)
                 })?
             } else {
-                s.parse().map_err(|_| {
+                stripped.parse().map_err(|_| {
                     format!("invalid integer: {}", s)
                 })?
             };
