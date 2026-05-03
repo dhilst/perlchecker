@@ -352,7 +352,9 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             let newline = Z3String::from_str("\n").expect("newline literal");
             let len = encoded.length();
             let one = Int::from_i64(1);
-            let trimmed_len = Int::sub(&[&len, &one]);
+            let zero = Int::from_i64(0);
+            let raw_trimmed_len = Int::sub(&[&len, &one]);
+            let trimmed_len = len.gt(&zero).ite(&raw_trimmed_len, &zero);
             let trimmed = encoded.substr(Int::from_i64(0), trimmed_len);
             // Z3_mk_seq_suffix(ctx, suffix, s) checks if suffix is a suffix of s
             let has_newline = unsafe {
