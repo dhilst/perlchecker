@@ -46,6 +46,7 @@ pub enum Builtin {
     StartsWith,
     EndsWith,
     Replace,
+    CharAt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1261,6 +1262,30 @@ fn infer_expr_type(
                     env,
                     assumptions,
                     ExprType::Str,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
+            }
+            Builtin::CharAt => {
+                let [string, index] = args.as_slice() else {
+                    unreachable!("char_at arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "char_at string",
+                    string,
+                    env,
+                    assumptions,
+                    ExprType::Str,
+                    signatures,
+                )?;
+                expect_expr_type(
+                    function,
+                    "char_at index",
+                    index,
+                    env,
+                    assumptions,
+                    ExprType::Int,
                     signatures,
                 )?;
                 Ok(ExprType::Str)
