@@ -1514,7 +1514,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::scalar_call => parse_scalar_call(primary),
             Rule::pop_call => parse_pop_call(primary),
             Rule::length_call => parse_builtin_call(primary, Builtin::Length),
-            Rule::substr_call => parse_builtin_call(primary, Builtin::Substr),
+            Rule::substr_call => parse_substr_call(primary),
             Rule::index_call => parse_builtin_call(primary, Builtin::Index),
             Rule::abs_call => parse_builtin_call(primary, Builtin::Abs),
             Rule::min_call => parse_builtin_call(primary, Builtin::Min),
@@ -1608,6 +1608,33 @@ fn parse_builtin_call(
         .map(build_expr)
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(Expr::Builtin { function, args })
+}
+
+/// Parse substr with 2 or 3 arguments.
+/// 2-arg form `substr($s, $off)` is desugared to `substr($s, $off, length($s) - $off)`.
+fn parse_substr_call(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> {
+    let mut args = pair
+        .into_inner()
+        .filter(|inner| inner.as_rule() == Rule::expr)
+        .map(build_expr)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    if args.len() == 2 {
+        let str_expr = args[0].clone();
+        let offset_expr = args[1].clone();
+        let length_expr = Expr::Binary {
+            left: Box::new(Expr::Builtin {
+                function: Builtin::Length,
+                args: vec![str_expr],
+            }),
+            op: BinaryOp::Sub,
+            right: Box::new(offset_expr),
+        };
+        args.push(length_expr);
+    }
+    Ok(Expr::Builtin {
+        function: Builtin::Substr,
+        args,
+    })
 }
 
 fn parse_collection_access(

@@ -971,7 +971,12 @@ fn infer_expr_type(
                         function: function.to_string(),
                     });
                 }
-                if !is_proven_nonnegative(len, assumptions) {
+                // Skip length-nonneg check when len is the desugared form
+                // `length(value) - start` (from 2-arg substr), since the start
+                // check above already guarantees start <= length(value).
+                if !is_desugared_substr_length(len, value, start)
+                    && !is_proven_nonnegative(len, assumptions)
+                {
                     return Err(TypeCheckError::UnsafeSubstringLength {
                         function: function.to_string(),
                     });
@@ -1349,6 +1354,18 @@ fn length_expr(expr: Expr) -> Expr {
         function: Builtin::Length,
         args: vec![expr],
     }
+}
+
+/// Detect the desugared 2-arg substr pattern: `length(value) - start`.
+fn is_desugared_substr_length(len: &Expr, value: &Expr, start: &Expr) -> bool {
+    matches!(
+        len,
+        Expr::Binary {
+            left,
+            op: BinaryOp::Sub,
+            right,
+        } if **left == length_expr(value.clone()) && **right == *start
+    )
 }
 
 fn collection_element_type(
