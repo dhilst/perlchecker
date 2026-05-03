@@ -266,6 +266,20 @@ fn encode_str(expr: &StrExpr) -> Z3String {
                 Z3String::wrap(ctx, z3_sys::Z3_mk_string_from_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
             }
         }
+        StrExpr::Chomp(value) => {
+            let ctx = &Context::thread_local();
+            let encoded = encode_str(value);
+            let newline = Z3String::from_str("\n").expect("newline literal");
+            let len = encoded.length();
+            let one = Int::from_i64(1);
+            let trimmed_len = Int::sub(&[&len, &one]);
+            let trimmed = encoded.substr(Int::from_i64(0), trimmed_len);
+            // Z3_mk_seq_suffix(ctx, suffix, s) checks if suffix is a suffix of s
+            let has_newline = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), newline.get_z3_ast(), encoded.get_z3_ast()).unwrap())
+            };
+            has_newline.ite(&trimmed, &encoded)
+        }
         StrExpr::Ite(cond, then_str, else_str) => {
             let cond_bool = encode_bool(cond);
             let then_encoded = encode_str(then_str);
@@ -455,6 +469,7 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
             &encode_int_safety(len),
         ]),
         StrExpr::Chr(value) => encode_int_safety(value),
+        StrExpr::Chomp(value) => encode_str_safety(value),
         StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_str_safety(then_str),
@@ -595,6 +610,7 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_int(len, vars);
         }
         StrExpr::Chr(value) => collect_string_vars_from_int(value, vars),
+        StrExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Ite(cond, then_str, else_str) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_str(then_str, vars);

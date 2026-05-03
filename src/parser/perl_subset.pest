@@ -39,7 +39,7 @@ for_hash_assign = { var ~ "{" ~ access_key ~ "}" ~ "=" ~ expr }
 expr = { ternary_expr }
 ternary_expr = { simple_expr ~ ("?" ~ simple_expr ~ ":" ~ ternary_expr)? }
 simple_expr = { prefix_op* ~ atom ~ (infix_op ~ prefix_op* ~ atom)* }
-atom = _{ scalar_call | pop_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | call_expr | hash_access | array_access | string | int | var | "(" ~ expr ~ ")" }
+atom = _{ scalar_call | pop_call | chomp_call | length_call | substr_call | index_call | abs_call | min_call | max_call | ord_call | chr_call | call_expr | hash_access | array_access | string | int | var | "(" ~ expr ~ ")" }
 prefix_op = _{ op_low_not | op_not | op_neg | op_bitnot }
 infix_op = _{ op_low_and | op_low_or | op_or | op_and | op_cmp | op_seq | op_sne | op_slt | op_sgt | op_sle | op_sge | op_eq | op_ne | op_shl | op_spaceship | op_le | op_lt | op_shr | op_ge | op_gt | op_bitor | op_bitand | op_bitxor | op_concat | op_add | op_sub | op_pow | op_repeat | op_mul | op_div | op_mod }
 
@@ -53,6 +53,7 @@ min_call = { "min" ~ "(" ~ expr ~ "," ~ expr ~ ")" }
 max_call = { "max" ~ "(" ~ expr ~ "," ~ expr ~ ")" }
 ord_call = { "ord" ~ "(" ~ expr ~ ")" }
 chr_call = { "chr" ~ "(" ~ expr ~ ")" }
+chomp_call = { "chomp" ~ "(" ~ expr ~ ")" }
 
 op_or = { "||" }
 op_and = { "&&" }
@@ -91,7 +92,7 @@ op_low_or = { "or" }
 op_low_not = { "not" }
 
 int = @{ ASCII_DIGIT+ }
-string = @{ "\"" ~ ( "\\\"" | "\\\\" | !("\"" | NEWLINE) ~ ANY )* ~ "\"" }
+string = @{ "\"" ~ ( "\\\"" | "\\\\" | "\\n" | "\\t" | !("\"" | NEWLINE) ~ ANY )* ~ "\"" }
 var = @{ "$" ~ ident }
 bare_ident = @{ ident }
 ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }

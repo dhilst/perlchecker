@@ -39,6 +39,7 @@ pub enum Builtin {
     Max,
     Ord,
     Chr,
+    Chomp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1086,6 +1087,21 @@ fn infer_expr_type(
                     env,
                     assumptions,
                     ExprType::Int,
+                    signatures,
+                )?;
+                Ok(ExprType::Str)
+            }
+            Builtin::Chomp => {
+                let [value] = args.as_slice() else {
+                    unreachable!("chomp arity is enforced by the parser");
+                };
+                expect_expr_type(
+                    function,
+                    "chomp argument",
+                    value,
+                    env,
+                    assumptions,
+                    ExprType::Str,
                     signatures,
                 )?;
                 Ok(ExprType::Str)

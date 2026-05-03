@@ -1326,6 +1326,7 @@ fn build_simple_expr(pair: Pair<'_, Rule>) -> std::result::Result<Expr, String> 
             Rule::max_call => parse_builtin_call(primary, Builtin::Max),
             Rule::ord_call => parse_builtin_call(primary, Builtin::Ord),
             Rule::chr_call => parse_builtin_call(primary, Builtin::Chr),
+            Rule::chomp_call => parse_builtin_call(primary, Builtin::Chomp),
             other => Err(format!("unexpected primary rule: {other:?}")),
         })
         .map_prefix(|op, rhs| {
@@ -1479,6 +1480,8 @@ fn parse_string_literal(raw: &str) -> std::result::Result<String, String> {
         if escaped {
             match ch {
                 '"' | '\\' => value.push(ch),
+                'n' => value.push('\n'),
+                't' => value.push('\t'),
                 other => return Err(format!("unsupported escape sequence: \\{other}")),
             }
             escaped = false;

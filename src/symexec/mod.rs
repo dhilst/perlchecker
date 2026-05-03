@@ -45,6 +45,7 @@ pub enum StrExpr {
     Concat(Box<StrExpr>, Box<StrExpr>),
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
     Chr(Box<IntExpr>),
+    Chomp(Box<StrExpr>),
     Ite(Box<BoolExpr>, Box<StrExpr>, Box<StrExpr>),
     ArraySelect(Box<ArrayStrExpr>, Box<IntExpr>),
     HashSelect(Box<HashStrExpr>, Box<StrExpr>),
@@ -1157,6 +1158,15 @@ fn eval_builtin(
                 unreachable!("chr arity is enforced by the parser");
             };
             SymValue::Str(StrExpr::Chr(Box::new(expect_int(
+                value.clone(),
+                function,
+            )?)))
+        }
+        Builtin::Chomp => {
+            let [value] = args else {
+                unreachable!("chomp arity is enforced by the parser");
+            };
+            SymValue::Str(StrExpr::Chomp(Box::new(expect_str(
                 value.clone(),
                 function,
             )?)))
