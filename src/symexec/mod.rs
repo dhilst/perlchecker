@@ -38,6 +38,7 @@ pub enum IntExpr {
     Contains(Box<StrExpr>, Box<StrExpr>),
     StartsWith(Box<StrExpr>, Box<StrExpr>),
     EndsWith(Box<StrExpr>, Box<StrExpr>),
+    Chomp(Box<StrExpr>),
     ArraySelect(Box<ArrayIntExpr>, Box<IntExpr>),
     HashSelect(Box<HashIntExpr>, Box<StrExpr>),
 }
@@ -50,7 +51,6 @@ pub enum StrExpr {
     Substr(Box<StrExpr>, Box<IntExpr>, Box<IntExpr>),
     Chr(Box<IntExpr>),
     FromInt(Box<IntExpr>),
-    Chomp(Box<StrExpr>),
     Reverse(Box<StrExpr>),
     Replace(Box<StrExpr>, Box<StrExpr>, Box<StrExpr>),
     CharAt(Box<StrExpr>, Box<IntExpr>),
@@ -1404,7 +1404,7 @@ fn eval_builtin(
             let [value] = args else {
                 unreachable!("chomp arity is enforced by the parser");
             };
-            SymValue::Str(StrExpr::Chomp(Box::new(expect_str(
+            SymValue::Int(IntExpr::Chomp(Box::new(expect_str(
                 value.clone(),
                 function,
             )?)))

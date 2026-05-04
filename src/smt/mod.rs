@@ -302,6 +302,15 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::Index(haystack, needle, start) => {
             encode_index_of(&encode_str(haystack), &encode_str(needle), &encode_int(start))
         }
+        IntExpr::Chomp(value) => {
+            let ctx = &Context::thread_local();
+            let encoded = encode_str(value);
+            let newline = Z3String::from_str("\n").expect("newline literal");
+            let has_newline = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), newline.get_z3_ast(), encoded.get_z3_ast()).unwrap())
+            };
+            has_newline.ite(&Int::from_i64(1), &Int::from_i64(0))
+        }
         IntExpr::ArraySelect(array, index) => encode_array_int(array)
             .select(&encode_int(index))
             .as_int()
@@ -345,22 +354,6 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             let minus_sign = Z3String::from_str("-").expect("minus literal");
             let neg_str = Z3String::concat(&[minus_sign, neg_digits]);
             is_nonneg.ite(&pos_str, &neg_str)
-        }
-        StrExpr::Chomp(value) => {
-            let ctx = &Context::thread_local();
-            let encoded = encode_str(value);
-            let newline = Z3String::from_str("\n").expect("newline literal");
-            let len = encoded.length();
-            let one = Int::from_i64(1);
-            let zero = Int::from_i64(0);
-            let raw_trimmed_len = Int::sub(&[&len, &one]);
-            let trimmed_len = len.gt(&zero).ite(&raw_trimmed_len, &zero);
-            let trimmed = encoded.substr(Int::from_i64(0), trimmed_len);
-            // Z3_mk_seq_suffix(ctx, suffix, s) checks if suffix is a suffix of s
-            let has_newline = unsafe {
-                Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), newline.get_z3_ast(), encoded.get_z3_ast()).unwrap())
-            };
-            has_newline.ite(&trimmed, &encoded)
         }
         StrExpr::Reverse(value) => {
             let ctx = &Context::thread_local();
@@ -603,6 +596,7 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::EndsWith(string, suffix) => {
             Bool::and(&[&encode_str_safety(string), &encode_str_safety(suffix)])
         }
+        IntExpr::Chomp(value) => encode_str_safety(value),
         IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
             &encode_bool_safety(cond),
             &encode_int_safety(then_int),
@@ -636,7 +630,6 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
         ]),
         StrExpr::Chr(value) => encode_int_safety(value),
         StrExpr::FromInt(value) => encode_int_safety(value),
-        StrExpr::Chomp(value) => encode_str_safety(value),
         StrExpr::Reverse(value) => encode_str_safety(value),
         StrExpr::Replace(string, from, to) => Bool::and(&[
             &encode_str_safety(string),
@@ -767,6 +760,7 @@ fn collect_string_vars_from_int(expr: &IntExpr, vars: &mut Vec<String>) {
             collect_string_vars_from_str(suffix, vars);
         }
         IntExpr::Ord(value) => collect_string_vars_from_str(value, vars),
+        IntExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
         IntExpr::Ite(cond, then_int, else_int) => {
             collect_string_vars_from_bool_inner(cond, vars);
             collect_string_vars_from_int(then_int, vars);
@@ -802,7 +796,6 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
         }
         StrExpr::Chr(value) => collect_string_vars_from_int(value, vars),
         StrExpr::FromInt(value) => collect_string_vars_from_int(value, vars),
-        StrExpr::Chomp(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Reverse(value) => collect_string_vars_from_str(value, vars),
         StrExpr::Replace(string, from, to) => {
             collect_string_vars_from_str(string, vars);

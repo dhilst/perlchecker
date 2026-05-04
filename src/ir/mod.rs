@@ -213,7 +213,7 @@ fn is_int_element(expr: &SsaExpr) -> bool {
         SsaExpr::Builtin { function, .. } => {
             // Most builtins return Int, except string-producing ones
             !matches!(function,
-                Builtin::Chr | Builtin::Chomp | Builtin::Reverse | Builtin::Replace | Builtin::CharAt
+                Builtin::Chr | Builtin::Reverse | Builtin::Replace | Builtin::CharAt
             )
         }
         SsaExpr::Access { kind, .. } => {

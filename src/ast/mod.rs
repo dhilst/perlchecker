@@ -1563,7 +1563,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Str)
+                Ok(ExprType::Int)
             }
             Builtin::Reverse => {
                 let [value] = args.as_slice() else {
