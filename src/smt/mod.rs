@@ -272,8 +272,12 @@ fn encode_int(expr: &IntExpr) -> Int {
             r_nonneg.ite(&shr_result, &shl_result)
         }
         IntExpr::BitNot(value) => {
-            let bv = BV::from_int(&encode_int(value), 64);
-            bv.bvnot().to_int(true)
+            // ~x == -x - 1 in two's complement (algebraic identity).
+            // Using direct arithmetic avoids the bv2int(signed)/int2bv
+            // round-trip that causes Z3 timeouts when composed with
+            // other bitwise operations.
+            let encoded = encode_int(value);
+            encoded.unary_minus() - Int::from_i64(1)
         }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
