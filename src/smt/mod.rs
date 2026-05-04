@@ -240,7 +240,7 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::Shr(left, right) => {
             let l_bv = BV::from_int(&encode_int(left), 64);
             let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvashr(&r_bv).to_int(true)
+            l_bv.bvlshr(&r_bv).to_int(false)
         }
         IntExpr::BitNot(value) => {
             let bv = BV::from_int(&encode_int(value), 64);
