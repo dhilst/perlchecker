@@ -493,6 +493,10 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             // contain `from`).  Phase 2 replaces all placeholders with `to` (no
             // cascade since placeholder length > MAX_STR_LEN means `to` cannot
             // contain it).
+            //
+            // Note: the input string to replace may be a concatenation of two
+            // bounded variables (up to 2*MAX_STR_LEN chars), so we iterate
+            // 2*MAX_STR_LEN times to cover all possible occurrences.
             let ctx = &Context::thread_local();
             let s = encode_str(string);
             let f = encode_str(from);
@@ -502,16 +506,17 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             // string of length <= MAX_STR_LEN.
             let placeholder_chars: String = std::iter::repeat('\u{F8FF}').take((MAX_STR_LEN + 1) as usize).collect();
             let placeholder = Z3String::from_str(&placeholder_chars).expect("placeholder literal");
-            // Phase 1: replace from -> placeholder (chain MAX_STR_LEN times)
+            // Phase 1: replace from -> placeholder (chain 2*MAX_STR_LEN times
+            // to handle concatenated strings)
             let mut current = s;
-            for _ in 0..MAX_STR_LEN {
+            for _ in 0..2 * MAX_STR_LEN {
                 current = unsafe {
                     let args = [current.get_z3_ast(), f.get_z3_ast(), placeholder.get_z3_ast()];
                     Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
                 };
             }
-            // Phase 2: replace placeholder -> to (chain MAX_STR_LEN times)
-            for _ in 0..MAX_STR_LEN {
+            // Phase 2: replace placeholder -> to (chain 2*MAX_STR_LEN times)
+            for _ in 0..2 * MAX_STR_LEN {
                 current = unsafe {
                     let args = [current.get_z3_ast(), placeholder.get_z3_ast(), t.get_z3_ast()];
                     Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
