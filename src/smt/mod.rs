@@ -212,12 +212,19 @@ fn encode_int(expr: &IntExpr) -> Int {
             // Int::power returns Real. Convert back to Int using truncation
             // toward zero (matching Perl's behavior), NOT floor.
             // floor(-0.5) = -1, but Perl truncates -0.5 to 0.
-            let real_result = encode_int(left).power(&encode_int(right));
+            //
+            // Guard: Perl defines $x ** 0 = 1 for all $x (including 0 ** 0).
+            // Z3 leaves 0^0 unspecified, so we handle exponent == 0 explicitly.
+            let l = encode_int(left);
+            let r = encode_int(right);
+            let exp_is_zero = r.eq(&Int::from_i64(0));
+            let real_result = l.power(&r);
             let zero_real = Real::from_rational(0, 1);
             let is_nonneg = real_result.ge(&zero_real);
             let floor_val = real_result.to_int();
             let neg_floor = real_result.unary_minus().to_int();
-            is_nonneg.ite(&floor_val, &neg_floor.unary_minus())
+            let normal_result = is_nonneg.ite(&floor_val, &neg_floor.unary_minus());
+            exp_is_zero.ite(&Int::from_i64(1), &normal_result)
         }
         IntExpr::Div(left, right) => {
             encode_truncating_division(&encode_int(left), &encode_int(right))
