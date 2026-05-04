@@ -185,6 +185,8 @@ pub enum SymExecError {
     DieReached { function: String },
     #[error("function `{function}`: assertion failed")]
     AssertFailed { function: String },
+    #[error("function `{function}` may violate extern `{callee}` precondition on a feasible path")]
+    ExternPreViolated { function: String, callee: String },
     #[error("function `{function}` has no valid execution paths after discarding invalid arithmetic paths")]
     NoValidPaths { function: String },
     #[error(transparent)]
@@ -792,16 +794,20 @@ fn execute_call(
             _ => {}
         }
     }
-    let pre = expect_bool(eval_expr(callee, &spec.pre, &annotation_env)?, callee)?;
-    let initial_path_condition = BoolExpr::And(Box::new(caller_path_condition), Box::new(pre));
-
+    // NOTE: We do NOT assume the callee's precondition here. Since we are
+    // inlining the callee's body, the body's actual behavior determines the
+    // result. Assuming the precondition would unsoundly prune caller paths
+    // where the precondition is violated — the callee still executes in Perl
+    // regardless of whether its precondition holds. The precondition is only
+    // relevant when verifying the callee in isolation (where it constrains
+    // the input domain) or for abstract/extern contract-based calls.
     execute_cfg_from_state(
         program,
         spec,
         cfg,
         State {
             env,
-            path_condition: initial_path_condition,
+            path_condition: caller_path_condition,
         },
     )
 }
@@ -815,7 +821,7 @@ fn execute_call(
 /// 5. Add the postcondition as an assumption to the path condition
 /// 6. Return the fresh symbolic return value
 fn execute_extern_call(
-    _program: &Program,
+    program: &Program,
     caller: &str,
     ext: &ExternSpec,
     args: Vec<SymValue>,
@@ -842,6 +848,20 @@ fn execute_extern_call(
     let pre = eval_expr(&ext.name, &ext.precondition, &annotation_env)?;
     let pre_bool = expect_bool(pre, &ext.name)?;
 
+    // VERIFY that the caller's path condition implies the extern's precondition.
+    // Check: is (caller_pc AND NOT pre) satisfiable? If yes, the caller can violate
+    // the extern's precondition, which is unsound.
+    let pre_violation = BoolExpr::And(
+        Box::new(caller_path_condition.clone()),
+        Box::new(BoolExpr::Not(Box::new(pre_bool.clone()))),
+    );
+    if smt::is_satisfiable_with_timeout(caller, &pre_violation, program.limits.solver_timeout_ms)? {
+        return Err(SymExecError::ExternPreViolated {
+            function: caller.to_string(),
+            callee: ext.name.clone(),
+        });
+    }
+
     // Create a fresh symbolic return value
     let counter = EXTERN_FRESH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let fresh_name = format!("__extern_{}_{}", ext.name, counter);
@@ -853,6 +873,7 @@ fn execute_extern_call(
     let post_bool = expect_bool(post, &ext.name)?;
 
     // Path condition: caller_pc AND precondition AND postcondition
+    // (precondition is now known to hold on all reachable paths)
     let pc = BoolExpr::And(
         Box::new(BoolExpr::And(
             Box::new(caller_path_condition),
@@ -1369,18 +1390,18 @@ fn eval_builtin(
                 SymValue::ArrayInt(ArrayIntExpr::Var(name)) => {
                     SymValue::Int(IntExpr::Var(format!("{name}__len")))
                 }
-                SymValue::ArrayInt(ArrayIntExpr::Store(_, _, _)) => {
-                    // For Store variants, we need to extract the base variable name
-                    let base_name = extract_array_int_base_name(array);
-                    SymValue::Int(IntExpr::Var(format!("{base_name}__len")))
+                SymValue::ArrayInt(arr @ ArrayIntExpr::Store(_, _, _)) => {
+                    // For Store variants, use effective length which accounts for
+                    // stores that extend the array beyond its current length.
+                    SymValue::Int(effective_array_int_length(arr))
                 }
                 SymValue::ArrayStr(ArrayStrExpr::Var(name)) => {
                     SymValue::Int(IntExpr::Var(format!("{name}__len")))
                 }
-                SymValue::ArrayStr(ArrayStrExpr::Store(_, _, _)) => {
-                    // For Store variants, we need to extract the base variable name
-                    let base_name = extract_array_str_base_name(array);
-                    SymValue::Int(IntExpr::Var(format!("{base_name}__len")))
+                SymValue::ArrayStr(arr @ ArrayStrExpr::Store(_, _, _)) => {
+                    // For Store variants, use effective length which accounts for
+                    // stores that extend the array beyond its current length.
+                    SymValue::Int(effective_array_str_length(arr))
                 }
                 _ => {
                     return Err(SymExecError::TypeMismatch {
