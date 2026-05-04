@@ -1764,7 +1764,7 @@ mod tests {
                 "# sig: (Int, Int) -> Int".to_string(),
                 "# post: $result == 1".to_string(),
             ],
-            body: "\n    my ($x, $y) = @_;\n    if ($y == 0) {\n        return $x / $y;\n    }\n    return 1;\n".to_string(),
+            body: "\n    my ($x, $y) = @_;\n    if ($y == 0) {\n        return int($x / $y);\n    }\n    return 1;\n".to_string(),
             start_line: 1,
         };
 

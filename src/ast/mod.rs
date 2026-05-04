@@ -292,6 +292,8 @@ pub enum TypeCheckError {
         expected: &'static str,
         found: &'static str,
     },
+    #[error("function `{function}` uses bare `/` division which returns a float in Perl; wrap in int() for truncating division: int($x / $y)")]
+    BareDivision { function: String },
 }
 
 pub fn type_check_function(
@@ -365,6 +367,9 @@ pub fn type_check_function_with_signatures(
         signatures,
         &body_alias_map,
     )?;
+
+    // Reject bare Int/Int division (Perl's `/` returns a float; use int() to truncate)
+    check_no_bare_division(&function.name, &function.body, &spec.pre, &spec.post)?;
 
     debug!(function = function.name, "type checking completed");
     Ok(())
@@ -2334,6 +2339,116 @@ fn render_expr_type(ty: ExprType) -> &'static str {
     }
 }
 
+/// Check that no bare `Int / Int` division appears outside of `int()`.
+/// Perl's `/` returns a float; only `int($x / $y)` truncates.
+fn check_no_bare_division(function: &str, stmts: &[Stmt], pre: &Expr, post: &Expr) -> std::result::Result<(), TypeCheckError> {
+    check_expr_no_bare_div(function, pre)?;
+    check_expr_no_bare_div(function, post)?;
+    for stmt in stmts {
+        check_stmt_no_bare_div(function, stmt)?;
+    }
+    Ok(())
+}
+
+fn check_stmt_no_bare_div(function: &str, stmt: &Stmt) -> std::result::Result<(), TypeCheckError> {
+    match stmt {
+        Stmt::Assign { expr, .. } | Stmt::Return(expr) | Stmt::Die(expr)
+        | Stmt::Assert(expr) | Stmt::GhostAssign { expr, .. }
+        | Stmt::DerefAssign { expr, .. } => {
+            check_expr_no_bare_div(function, expr)
+        }
+        Stmt::ArrayAssign { index, expr, .. } | Stmt::ArrowArrayAssign { index, expr, .. } => {
+            check_expr_no_bare_div(function, index)?;
+            check_expr_no_bare_div(function, expr)
+        }
+        Stmt::HashAssign { key, expr, .. } | Stmt::ArrowHashAssign { key, expr, .. } => {
+            check_expr_no_bare_div(function, key)?;
+            check_expr_no_bare_div(function, expr)
+        }
+        Stmt::If { condition, then_branch, else_branch } => {
+            check_expr_no_bare_div(function, condition)?;
+            for s in then_branch { check_stmt_no_bare_div(function, s)?; }
+            for s in else_branch { check_stmt_no_bare_div(function, s)?; }
+            Ok(())
+        }
+        Stmt::While { condition, body, step, invariant, .. } => {
+            check_expr_no_bare_div(function, condition)?;
+            for s in body { check_stmt_no_bare_div(function, s)?; }
+            for s in step { check_stmt_no_bare_div(function, s)?; }
+            if let Some(inv) = invariant {
+                check_expr_no_bare_div(function, inv)?;
+            }
+            Ok(())
+        }
+        Stmt::Push { value, .. } => check_expr_no_bare_div(function, value),
+        Stmt::ArrayInit { elements, .. } => {
+            for e in elements { check_expr_no_bare_div(function, e)?; }
+            Ok(())
+        }
+        Stmt::Declare { .. } | Stmt::LoopBoundExceeded | Stmt::Last | Stmt::Next => Ok(()),
+    }
+}
+
+/// Check an expression for bare division. Division is only allowed as the
+/// direct argument of `int()`.
+fn check_expr_no_bare_div(function: &str, expr: &Expr) -> std::result::Result<(), TypeCheckError> {
+    match expr {
+        Expr::Binary { left, op: BinaryOp::Div, right } => {
+            // Bare division found — reject
+            // But still recurse into sub-expressions for nested bare divs
+            // (the error on this level is enough though)
+            let _ = left;
+            let _ = right;
+            Err(TypeCheckError::BareDivision { function: function.to_string() })
+        }
+        Expr::Binary { left, right, .. } => {
+            check_expr_no_bare_div(function, left)?;
+            check_expr_no_bare_div(function, right)
+        }
+        Expr::Unary { expr, .. } => check_expr_no_bare_div(function, expr),
+        Expr::Ternary { condition, then_expr, else_expr } => {
+            check_expr_no_bare_div(function, condition)?;
+            check_expr_no_bare_div(function, then_expr)?;
+            check_expr_no_bare_div(function, else_expr)
+        }
+        Expr::Access { index, .. } => check_expr_no_bare_div(function, index),
+        Expr::Call { args, .. } => {
+            for a in args { check_expr_no_bare_div(function, a)?; }
+            Ok(())
+        }
+        Expr::Builtin { function: Builtin::Int, args } => {
+            // int() wraps division — allow division in direct arg, but
+            // still check sub-sub-expressions of that arg for nested bare divs
+            for a in args {
+                check_expr_no_bare_div_inside_int(function, a)?;
+            }
+            Ok(())
+        }
+        Expr::Builtin { args, .. } => {
+            for a in args { check_expr_no_bare_div(function, a)?; }
+            Ok(())
+        }
+        Expr::ArrowArrayAccess { index, .. } => check_expr_no_bare_div(function, index),
+        Expr::ArrowHashAccess { key, .. } => check_expr_no_bare_div(function, key),
+        Expr::Pop { .. } | Expr::Int(_) | Expr::Bool(_) | Expr::String(_)
+        | Expr::Variable(_) | Expr::Exists { .. }
+        | Expr::Ref(_) | Expr::Deref(_) | Expr::RefArray(_) | Expr::RefHash(_) => Ok(()),
+    }
+}
+
+/// Inside `int(...)`, allow the top-level expression to be a division,
+/// but still check the division's operands for nested bare divisions.
+fn check_expr_no_bare_div_inside_int(function: &str, expr: &Expr) -> std::result::Result<(), TypeCheckError> {
+    match expr {
+        Expr::Binary { left, op: BinaryOp::Div, right } => {
+            // This division is allowed (it's inside int()). Check operands.
+            check_expr_no_bare_div(function, left)?;
+            check_expr_no_bare_div(function, right)
+        }
+        _ => check_expr_no_bare_div(function, expr),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -2438,7 +2553,24 @@ mod tests {
     }
 
     #[test]
-    fn accepts_division_without_static_nonzero_proof() {
+    fn accepts_division_inside_int() {
+        let function = ExtractedFunction {
+            name: "foo".to_string(),
+            annotations: vec![
+                "# sig: (Int, Int) -> Int".to_string(),
+                "# post: $result == $x".to_string(),
+            ],
+            body: "\n    my ($x, $y) = @_;\n    return int($x / $y);\n".to_string(),
+            start_line: 1,
+        };
+
+        let spec = parse_function_spec(&function).unwrap();
+        let ast = parse_function_ast(&function).unwrap();
+        type_check_function(&spec, &ast).unwrap();
+    }
+
+    #[test]
+    fn rejects_bare_division() {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
@@ -2451,7 +2583,8 @@ mod tests {
 
         let spec = parse_function_spec(&function).unwrap();
         let ast = parse_function_ast(&function).unwrap();
-        type_check_function(&spec, &ast).unwrap();
+        let err = type_check_function(&spec, &ast).unwrap_err();
+        assert!(matches!(err, TypeCheckError::BareDivision { .. }));
     }
 
     #[test]
