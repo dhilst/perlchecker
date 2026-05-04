@@ -14,6 +14,10 @@ use crate::{
 /// nested foreach loops from clobbering each other's iteration index.
 static FOREACH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+/// Counter to generate unique loop flag variable names (__broke_N, __skipped_N),
+/// preventing collisions with user variables of the same name.
+static LOOP_FLAG_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Parser)]
 #[grammar = "parser/perl_subset.pest"]
 struct PerlSubsetParser;
@@ -1318,17 +1322,18 @@ fn unroll_while_simple(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Ve
 ///       if (C && $__broke == 0) { ... recurse ... }
 ///   }
 fn unroll_while_with_last(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
-    static BREAK_FLAG: &str = "__broke";
+    let flag_id = LOOP_FLAG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let break_flag = format!("__broke_{flag_id}");
 
     // Declare and initialize the break flag
     let declare = Stmt::Assign {
-        name: BREAK_FLAG.to_string(),
+        name: break_flag.clone(),
         expr: Expr::Int(0),
         declaration: true,
     };
 
     let mut result = vec![declare];
-    result.extend(unroll_while_with_flag(condition, body, remaining, BREAK_FLAG));
+    result.extend(unroll_while_with_flag(condition, body, remaining, &break_flag));
     result
 }
 
@@ -1475,10 +1480,11 @@ pub fn unroll_for_with_next(
     step: Vec<Stmt>,
     remaining: usize,
 ) -> Vec<Stmt> {
-    static SKIP_FLAG: &str = "__skipped";
+    let flag_id = LOOP_FLAG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let skip_flag = format!("__skipped_{flag_id}");
 
     let declare = Stmt::Assign {
-        name: SKIP_FLAG.to_string(),
+        name: skip_flag.clone(),
         expr: Expr::Int(0),
         declaration: true,
     };
@@ -1486,21 +1492,21 @@ pub fn unroll_for_with_next(
     let has_last = contains_last(&body);
 
     if has_last {
-        static BREAK_FLAG: &str = "__broke";
+        let break_flag = format!("__broke_{flag_id}");
         let declare_broke = Stmt::Assign {
-            name: BREAK_FLAG.to_string(),
+            name: break_flag.clone(),
             expr: Expr::Int(0),
             declaration: true,
         };
         let mut result = vec![declare_broke, declare];
         result.extend(unroll_for_with_both_flags(
-            condition, body, step, remaining, BREAK_FLAG, SKIP_FLAG,
+            condition, body, step, remaining, &break_flag, &skip_flag,
         ));
         result
     } else {
         let mut result = vec![declare];
         result.extend(unroll_for_with_skip_flag(
-            condition, body, step, remaining, SKIP_FLAG,
+            condition, body, step, remaining, &skip_flag,
         ));
         result
     }
@@ -1643,18 +1649,19 @@ fn contains_next(stmts: &[Stmt]) -> bool {
 ///       }
 ///   }
 fn unroll_while_with_next(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
-    static SKIP_FLAG: &str = "__skipped";
+    let flag_id = LOOP_FLAG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let skip_flag = format!("__skipped_{flag_id}");
 
     // Declare the skip flag once before the loop
     let declare = Stmt::Assign {
-        name: SKIP_FLAG.to_string(),
+        name: skip_flag.clone(),
         expr: Expr::Int(0),
         declaration: true,
     };
 
     let mut result = vec![declare];
     result.extend(unroll_while_with_skip_flag(
-        condition, body, remaining, SKIP_FLAG,
+        condition, body, remaining, &skip_flag,
     ));
     result
 }
@@ -1701,24 +1708,25 @@ fn unroll_while_with_skip_flag(
 
 /// Unroll a while loop whose body contains both `last` and `next`.
 fn unroll_while_with_last_and_next(condition: Expr, body: Vec<Stmt>, remaining: usize) -> Vec<Stmt> {
-    static BREAK_FLAG: &str = "__broke";
-    static SKIP_FLAG: &str = "__skipped";
+    let flag_id = LOOP_FLAG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let break_flag = format!("__broke_{flag_id}");
+    let skip_flag = format!("__skipped_{flag_id}");
 
     // Declare both flags
     let declare_broke = Stmt::Assign {
-        name: BREAK_FLAG.to_string(),
+        name: break_flag.clone(),
         expr: Expr::Int(0),
         declaration: true,
     };
     let declare_skipped = Stmt::Assign {
-        name: SKIP_FLAG.to_string(),
+        name: skip_flag.clone(),
         expr: Expr::Int(0),
         declaration: true,
     };
 
     let mut result = vec![declare_broke, declare_skipped];
     result.extend(unroll_while_with_both_flags(
-        condition, body, remaining, BREAK_FLAG, SKIP_FLAG,
+        condition, body, remaining, &break_flag, &skip_flag,
     ));
     result
 }
