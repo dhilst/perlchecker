@@ -1382,19 +1382,22 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                if is_negative_literal(start) {
-                    return Err(TypeCheckError::NegativeSubstringArgument {
-                        function: function.to_string(),
-                        argument: "start",
-                    });
-                }
                 if is_negative_literal(len) {
                     return Err(TypeCheckError::NegativeSubstringArgument {
                         function: function.to_string(),
                         argument: "length",
                     });
                 }
-                if !is_proven_nonnegative(start, assumptions)
+                // Perl's substr allows negative start offsets (counting from end).
+                // For negative starts, verify |start| <= length(value).
+                // For non-negative starts, verify 0 <= start <= length(value).
+                if is_negative_literal(start) {
+                    if !is_neg_offset_in_bounds(start, value, assumptions) {
+                        return Err(TypeCheckError::UnsafeSubstringStart {
+                            function: function.to_string(),
+                        });
+                    }
+                } else if !is_proven_nonnegative(start, assumptions)
                     || !is_proven_leq_to_length(start, value, assumptions)
                 {
                     return Err(TypeCheckError::UnsafeSubstringStart {
@@ -2189,6 +2192,74 @@ fn is_desugared_substr_length(len: &Expr, value: &Expr, start: &Expr) -> bool {
     )
 }
 
+/// Check that a negative `start` offset is valid for substr: |start| <= length(value).
+/// For a negative literal -N, we check that the assumptions prove length(value) >= N.
+fn is_neg_offset_in_bounds(start: &Expr, value: &Expr, assumptions: &Assumptions) -> bool {
+    // Extract the absolute value of the negative literal.
+    let abs_val = match start {
+        Expr::Int(v) if *v < 0 => -v,
+        Expr::Unary {
+            op: UnaryOp::Neg,
+            expr,
+        } => match expr.as_ref() {
+            Expr::Int(v) if *v > 0 => *v,
+            _ => return false,
+        },
+        _ => return false,
+    };
+    // We need to prove length(value) >= abs_val from assumptions.
+    let length = length_expr(value.clone());
+    assumptions.iter().any(|assumption| {
+        assumption_implies_ge_int(&length, abs_val, assumption)
+    })
+}
+
+/// Check if an assumption implies `target >= min_val`.
+/// Handles assumptions like `target >= K` or `target > K` where K >= min_val (or K >= min_val - 1 for >).
+fn assumption_implies_ge_int(target: &Expr, min_val: i64, assumption: &Expr) -> bool {
+    match assumption {
+        Expr::Binary { left, op, right } => match op {
+            // left >= right: if left == target and right is Int(K) with K >= min_val
+            BinaryOp::Ge => {
+                if left.as_ref() == target {
+                    matches!(right.as_ref(), Expr::Int(k) if *k >= min_val)
+                } else if right.as_ref() == target {
+                    // right >= ... but this is `something >= target`, not what we want
+                    false
+                } else {
+                    false
+                }
+            }
+            // left > right: if left == target and right is Int(K) with K >= min_val - 1
+            BinaryOp::Gt => {
+                if left.as_ref() == target {
+                    matches!(right.as_ref(), Expr::Int(k) if *k >= min_val - 1)
+                } else {
+                    false
+                }
+            }
+            // left <= right: if right == target and left is Int(K) with K >= min_val
+            BinaryOp::Le => {
+                if right.as_ref() == target {
+                    matches!(left.as_ref(), Expr::Int(k) if *k >= min_val)
+                } else {
+                    false
+                }
+            }
+            // left < right: if right == target and left is Int(K) with K >= min_val - 1
+            BinaryOp::Lt => {
+                if right.as_ref() == target {
+                    matches!(left.as_ref(), Expr::Int(k) if *k >= min_val - 1)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 fn collection_element_type(
     function: &str,
     env: &TypeEnv,
@@ -2420,6 +2491,8 @@ mod tests {
 
     #[test]
     fn rejects_negative_substring_start() {
+        // Negative start without a precondition proving length >= |start|
+        // should be rejected as UnsafeSubstringStart.
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
@@ -2436,9 +2509,8 @@ mod tests {
 
         assert_eq!(
             error,
-            TypeCheckError::NegativeSubstringArgument {
+            TypeCheckError::UnsafeSubstringStart {
                 function: "foo".to_string(),
-                argument: "start",
             }
         );
     }

@@ -273,7 +273,7 @@ fn encode_int(expr: &IntExpr) -> Int {
         }
         IntExpr::BitNot(value) => {
             let bv = BV::from_int(&encode_int(value), 64);
-            bv.bvnot().to_int(false)
+            bv.bvnot().to_int(true)
         }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
@@ -415,7 +415,19 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         StrExpr::Var(name) => Z3String::new_const(name.clone()),
         StrExpr::Concat(left, right) => Z3String::concat(&[encode_str(left), encode_str(right)]),
         StrExpr::Substr(value, start, len) => {
-            encode_str(value).substr(encode_int(start), encode_int(len))
+            // Perl's substr() normalizes negative start offsets:
+            // substr($s, -N, L) == substr($s, length($s) - N, L).
+            // Z3's str.substr returns "" for negative start, so we must
+            // normalize: effective_start = if start >= 0 then start else length(value) + start
+            let encoded_value = encode_str(value);
+            let encoded_start = encode_int(start);
+            let encoded_len = encode_int(len);
+            let zero = Int::from_i64(0);
+            let effective_start = encoded_start.ge(&zero).ite(
+                &encoded_start,
+                &Int::add(&[&encoded_value.length(), &encoded_start]),
+            );
+            encoded_value.substr(effective_start, encoded_len)
         }
         StrExpr::Chr(value) => {
             // Perl's chr() always returns a 1-character string.  For negative
@@ -461,23 +473,43 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             fresh_var
         }
         StrExpr::Replace(string, from, to) => {
-            // Perl's replace is global (s///g): it replaces ALL occurrences.
-            // Z3's str.replace only replaces the first occurrence, which is
-            // unsound for inputs containing the pattern more than once.
+            // Perl's replace is global (s///g): it replaces ALL non-overlapping
+            // occurrences in a single left-to-right pass.
             //
-            // Fix: chain str.replace MAX_STR_LEN times to cover all possible
-            // occurrences in bounded strings.  With MAX_STR_LEN = 32, a
-            // single-character pattern can appear at most 32 times.  After
-            // all occurrences are replaced, subsequent calls are harmless
-            // no-ops (str.replace on a string not containing the pattern
-            // returns the string unchanged).
+            // The naive approach of chaining str.replace MAX_STR_LEN times is
+            // unsound when the replacement string contains the search pattern,
+            // causing cascading re-replacements (e.g., replace("ab","a","aa")
+            // would produce a string of length > 32 instead of correct "aab").
+            //
+            // Fix: two-phase replacement using a sentinel placeholder string of
+            // length MAX_STR_LEN+1.  Since all input strings are bounded to
+            // MAX_STR_LEN, neither the original string nor `from` nor `to` can
+            // contain the placeholder.  Phase 1 replaces all occurrences of
+            // `from` with the placeholder (no cascade since placeholder does not
+            // contain `from`).  Phase 2 replaces all placeholders with `to` (no
+            // cascade since placeholder length > MAX_STR_LEN means `to` cannot
+            // contain it).
             let ctx = &Context::thread_local();
+            let s = encode_str(string);
             let f = encode_str(from);
             let t = encode_str(to);
-            let mut current = encode_str(string);
+            // Build a placeholder: a string of (MAX_STR_LEN + 1) private-use-area
+            // characters (U+F8FF).  This cannot appear in any bounded input
+            // string of length <= MAX_STR_LEN.
+            let placeholder_chars: String = std::iter::repeat('\u{F8FF}').take((MAX_STR_LEN + 1) as usize).collect();
+            let placeholder = Z3String::from_str(&placeholder_chars).expect("placeholder literal");
+            // Phase 1: replace from -> placeholder (chain MAX_STR_LEN times)
+            let mut current = s;
             for _ in 0..MAX_STR_LEN {
                 current = unsafe {
-                    let args = [current.get_z3_ast(), f.get_z3_ast(), t.get_z3_ast()];
+                    let args = [current.get_z3_ast(), f.get_z3_ast(), placeholder.get_z3_ast()];
+                    Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
+                };
+            }
+            // Phase 2: replace placeholder -> to (chain MAX_STR_LEN times)
+            for _ in 0..MAX_STR_LEN {
+                current = unsafe {
+                    let args = [current.get_z3_ast(), placeholder.get_z3_ast(), t.get_z3_ast()];
                     Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
                 };
             }
