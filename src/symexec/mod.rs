@@ -1488,6 +1488,23 @@ fn eval_builtin(
     })
 }
 
+/// Normalize a potentially-negative array index to account for Perl semantics:
+/// `$arr[-1]` means `$arr[scalar(@arr) - 1]`.  We emit:
+///   ite(index < 0, len + index, index)
+/// where `len` is the companion `__len` variable for the array.
+fn normalize_array_index(array_base: &str, raw_index: IntExpr) -> IntExpr {
+    let len = IntExpr::Var(format!("{array_base}__len"));
+    IntExpr::Ite(
+        Box::new(BoolExpr::IntCmp(
+            CmpOp::Lt,
+            Box::new(raw_index.clone()),
+            Box::new(IntExpr::Const(0)),
+        )),
+        Box::new(IntExpr::Add(Box::new(len), Box::new(raw_index.clone()))),
+        Box::new(raw_index),
+    )
+}
+
 fn eval_access(
     function: &str,
     kind: AccessKind,
@@ -1496,14 +1513,24 @@ fn eval_access(
 ) -> std::result::Result<SymValue, SymExecError> {
     Ok(match kind {
         AccessKind::Array => match collection {
-            SymValue::ArrayInt(array) => SymValue::Int(IntExpr::ArraySelect(
-                Box::new(array),
-                Box::new(expect_int(index, function)?),
-            )),
-            SymValue::ArrayStr(array) => SymValue::Str(StrExpr::ArraySelect(
-                Box::new(array),
-                Box::new(expect_int(index, function)?),
-            )),
+            SymValue::ArrayInt(ref array) => {
+                let base = extract_array_int_base_name(&collection);
+                let raw_index = expect_int(index, function)?;
+                let normalized = normalize_array_index(&base, raw_index);
+                SymValue::Int(IntExpr::ArraySelect(
+                    Box::new(array.clone()),
+                    Box::new(normalized),
+                ))
+            }
+            SymValue::ArrayStr(ref array) => {
+                let base = extract_array_str_base_name(&collection);
+                let raw_index = expect_int(index, function)?;
+                let normalized = normalize_array_index(&base, raw_index);
+                SymValue::Str(StrExpr::ArraySelect(
+                    Box::new(array.clone()),
+                    Box::new(normalized),
+                ))
+            }
             _ => {
                 return Err(SymExecError::TypeMismatch {
                     function: function.to_string(),
@@ -1537,20 +1564,26 @@ fn eval_store(
 ) -> std::result::Result<SymValue, SymExecError> {
     Ok(match kind {
         AccessKind::Array => match (collection, value) {
-            (SymValue::ArrayInt(array), SymValue::Int(value)) => SymValue::ArrayInt(
-                ArrayIntExpr::Store(
+            (SymValue::ArrayInt(array), SymValue::Int(value)) => {
+                let base = extract_array_int_base_name(&SymValue::ArrayInt(array.clone()));
+                let raw_index = expect_int(index, function)?;
+                let normalized = normalize_array_index(&base, raw_index);
+                SymValue::ArrayInt(ArrayIntExpr::Store(
                     Box::new(array),
-                    Box::new(expect_int(index, function)?),
+                    Box::new(normalized),
                     Box::new(value),
-                ),
-            ),
-            (SymValue::ArrayStr(array), SymValue::Str(value)) => SymValue::ArrayStr(
-                ArrayStrExpr::Store(
+                ))
+            }
+            (SymValue::ArrayStr(array), SymValue::Str(value)) => {
+                let base = extract_array_str_base_name(&SymValue::ArrayStr(array.clone()));
+                let raw_index = expect_int(index, function)?;
+                let normalized = normalize_array_index(&base, raw_index);
+                SymValue::ArrayStr(ArrayStrExpr::Store(
                     Box::new(array),
-                    Box::new(expect_int(index, function)?),
+                    Box::new(normalized),
                     Box::new(value),
-                ),
-            ),
+                ))
+            }
             _ => {
                 return Err(SymExecError::TypeMismatch {
                     function: function.to_string(),
