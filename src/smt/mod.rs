@@ -762,11 +762,18 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Add(left, right)
         | IntExpr::Sub(left, right)
         | IntExpr::Mul(left, right)
-        | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+        }
+        IntExpr::Pow(left, right) => {
+            // Soundness: Perl's ** with a negative exponent produces a float
+            // (e.g. 2**-1 = 0.5), which breaks our integer-only model.
+            // Discard paths where the exponent is negative.
+            let r = encode_int(right);
+            let exp_nonneg = r.ge(0);
+            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &exp_nonneg])
         }
         IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
             // Soundness: Z3's int2bv wraps mod 2^64, but Perl's NV-to-UV
