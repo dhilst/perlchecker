@@ -7,7 +7,7 @@ use z3::{
     Params,
     Sort,
     Solver,
-    ast::{Ast as _, Array, BV, Bool, Int, String as Z3String},
+    ast::{Ast as _, Array, BV, Bool, Int, Real, String as Z3String},
 };
 
 use crate::{
@@ -209,7 +209,15 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::Sub(left, right) => Int::sub(&[&encode_int(left), &encode_int(right)]),
         IntExpr::Mul(left, right) => Int::mul(&[&encode_int(left), &encode_int(right)]),
         IntExpr::Pow(left, right) => {
-            encode_int(left).power(&encode_int(right)).to_int()
+            // Int::power returns Real. Convert back to Int using truncation
+            // toward zero (matching Perl's behavior), NOT floor.
+            // floor(-0.5) = -1, but Perl truncates -0.5 to 0.
+            let real_result = encode_int(left).power(&encode_int(right));
+            let zero_real = Real::from_rational(0, 1);
+            let is_nonneg = real_result.ge(&zero_real);
+            let floor_val = real_result.to_int();
+            let neg_floor = real_result.unary_minus().to_int();
+            is_nonneg.ite(&floor_val, &neg_floor.unary_minus())
         }
         IntExpr::Div(left, right) => {
             encode_truncating_division(&encode_int(left), &encode_int(right))
