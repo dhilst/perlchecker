@@ -274,10 +274,17 @@ fn encode_int(expr: &IntExpr) -> Int {
             is_nonnegative.ite(&encoded, &encoded.unary_minus())
         }
         IntExpr::Ord(value) => {
+            // Perl's ord($s) returns the code point of the FIRST character.
+            // Z3's str.to_code returns -1 for strings of length != 1.
+            // Fix: extract the first character with str.at($s, 0), then
+            // apply str.to_code to that single-character string.
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
+            let first_char = unsafe {
+                Z3String::wrap(ctx, z3_sys::Z3_mk_seq_at(ctx.get_z3_context(), encoded.get_z3_ast(), Int::from_i64(0).get_z3_ast()).unwrap())
+            };
             unsafe {
-                Int::wrap(ctx, z3_sys::Z3_mk_string_to_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
+                Int::wrap(ctx, z3_sys::Z3_mk_string_to_code(ctx.get_z3_context(), first_char.get_z3_ast()).unwrap())
             }
         }
         IntExpr::StrToInt(value) => {
