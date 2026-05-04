@@ -556,12 +556,32 @@ impl<'a> SsaBuilder<'a> {
                 prefix.push(SsaStmt::Assign(new_len_name.clone(), decrement));
                 self.len_companions.insert(array.clone(), new_len_name.clone());
 
-                // The popped value is at index new_len (i.e., the last element)
-                SsaExpr::Access {
+                // The popped value is at index new_len (i.e., the last element).
+                // Capture it into a temp before invalidating the slot.
+                let pop_val_name = self.fresh_name(&format!("{array}__pop"));
+                let access_expr = SsaExpr::Access {
+                    kind: AccessKind::Array,
+                    collection: Box::new(SsaExpr::Var(collection_name.clone())),
+                    index: Box::new(SsaExpr::Var(new_len_name.clone())),
+                };
+                prefix.push(SsaStmt::Assign(pop_val_name.clone(), access_expr));
+
+                // Invalidate the popped slot by storing a fresh unconstrained value.
+                // This prevents unsound reads at indices >= scalar(@arr).
+                let ghost_name = self.fresh_name(&format!("{array}__ghost"));
+                prefix.push(SsaStmt::Assign(ghost_name.clone(), SsaExpr::FreshVar(ghost_name.clone())));
+                let invalidation_store = SsaExpr::Store {
                     kind: AccessKind::Array,
                     collection: Box::new(SsaExpr::Var(collection_name)),
                     index: Box::new(SsaExpr::Var(new_len_name)),
-                }
+                    value: Box::new(SsaExpr::Var(ghost_name)),
+                };
+                let new_arr_name = self.fresh_name(array);
+                prefix.push(SsaStmt::Assign(new_arr_name.clone(), invalidation_store));
+                env.insert(array.clone(), new_arr_name);
+
+                // Return the captured pop value
+                SsaExpr::Var(pop_val_name)
             }
             Expr::Ref(_target) | Expr::RefArray(_target) | Expr::RefHash(_target) => {
                 // Reference creation is handled at the Stmt::Assign level.
