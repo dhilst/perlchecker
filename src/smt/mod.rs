@@ -249,6 +249,15 @@ fn encode_int(expr: &IntExpr) -> Int {
         }
         IntExpr::Shl(left, right) => {
             // Perl: x << -n  is equivalent to  x >> n
+            //
+            // Soundness: shift amounts >= 64 always yield 0 in Perl.
+            // Z3's bvshl already returns 0 for shifts in [64, 2^64-1],
+            // but shift amounts >= 2^64 would wrap via int2bv. We guard
+            // the final result: if abs(amount) >= 64, result is 0.
+            //
+            // Left-operand overflow (value >= 2^64) is handled via a
+            // safety constraint (see encode_int_safety) that blocks
+            // verification when int2bv would produce unsound wrapping.
             let l = encode_int(left);
             let r = encode_int(right);
             let l_bv = BV::from_int(&l, 64);
@@ -257,10 +266,15 @@ fn encode_int(expr: &IntExpr) -> Int {
             let r_bv = BV::from_int(&r_abs, 64);
             let shl_result = l_bv.bvshl(&r_bv).to_int(false);
             let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
-            r_nonneg.ite(&shl_result, &shr_result)
+            let normal_result = r_nonneg.ite(&shl_result, &shr_result);
+            // Guard: shift amounts >= 64 always yield 0
+            let sixty_four = Int::from_i64(64);
+            let r_too_large = r_abs.ge(&sixty_four);
+            r_too_large.ite(&Int::from_i64(0), &normal_result)
         }
         IntExpr::Shr(left, right) => {
             // Perl: x >> -n  is equivalent to  x << n
+            // Same shift-amount guarding as Shl (see comments above).
             let l = encode_int(left);
             let r = encode_int(right);
             let l_bv = BV::from_int(&l, 64);
@@ -269,7 +283,11 @@ fn encode_int(expr: &IntExpr) -> Int {
             let r_bv = BV::from_int(&r_abs, 64);
             let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
             let shl_result = l_bv.bvshl(&r_bv).to_int(false);
-            r_nonneg.ite(&shr_result, &shl_result)
+            let normal_result = r_nonneg.ite(&shr_result, &shl_result);
+            // Guard: shift amounts >= 64 always yield 0
+            let sixty_four = Int::from_i64(64);
+            let r_too_large = r_abs.ge(&sixty_four);
+            r_too_large.ite(&Int::from_i64(0), &normal_result)
         }
         IntExpr::BitNot(value) => {
             // ~x == -x - 1 in two's complement (algebraic identity).
@@ -747,10 +765,18 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         | IntExpr::Pow(left, right)
         | IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
-        | IntExpr::BitXor(left, right)
-        | IntExpr::Shl(left, right)
-        | IntExpr::Shr(left, right) => {
+        | IntExpr::BitXor(left, right) => {
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+        }
+        IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
+            // Soundness: Z3's int2bv wraps mod 2^64, but Perl's NV-to-UV
+            // conversion saturates at UINT64_MAX for values >= 2^64.
+            // Assert the left operand is < 2^64 to prevent unsound wrapping.
+            let l = encode_int(left);
+            let uint64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
+            let two_pow_64 = Int::add(&[&uint64_max, &Int::from_i64(1)]);
+            let l_in_range = l.lt(&two_pow_64);
+            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &l_in_range])
         }
         IntExpr::Div(left, right) | IntExpr::Mod(left, right) => Bool::and(&[
             &encode_int_safety(left),
