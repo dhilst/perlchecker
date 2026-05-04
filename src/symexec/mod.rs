@@ -775,24 +775,13 @@ fn execute_call(
         })?;
 
     let mut env = BTreeMap::new();
-    let mut annotation_env = BTreeMap::new();
-    for ((param, arg_type), arg_value) in cfg
+    for ((param, _arg_type), arg_value) in cfg
         .params
         .iter()
         .zip(spec.arg_types.iter())
         .zip(args.into_iter())
     {
-        env.insert(param.ssa_name.clone(), arg_value.clone());
-        annotation_env.insert(param.source.clone(), arg_value.clone());
-
-        // For array parameters, add companion length variables
-        match arg_type {
-            Type::ArrayInt | Type::ArrayStr => {
-                let len_var = format!("{}__len", param.source);
-                annotation_env.insert(len_var.clone(), SymValue::Int(IntExpr::Var(len_var)));
-            }
-            _ => {}
-        }
+        env.insert(param.ssa_name.clone(), arg_value);
     }
     // NOTE: We do NOT assume the callee's precondition here. Since we are
     // inlining the callee's body, the body's actual behavior determines the
