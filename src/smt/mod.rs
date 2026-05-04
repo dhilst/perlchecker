@@ -797,11 +797,14 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             Bool::and(&[&encode_str_safety(string), &encode_str_safety(suffix)])
         }
         IntExpr::Chomp(value) => encode_str_safety(value),
-        IntExpr::Ite(cond, then_int, else_int) => Bool::and(&[
-            &encode_bool_safety(cond),
-            &encode_int_safety(then_int),
-            &encode_int_safety(else_int),
-        ]),
+        IntExpr::Ite(cond, then_int, else_int) => {
+            let cond_encoded = encode_bool(cond);
+            // Safety of each branch is conditional on the condition:
+            // cond => safety(then), NOT cond => safety(else)
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_int_safety(then_int)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_int_safety(else_int)]);
+            Bool::and(&[&encode_bool_safety(cond), &then_safe, &else_safe])
+        }
         IntExpr::Length(value) => encode_str_safety(value),
         IntExpr::Index(haystack, needle, start) => {
             Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle), &encode_int_safety(start)])
@@ -840,11 +843,14 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
             &encode_str_safety(string),
             &encode_int_safety(index),
         ]),
-        StrExpr::Ite(cond, then_str, else_str) => Bool::and(&[
-            &encode_bool_safety(cond),
-            &encode_str_safety(then_str),
-            &encode_str_safety(else_str),
-        ]),
+        StrExpr::Ite(cond, then_str, else_str) => {
+            let cond_encoded = encode_bool(cond);
+            // Safety of each branch is conditional on the condition:
+            // cond => safety(then), NOT cond => safety(else)
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_str_safety(then_str)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_str_safety(else_str)]);
+            Bool::and(&[&encode_bool_safety(cond), &then_safe, &else_safe])
+        }
         StrExpr::ArraySelect(array, index) => Bool::and(&[
             &encode_array_str_safety(array),
             &encode_int_safety(index),
