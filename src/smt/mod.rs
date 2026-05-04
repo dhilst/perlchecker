@@ -559,17 +559,31 @@ fn encode_index_of(haystack: &Z3String, needle: &Z3String, start: &Int) -> Int {
     //
     // Perl treats negative start positions as 0; Z3's str.indexof returns
     // -1 for negative offsets.  Clamp start to max(start, 0).
+    //
+    // Empty-needle fix: In Perl, index($s, "", $pos) returns
+    // min($pos, length($s)) — the empty string is always "found".
+    // Z3's str.indexof(s, "", pos) returns -1 when pos > length(s),
+    // which diverges from Perl.  Guard: when needle is empty, return
+    // min(clamped_start, length(haystack)).
     let ctx = &Context::thread_local();
     let zero = Int::from_i64(0);
     let clamped_start = start.ge(0).ite(start, &zero);
-    unsafe {
+    let z3_result = unsafe {
         Int::wrap(ctx, z3_sys::Z3_mk_seq_index(
             ctx.get_z3_context(),
             haystack.get_z3_ast(),
             needle.get_z3_ast(),
             clamped_start.get_z3_ast(),
         ).unwrap())
-    }
+    };
+    // Detect empty needle: length(needle) == 0
+    let needle_is_empty = needle.length().eq(Int::from_i64(0));
+    // Perl result for empty needle: min(clamped_start, length(haystack))
+    let hay_len = haystack.length();
+    let start_le_len = clamped_start.le(&hay_len);
+    let empty_needle_result = start_le_len.ite(&clamped_start, &hay_len);
+    // Use the Perl-correct result when needle is empty
+    needle_is_empty.ite(&empty_needle_result, &z3_result)
 }
 
 fn encode_truncating_division(left: &Int, right: &Int) -> Int {
