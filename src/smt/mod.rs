@@ -293,11 +293,42 @@ fn encode_int(expr: &IntExpr) -> Int {
             is_empty.ite(&Int::from_i64(0), &code_point)
         }
         IntExpr::StrToInt(value) => {
+            // Perl's int($s) extracts the leading integer from a string.
+            // Z3's str.to_int only handles non-negative digit strings and
+            // returns -1 for anything else — including strings like "-5".
+            //
+            // Fix: detect a leading '-' sign, apply str.to_int to the tail,
+            // and negate the result. This makes int("" . $n) a correct
+            // round-trip for negative integers.
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
-            unsafe {
-                Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
-            }
+            let minus_sign = Z3String::from_str("-").expect("minus literal");
+            let one = Int::from_i64(1);
+            // Does the string start with '-'?
+            let starts_with_minus = unsafe {
+                Bool::wrap(ctx, z3_sys::Z3_mk_seq_prefix(
+                    ctx.get_z3_context(),
+                    minus_sign.get_z3_ast(),
+                    encoded.get_z3_ast(),
+                ).unwrap())
+            };
+            // Positive path: str.to_int on the whole string
+            let pos_val = unsafe {
+                Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
+                    ctx.get_z3_context(),
+                    encoded.get_z3_ast(),
+                ).unwrap())
+            };
+            // Negative path: strip the leading '-', str.to_int on the rest, negate
+            let tail = encoded.substr(one, encoded.length());
+            let tail_val = unsafe {
+                Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
+                    ctx.get_z3_context(),
+                    tail.get_z3_ast(),
+                ).unwrap())
+            };
+            let neg_val = tail_val.unary_minus();
+            starts_with_minus.ite(&neg_val, &pos_val)
         }
         IntExpr::Contains(haystack, needle) => {
             let ctx = &Context::thread_local();
