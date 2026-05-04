@@ -426,6 +426,59 @@ impl<'a> SsaBuilder<'a> {
                     // defined() on a non-variable expression: always defined
                     return Ok(SsaExpr::Int(1));
                 }
+                // Chomp side-effect: chomp($var) modifies $var in place by
+                // removing a trailing newline. We desugar it to:
+                //   $var = ends_with($var, "\n") ? substr($var, 0, length($var)-1) : $var
+                //   chomp_result = ends_with($var_old, "\n") ? 1 : 0
+                if *function == crate::ast::Builtin::Chomp {
+                    if let Some(Expr::Variable(var_name)) = args.first() {
+                        let old_ssa = env.get(var_name).cloned().ok_or_else(|| IrError::UnknownVariable {
+                            function: self.function.to_string(),
+                            variable: var_name.clone(),
+                        })?;
+                        let old_var = SsaExpr::Var(old_ssa);
+                        // ends_with($var, "\n") — returns 1 or 0
+                        let has_newline = SsaExpr::Builtin {
+                            function: crate::ast::Builtin::EndsWith,
+                            args: vec![old_var.clone(), SsaExpr::String("\n".to_string())],
+                        };
+                        // Convert to Bool for ITE condition: ends_with(...) > 0
+                        let condition = SsaExpr::Binary {
+                            left: Box::new(has_newline),
+                            op: BinaryOp::Gt,
+                            right: Box::new(SsaExpr::Int(0)),
+                        };
+                        // substr($var, 0, length($var) - 1)
+                        let var_len = SsaExpr::Builtin {
+                            function: crate::ast::Builtin::Length,
+                            args: vec![old_var.clone()],
+                        };
+                        let len_minus_one = SsaExpr::Binary {
+                            left: Box::new(var_len),
+                            op: BinaryOp::Sub,
+                            right: Box::new(SsaExpr::Int(1)),
+                        };
+                        let chomped = SsaExpr::Builtin {
+                            function: crate::ast::Builtin::Substr,
+                            args: vec![old_var.clone(), SsaExpr::Int(0), len_minus_one],
+                        };
+                        // $var_new = has_newline ? chomped : $var
+                        let new_value = SsaExpr::Ite {
+                            condition: Box::new(condition.clone()),
+                            then_expr: Box::new(chomped),
+                            else_expr: Box::new(old_var),
+                        };
+                        let new_ssa = self.fresh_name(var_name);
+                        prefix.push(SsaStmt::Assign(new_ssa.clone(), new_value));
+                        env.insert(var_name.clone(), new_ssa);
+                        // Return the count (1 if newline was removed, 0 otherwise)
+                        return Ok(SsaExpr::Ite {
+                            condition: Box::new(condition),
+                            then_expr: Box::new(SsaExpr::Int(1)),
+                            else_expr: Box::new(SsaExpr::Int(0)),
+                        });
+                    }
+                }
                 SsaExpr::Builtin {
                     function: *function,
                     args: args
