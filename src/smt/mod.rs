@@ -364,10 +364,21 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             encode_str(value).substr(encode_int(start), encode_int(len))
         }
         StrExpr::Chr(value) => {
+            // Perl's chr() always returns a 1-character string.  For negative
+            // code points it returns U+FFFD (replacement character, code 65533).
+            // Z3's str.from_code returns "" for values < 0 or > 196607, which
+            // would make length(chr(x)) == 0 satisfiable — unsound.
+            //
+            // Fix: clamp out-of-range inputs to 65533 before calling from_code.
             let ctx = &Context::thread_local();
             let encoded = encode_int(value);
+            let replacement = Int::from_i64(65533); // U+FFFD
+            let max_code = Int::from_i64(196607);   // Z3 seq max code point
+            let zero = Int::from_i64(0);
+            let in_range = Bool::and(&[&encoded.ge(&zero), &encoded.le(&max_code)]);
+            let clamped = in_range.ite(&encoded, &replacement);
             unsafe {
-                Z3String::wrap(ctx, z3_sys::Z3_mk_string_from_code(ctx.get_z3_context(), encoded.get_z3_ast()).unwrap())
+                Z3String::wrap(ctx, z3_sys::Z3_mk_string_from_code(ctx.get_z3_context(), clamped.get_z3_ast()).unwrap())
             }
         }
         StrExpr::FromInt(value) => {
