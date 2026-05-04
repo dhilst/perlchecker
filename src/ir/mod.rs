@@ -556,12 +556,21 @@ impl<'a> SsaBuilder<'a> {
                     init_name
                 };
 
-                // Emit: new_len = old_len - 1
+                // Emit: new_len = ite(old_len > 0, old_len - 1, 0)
+                // Guards against negative length when popping an empty array.
                 let new_len_name = self.fresh_name(&len_base);
-                let decrement = SsaExpr::Binary {
-                    left: Box::new(SsaExpr::Var(len_ssa)),
-                    op: BinaryOp::Sub,
-                    right: Box::new(SsaExpr::Int(1)),
+                let decrement = SsaExpr::Ite {
+                    condition: Box::new(SsaExpr::Binary {
+                        left: Box::new(SsaExpr::Var(len_ssa.clone())),
+                        op: BinaryOp::Gt,
+                        right: Box::new(SsaExpr::Int(0)),
+                    }),
+                    then_expr: Box::new(SsaExpr::Binary {
+                        left: Box::new(SsaExpr::Var(len_ssa.clone())),
+                        op: BinaryOp::Sub,
+                        right: Box::new(SsaExpr::Int(1)),
+                    }),
+                    else_expr: Box::new(SsaExpr::Int(0)),
                 };
                 prefix.push(SsaStmt::Assign(new_len_name.clone(), decrement));
                 self.len_companions.insert(array.clone(), new_len_name.clone());
@@ -583,15 +592,24 @@ impl<'a> SsaBuilder<'a> {
                 let invalidation_store = SsaExpr::Store {
                     kind: AccessKind::Array,
                     collection: Box::new(SsaExpr::Var(collection_name)),
-                    index: Box::new(SsaExpr::Var(new_len_name)),
+                    index: Box::new(SsaExpr::Var(new_len_name.clone())),
                     value: Box::new(SsaExpr::Var(ghost_name)),
                 };
                 let new_arr_name = self.fresh_name(array);
                 prefix.push(SsaStmt::Assign(new_arr_name.clone(), invalidation_store));
                 env.insert(array.clone(), new_arr_name);
 
-                // Return the captured pop value
-                SsaExpr::Var(pop_val_name)
+                // Return: ite(old_len > 0, pop_val, 0)
+                // In Perl, pop on empty array returns undef (0 in numeric context).
+                SsaExpr::Ite {
+                    condition: Box::new(SsaExpr::Binary {
+                        left: Box::new(SsaExpr::Var(len_ssa)),
+                        op: BinaryOp::Gt,
+                        right: Box::new(SsaExpr::Int(0)),
+                    }),
+                    then_expr: Box::new(SsaExpr::Var(pop_val_name)),
+                    else_expr: Box::new(SsaExpr::Int(0)),
+                }
             }
             Expr::Ref(_target) | Expr::RefArray(_target) | Expr::RefHash(_target) => {
                 // Reference creation is handled at the Stmt::Assign level.
