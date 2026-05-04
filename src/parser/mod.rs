@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use pest::{Parser, iterators::Pair, pratt_parser::PrattParser};
 use pest_derive::Parser;
 use thiserror::Error;
@@ -7,6 +9,10 @@ use crate::{
     ast::{AccessKind, BinaryOp, Builtin, Expr, FunctionAst, Stmt, UnaryOp},
     extractor::ExtractedFunction,
 };
+
+/// Counter to generate unique foreach index variable names, preventing
+/// nested foreach loops from clobbering each other's iteration index.
+static FOREACH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Parser)]
 #[grammar = "parser/perl_subset.pest"]
@@ -1110,7 +1116,8 @@ fn parse_foreach(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotation
     //     $__foreach_i = $__foreach_i + 1;
     // }
 
-    let idx = "__foreach_i".to_string();
+    let foreach_id = FOREACH_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let idx = format!("__foreach_i_{foreach_id}");
 
     // Init: my $__foreach_i = 0;
     let init = Stmt::Assign {
