@@ -14,8 +14,8 @@ use crate::{
     ast::Type,
     limits::DEFAULT_SOLVER_TIMEOUT_MS,
     symexec::{
-        ArrayIntExpr, ArrayStrExpr, BoolExpr, HashIntExpr, HashStrExpr, IntExpr, ModelValue,
-        StrExpr,
+        ArrayIntExpr, ArrayStrExpr, BoolExpr, CmpOp, HashIntExpr, HashStrExpr, IntExpr,
+        ModelValue, StrExpr,
     },
 };
 
@@ -189,9 +189,80 @@ fn assert_reverse_axioms(solver: &Solver) {
 }
 
 fn assert_string_bounds(solver: &Solver, condition: &BoolExpr) {
+    let user_bounds = extract_length_bounds_from_bool(condition);
     for variable in collect_string_vars_from_bool(condition) {
+        let bound = user_bounds
+            .get(&variable)
+            .copied()
+            .map(|ub| ub.max(MAX_STR_LEN))
+            .unwrap_or(MAX_STR_LEN);
         let symbol = Z3String::new_const(variable);
-        solver.assert(&symbol.length().le(MAX_STR_LEN));
+        solver.assert(&symbol.length().le(bound));
+    }
+}
+
+/// Extract explicit upper bounds on string lengths from the condition.
+/// Looks for patterns like `length(Var(name)) <= N` (and symmetric forms)
+/// within conjunctions to find user-specified length constraints.
+fn extract_length_bounds_from_bool(expr: &BoolExpr) -> BTreeMap<String, i64> {
+    let mut bounds = BTreeMap::new();
+    extract_length_bounds_inner(expr, &mut bounds);
+    bounds
+}
+
+fn extract_length_bounds_inner(expr: &BoolExpr, bounds: &mut BTreeMap<String, i64>) {
+    match expr {
+        BoolExpr::And(left, right) => {
+            extract_length_bounds_inner(left, bounds);
+            extract_length_bounds_inner(right, bounds);
+        }
+        BoolExpr::IntCmp(op, left, right) => {
+            // Check for: Length(Var(name)) <op> Const(n)
+            if let Some((name, bound)) = extract_length_upper_bound(op, left, right) {
+                let entry = bounds.entry(name).or_insert(0);
+                if bound > *entry {
+                    *entry = bound;
+                }
+            }
+            // Check symmetric: Const(n) <op> Length(Var(name))
+            if let Some(flipped) = flip_cmp_op(op) {
+                if let Some((name, bound)) = extract_length_upper_bound(&flipped, right, left) {
+                    let entry = bounds.entry(name).or_insert(0);
+                    if bound > *entry {
+                        *entry = bound;
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn extract_length_upper_bound(op: &CmpOp, left: &IntExpr, right: &IntExpr) -> Option<(String, i64)> {
+    // Pattern: Length(Var(name)) <= Const(n) or Length(Var(name)) < Const(n)
+    if let IntExpr::Length(str_expr) = left {
+        if let StrExpr::Var(name) = str_expr.as_ref() {
+            if let IntExpr::Const(n) = right {
+                match op {
+                    CmpOp::Le => return Some((name.clone(), *n)),
+                    CmpOp::Lt => return Some((name.clone(), *n - 1)),
+                    CmpOp::Eq => return Some((name.clone(), *n)),
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
+fn flip_cmp_op(op: &CmpOp) -> Option<CmpOp> {
+    match op {
+        CmpOp::Lt => Some(CmpOp::Gt),
+        CmpOp::Le => Some(CmpOp::Ge),
+        CmpOp::Gt => Some(CmpOp::Lt),
+        CmpOp::Ge => Some(CmpOp::Le),
+        CmpOp::Eq => Some(CmpOp::Eq),
+        CmpOp::Ne => Some(CmpOp::Ne),
     }
 }
 
