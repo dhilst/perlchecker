@@ -233,14 +233,28 @@ fn encode_int(expr: &IntExpr) -> Int {
             l_bv.bvxor(&r_bv).to_int(false)
         }
         IntExpr::Shl(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 64);
-            let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvshl(&r_bv).to_int(false)
+            // Perl: x << -n  is equivalent to  x >> n
+            let l = encode_int(left);
+            let r = encode_int(right);
+            let l_bv = BV::from_int(&l, 64);
+            let r_nonneg = r.ge(0);
+            let r_abs = r_nonneg.ite(&r, &r.unary_minus());
+            let r_bv = BV::from_int(&r_abs, 64);
+            let shl_result = l_bv.bvshl(&r_bv).to_int(false);
+            let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
+            r_nonneg.ite(&shl_result, &shr_result)
         }
         IntExpr::Shr(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 64);
-            let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvlshr(&r_bv).to_int(false)
+            // Perl: x >> -n  is equivalent to  x << n
+            let l = encode_int(left);
+            let r = encode_int(right);
+            let l_bv = BV::from_int(&l, 64);
+            let r_nonneg = r.ge(0);
+            let r_abs = r_nonneg.ite(&r, &r.unary_minus());
+            let r_bv = BV::from_int(&r_abs, 64);
+            let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
+            let shl_result = l_bv.bvshl(&r_bv).to_int(false);
+            r_nonneg.ite(&shr_result, &shl_result)
         }
         IntExpr::BitNot(value) => {
             let bv = BV::from_int(&encode_int(value), 64);
