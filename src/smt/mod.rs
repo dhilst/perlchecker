@@ -214,7 +214,9 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::Div(left, right) => {
             encode_truncating_division(&encode_int(left), &encode_int(right))
         }
-        IntExpr::Mod(left, right) => encode_int(left).rem(&encode_int(right)),
+        IntExpr::Mod(left, right) => {
+            encode_perl_modulo(&encode_int(left), &encode_int(right))
+        }
         IntExpr::BitAnd(left, right) => {
             let l_bv = BV::from_int(&encode_int(left), 64);
             let r_bv = BV::from_int(&encode_int(right), 64);
@@ -462,6 +464,32 @@ fn encode_truncating_division(left: &Int, right: &Int) -> Int {
     left_nonnegative
         .iff(&right_nonnegative)
         .ite(&magnitude, &magnitude.unary_minus())
+}
+
+/// Encode Perl's `%` operator (floor-modulo).
+///
+/// Perl's modulo follows floor division: the result has the same sign as
+/// the divisor. This differs from both Z3's `rem` (which uses Euclidean
+/// semantics) and C's `%` (which follows truncated division).
+///
+/// Implementation: compute truncated remainder, then adjust when the
+/// remainder and divisor have different signs.
+///   trunc_rem = a - b * trunc_div(a, b)
+///   perl_mod  = if (trunc_rem != 0 && sign(trunc_rem) != sign(b))
+///               then trunc_rem + b
+///               else trunc_rem
+fn encode_perl_modulo(left: &Int, right: &Int) -> Int {
+    let trunc_div = encode_truncating_division(left, right);
+    let trunc_rem = Int::sub(&[left, &Int::mul(&[right, &trunc_div])]);
+    let zero = Int::from_i64(0);
+    let rem_nonzero = trunc_rem.eq(&zero).not();
+    // Signs differ when exactly one is negative
+    let rem_nonneg = trunc_rem.ge(0);
+    let right_nonneg = right.ge(0);
+    let signs_differ = rem_nonneg.iff(&right_nonneg).not();
+    let needs_adjust = Bool::and(&[&rem_nonzero, &signs_differ]);
+    let adjusted = Int::add(&[&trunc_rem, right]);
+    needs_adjust.ite(&adjusted, &trunc_rem)
 }
 
 fn encode_bool(expr: &BoolExpr) -> Bool {
@@ -886,5 +914,43 @@ mod tests {
         );
 
         assert!(is_satisfiable("foo", &condition).unwrap());
+    }
+
+    #[test]
+    fn perl_modulo_matches_all_sign_combinations() {
+        // Verify encode_perl_modulo matches Perl's % for all sign combinations
+        let cases: &[(i64, i64, i64)] = &[
+            // (a, b, expected_perl_mod)
+            (7, 3, 1),
+            (-7, 3, 2),
+            (7, -3, -2),
+            (-7, -3, -1),
+            (10, 3, 1),
+            (-10, 3, 2),
+            (10, -3, -2),
+            (-10, -3, -1),
+            (1, 5, 1),
+            (-1, 5, 4),
+            (1, -5, -4),
+            (-1, -5, -1),
+        ];
+
+        for &(a, b, perl_expected) in cases {
+            let condition = BoolExpr::IntCmp(
+                CmpOp::Eq,
+                Box::new(IntExpr::Mod(
+                    Box::new(IntExpr::Const(a)),
+                    Box::new(IntExpr::Const(b)),
+                )),
+                Box::new(IntExpr::Const(perl_expected)),
+            );
+            assert!(
+                is_satisfiable("foo", &condition).unwrap(),
+                "encode_perl_modulo({}, {}) should equal {} (Perl's %)",
+                a,
+                b,
+                perl_expected
+            );
+        }
     }
 }
