@@ -190,12 +190,16 @@ fn assert_reverse_axioms(solver: &Solver) {
 
 fn assert_string_bounds(solver: &Solver, condition: &BoolExpr) {
     let user_bounds = extract_length_bounds_from_bool(condition);
+    // Soundness: the bound must be at least as large as the longest string
+    // constant in the formula.  Otherwise the solver cannot construct inputs
+    // that match those constants, causing false "verified" results.
+    let min_bound = max_string_const_len_bool(condition).max(MAX_STR_LEN);
     for variable in collect_string_vars_from_bool(condition) {
         let bound = user_bounds
             .get(&variable)
             .copied()
-            .map(|ub| ub.max(MAX_STR_LEN))
-            .unwrap_or(MAX_STR_LEN);
+            .map(|ub| ub.max(min_bound))
+            .unwrap_or(min_bound);
         let symbol = Z3String::new_const(variable);
         solver.assert(&symbol.length().le(bound));
     }
@@ -1097,6 +1101,91 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
         }
         StrExpr::ArraySelect(_, index) => collect_string_vars_from_int(index, vars),
         StrExpr::HashSelect(_, key) => collect_string_vars_from_str(key, vars),
+    }
+}
+
+/// Find the maximum length of any string constant appearing in a BoolExpr tree.
+/// Used to ensure variable bounds are at least as large as any constant they
+/// might need to equal, preventing false "verified" results.
+fn max_string_const_len_bool(expr: &BoolExpr) -> i64 {
+    match expr {
+        BoolExpr::Const(_) => 0,
+        BoolExpr::Not(inner) => max_string_const_len_bool(inner),
+        BoolExpr::And(left, right) | BoolExpr::Or(left, right) => {
+            max_string_const_len_bool(left).max(max_string_const_len_bool(right))
+        }
+        BoolExpr::IntCmp(_, left, right) => {
+            max_string_const_len_int(left).max(max_string_const_len_int(right))
+        }
+        BoolExpr::StrEq(left, right) | BoolExpr::StrCmp(_, left, right) => {
+            max_string_const_len_str(left).max(max_string_const_len_str(right))
+        }
+    }
+}
+
+fn max_string_const_len_int(expr: &IntExpr) -> i64 {
+    match expr {
+        IntExpr::Const(_) | IntExpr::Var(_) => 0,
+        IntExpr::Add(l, r)
+        | IntExpr::Sub(l, r)
+        | IntExpr::Mul(l, r)
+        | IntExpr::Div(l, r)
+        | IntExpr::Mod(l, r)
+        | IntExpr::Pow(l, r)
+        | IntExpr::BitAnd(l, r)
+        | IntExpr::BitOr(l, r)
+        | IntExpr::BitXor(l, r)
+        | IntExpr::Shl(l, r)
+        | IntExpr::Shr(l, r) => max_string_const_len_int(l).max(max_string_const_len_int(r)),
+        IntExpr::BitNot(v) | IntExpr::Abs(v) => max_string_const_len_int(v),
+        IntExpr::StrToInt(v) => max_string_const_len_str(v),
+        IntExpr::Contains(h, n) => max_string_const_len_str(h).max(max_string_const_len_str(n)),
+        IntExpr::StartsWith(s, p) => max_string_const_len_str(s).max(max_string_const_len_str(p)),
+        IntExpr::EndsWith(s, sfx) => max_string_const_len_str(s).max(max_string_const_len_str(sfx)),
+        IntExpr::Ord(v) | IntExpr::Chomp(v) => max_string_const_len_str(v),
+        IntExpr::Ite(c, t, e) => {
+            max_string_const_len_bool(c)
+                .max(max_string_const_len_int(t))
+                .max(max_string_const_len_int(e))
+        }
+        IntExpr::Length(v) => max_string_const_len_str(v),
+        IntExpr::Index(h, n, s) => {
+            max_string_const_len_str(h)
+                .max(max_string_const_len_str(n))
+                .max(max_string_const_len_int(s))
+        }
+        IntExpr::ArraySelect(_, idx) => max_string_const_len_int(idx),
+        IntExpr::HashSelect(_, key) => max_string_const_len_str(key),
+    }
+}
+
+fn max_string_const_len_str(expr: &StrExpr) -> i64 {
+    match expr {
+        StrExpr::Const(s) => s.len() as i64,
+        StrExpr::Var(_) => 0,
+        StrExpr::Concat(l, r) => max_string_const_len_str(l).max(max_string_const_len_str(r)),
+        StrExpr::Substr(v, s, len) => {
+            max_string_const_len_str(v)
+                .max(max_string_const_len_int(s))
+                .max(max_string_const_len_int(len))
+        }
+        StrExpr::Chr(v) | StrExpr::FromInt(v) => max_string_const_len_int(v),
+        StrExpr::Reverse(v) => max_string_const_len_str(v),
+        StrExpr::Replace(s, from, to) => {
+            max_string_const_len_str(s)
+                .max(max_string_const_len_str(from))
+                .max(max_string_const_len_str(to))
+        }
+        StrExpr::CharAt(s, idx) => {
+            max_string_const_len_str(s).max(max_string_const_len_int(idx))
+        }
+        StrExpr::Ite(c, t, e) => {
+            max_string_const_len_bool(c)
+                .max(max_string_const_len_str(t))
+                .max(max_string_const_len_str(e))
+        }
+        StrExpr::ArraySelect(_, idx) => max_string_const_len_int(idx),
+        StrExpr::HashSelect(_, key) => max_string_const_len_str(key),
     }
 }
 
