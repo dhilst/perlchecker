@@ -297,6 +297,13 @@ impl<'a> SsaBuilder<'a> {
                 // Desugar: $s x N => repeated concatenation (constant N only)
                 let n = match right.as_ref() {
                     Expr::Int(n) => *n,
+                    Expr::Unary { op: UnaryOp::Neg, expr } => match expr.as_ref() {
+                        Expr::Int(n) => -(*n),
+                        _ => return Err(IrError::UnknownVariable {
+                            function: self.function.to_string(),
+                            variable: "x operator requires a constant integer count".to_string(),
+                        }),
+                    },
                     _ => return Err(IrError::UnknownVariable {
                         function: self.function.to_string(),
                         variable: "x operator requires a constant integer count".to_string(),
