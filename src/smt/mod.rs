@@ -552,21 +552,24 @@ fn encode_hash_str(expr: &HashStrExpr) -> Array {
 }
 
 fn encode_index_of(haystack: &Z3String, needle: &Z3String, start: &Int) -> Int {
-    let needle_len = needle.length();
-    let haystack_len = haystack.length();
-    let mut result = Int::from_i64(-1);
-    for index in (0..=MAX_STR_LEN).rev() {
-        let offset = Int::from_i64(index);
-        let matches = Bool::and(&[
-            &haystack_len.ge(index),
-            &offset.ge(start),
-            &haystack
-                .substr(offset.clone(), needle_len.clone())
-                .eq(needle),
-        ]);
-        result = matches.ite(&offset, &result);
+    // Use Z3's native str.indexof which correctly handles arbitrary-length
+    // strings.  The previous hand-rolled loop only searched positions
+    // 0..=MAX_STR_LEN, which was unsound for strings produced by
+    // concatenation (whose length can exceed MAX_STR_LEN).
+    //
+    // Perl treats negative start positions as 0; Z3's str.indexof returns
+    // -1 for negative offsets.  Clamp start to max(start, 0).
+    let ctx = &Context::thread_local();
+    let zero = Int::from_i64(0);
+    let clamped_start = start.ge(0).ite(start, &zero);
+    unsafe {
+        Int::wrap(ctx, z3_sys::Z3_mk_seq_index(
+            ctx.get_z3_context(),
+            haystack.get_z3_ast(),
+            needle.get_z3_ast(),
+            clamped_start.get_z3_ast(),
+        ).unwrap())
     }
-    result
 }
 
 fn encode_truncating_division(left: &Int, right: &Int) -> Int {
