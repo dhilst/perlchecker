@@ -514,11 +514,21 @@ impl<'a> SsaBuilder<'a> {
                     self.exists_companions.insert(hash.clone(), fresh_name.clone());
                     fresh_name
                 };
-                // Return Select(companion, key) — reads the existence flag (0 or 1)
-                SsaExpr::Access {
-                    kind: AccessKind::Hash,
-                    collection: Box::new(SsaExpr::Var(companion_ssa)),
-                    index: Box::new(key_expr),
+                // Normalize to 0/1: ite(select(companion, key) != 0, 1, 0)
+                // The companion hash is unconstrained in Z3, so raw select could
+                // return any integer. Perl's exists() always returns 1 or 0.
+                SsaExpr::Ite {
+                    condition: Box::new(SsaExpr::Binary {
+                        left: Box::new(SsaExpr::Access {
+                            kind: AccessKind::Hash,
+                            collection: Box::new(SsaExpr::Var(companion_ssa)),
+                            index: Box::new(key_expr),
+                        }),
+                        op: crate::ast::BinaryOp::Ne,
+                        right: Box::new(SsaExpr::Int(0)),
+                    }),
+                    then_expr: Box::new(SsaExpr::Int(1)),
+                    else_expr: Box::new(SsaExpr::Int(0)),
                 }
             }
             Expr::Pop { array } => {
