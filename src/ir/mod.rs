@@ -370,6 +370,78 @@ impl<'a> SsaBuilder<'a> {
                     }),
                 }
             }
+            Expr::Binary { left, op: BinaryOp::And, right } => {
+                // Desugar short-circuit: A && B => if A { B } else { false }
+                // This ensures calls in B are only executed when A is true.
+                // Only desugar when the RHS produces hoisted statements (function calls);
+                // otherwise keep as a plain Binary expr for efficiency.
+                let left_val = self.rewrite_expr(left, env, prefix)?;
+                let mut rhs_prefix = Vec::new();
+                let right_val = self.rewrite_expr(right, env, &mut rhs_prefix)?;
+                if rhs_prefix.is_empty() {
+                    // No side effects in RHS — use plain And (semantically equivalent)
+                    SsaExpr::Binary {
+                        left: Box::new(left_val),
+                        op: BinaryOp::And,
+                        right: Box::new(right_val),
+                    }
+                } else {
+                    let then_name = self.fresh_name("__sc_and");
+                    let else_name = self.fresh_name("__sc_and");
+                    let result_name = self.fresh_name("__sc_and");
+                    let mut then_branch = rhs_prefix;
+                    then_branch.push(SsaStmt::Assign(then_name.clone(), right_val));
+                    let else_branch = vec![SsaStmt::Assign(else_name.clone(), SsaExpr::Bool(false))];
+                    prefix.push(SsaStmt::If {
+                        condition: left_val,
+                        then_branch,
+                        else_branch,
+                        merges: vec![SsaMerge {
+                            source: "__sc_and".to_string(),
+                            then_name,
+                            else_name,
+                            result_name: result_name.clone(),
+                        }],
+                    });
+                    SsaExpr::Var(result_name)
+                }
+            }
+            Expr::Binary { left, op: BinaryOp::Or, right } => {
+                // Desugar short-circuit: A || B => if A { true } else { B }
+                // This ensures calls in B are only executed when A is false.
+                // Only desugar when the RHS produces hoisted statements (function calls);
+                // otherwise keep as a plain Binary expr for efficiency.
+                let left_val = self.rewrite_expr(left, env, prefix)?;
+                let mut rhs_prefix = Vec::new();
+                let right_val = self.rewrite_expr(right, env, &mut rhs_prefix)?;
+                if rhs_prefix.is_empty() {
+                    // No side effects in RHS — use plain Or (semantically equivalent)
+                    SsaExpr::Binary {
+                        left: Box::new(left_val),
+                        op: BinaryOp::Or,
+                        right: Box::new(right_val),
+                    }
+                } else {
+                    let then_name = self.fresh_name("__sc_or");
+                    let else_name = self.fresh_name("__sc_or");
+                    let result_name = self.fresh_name("__sc_or");
+                    let then_branch = vec![SsaStmt::Assign(then_name.clone(), SsaExpr::Bool(true))];
+                    let mut else_branch = rhs_prefix;
+                    else_branch.push(SsaStmt::Assign(else_name.clone(), right_val));
+                    prefix.push(SsaStmt::If {
+                        condition: left_val,
+                        then_branch,
+                        else_branch,
+                        merges: vec![SsaMerge {
+                            source: "__sc_or".to_string(),
+                            then_name,
+                            else_name,
+                            result_name: result_name.clone(),
+                        }],
+                    });
+                    SsaExpr::Var(result_name)
+                }
+            }
             Expr::Binary { left, op, right } => SsaExpr::Binary {
                 left: Box::new(self.rewrite_expr(left, env, prefix)?),
                 op: *op,
