@@ -165,6 +165,10 @@ pub enum IrError {
         "function `{function}` references unsupported variable `{variable}` during SSA lowering"
     )]
     UnknownVariable { function: String, variable: String },
+    #[error(
+        "function `{function}`: ghost variable `{variable}` shadows a real variable"
+    )]
+    GhostShadowsReal { function: String, variable: String },
 }
 
 pub fn lower_to_ssa(function: &FunctionAst) -> std::result::Result<SsaFunction, IrError> {
@@ -175,6 +179,7 @@ pub fn lower_to_ssa(function: &FunctionAst) -> std::result::Result<SsaFunction, 
     for param in &function.params {
         let ssa_name = builder.fresh_name(param);
         env.insert(param.clone(), ssa_name.clone());
+        builder.real_vars.insert(param.clone());
         params.push(SsaParam {
             source: param.clone(),
             ssa_name,
@@ -252,6 +257,8 @@ struct SsaBuilder<'a> {
     /// Tracks static reference aliases: ref_name -> target_name.
     /// When we see `$ref = \$x`, we record alias_map["ref"] = "x".
     alias_map: BTreeMap<String, String>,
+    /// Tracks real (non-ghost) variable names so ghost assignments cannot shadow them.
+    real_vars: BTreeSet<String>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -263,6 +270,7 @@ impl<'a> SsaBuilder<'a> {
             defined_companions: BTreeSet::new(),
             exists_companions: BTreeMap::new(),
             alias_map: BTreeMap::new(),
+            real_vars: BTreeSet::new(),
         }
     }
 
@@ -753,9 +761,11 @@ impl<'a> SsaBuilder<'a> {
                     lowered.push(SsaStmt::Assign(def_name.clone(), SsaExpr::Int(0)));
                     env.insert(def_base, def_name);
                     self.defined_companions.insert(name.clone());
+                    self.real_vars.insert(name.clone());
                 }
                 crate::ast::Stmt::LoopBoundExceeded => lowered.push(SsaStmt::LoopBoundExceeded),
                 crate::ast::Stmt::Assign { name, expr, .. } => {
+                    self.real_vars.insert(name.clone());
                     // Check if this is a reference assignment: $ref = \$target / \@arr / \%hash
                     if let crate::ast::Expr::Ref(target) = expr {
                         // Record the alias and skip emitting any SSA assignment.
@@ -1262,6 +1272,15 @@ impl<'a> SsaBuilder<'a> {
                     lowered.push(SsaStmt::Die);
                 }
                 crate::ast::Stmt::GhostAssign { name, expr } => {
+                    // Reject ghost variables that shadow real variables — this would
+                    // be unsound because subsequent code referencing the variable
+                    // would use the ghost value instead of the real value.
+                    if self.real_vars.contains(name) {
+                        return Err(IrError::GhostShadowsReal {
+                            function: self.function.to_string(),
+                            variable: name.clone(),
+                        });
+                    }
                     // Ghost variables are lowered to regular SSA assignments.
                     let mut prefix = Vec::new();
                     let rhs = self.rewrite_expr(expr, &mut env, &mut prefix)?;
