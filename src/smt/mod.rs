@@ -295,15 +295,23 @@ fn encode_int(expr: &IntExpr) -> Int {
         IntExpr::StrToInt(value) => {
             // Perl's int($s) extracts the leading integer from a string.
             // Z3's str.to_int only handles non-negative digit strings and
-            // returns -1 for anything else — including strings like "-5".
+            // returns -1 for anything else — including strings like "-5"
+            // or non-numeric strings like "" and "abc".
             //
             // Fix: detect a leading '-' sign, apply str.to_int to the tail,
             // and negate the result. This makes int("" . $n) a correct
             // round-trip for negative integers.
+            //
+            // Additionally, Z3's str.to_int returns -1 for non-digit
+            // strings, but Perl's int() returns 0 for non-numeric input
+            // (e.g., int("") == 0, int("abc") == 0). We clamp the -1
+            // sentinel to 0 to match Perl semantics.
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
             let minus_sign = Z3String::from_str("-").expect("minus literal");
             let one = Int::from_i64(1);
+            let zero = Int::from_i64(0);
+            let neg_one = Int::from_i64(-1);
             // Does the string start with '-'?
             let starts_with_minus = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_prefix(
@@ -313,21 +321,24 @@ fn encode_int(expr: &IntExpr) -> Int {
                 ).unwrap())
             };
             // Positive path: str.to_int on the whole string
-            let pos_val = unsafe {
+            // Z3 returns -1 for non-digit strings; Perl returns 0.
+            let raw_pos_val = unsafe {
                 Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
                     ctx.get_z3_context(),
                     encoded.get_z3_ast(),
                 ).unwrap())
             };
+            let pos_val = raw_pos_val.eq(&neg_one).ite(&zero, &raw_pos_val);
             // Negative path: strip the leading '-', str.to_int on the rest, negate
+            // Z3 returns -1 for non-digit tails (e.g., "-abc"); Perl returns 0.
             let tail = encoded.substr(one, encoded.length());
-            let tail_val = unsafe {
+            let raw_tail_val = unsafe {
                 Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
                     ctx.get_z3_context(),
                     tail.get_z3_ast(),
                 ).unwrap())
             };
-            let neg_val = tail_val.unary_minus();
+            let neg_val = raw_tail_val.eq(&neg_one).ite(&zero, &raw_tail_val.unary_minus());
             starts_with_minus.ite(&neg_val, &pos_val)
         }
         IntExpr::Contains(haystack, needle) => {
