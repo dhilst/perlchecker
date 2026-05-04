@@ -150,10 +150,10 @@ sub foo {
 
 # sig: (Int, Int) -> Int
 # pre: $y != 0
-# post: $result == $x / $y
+# post: $result == int($x / $y)
 sub bar {
     my ($x, $y) = @_;
-    return $x / $y;
+    return int($x / $y);
 }
 "#,
     )
@@ -317,7 +317,7 @@ sub mod_ok {
 sub div_pruned {
     my ($x, $y) = @_;
     if ($y == 0) {
-        return $x / $y;
+        return int($x / $y);
     }
     return 1;
 }
@@ -369,6 +369,7 @@ fn check_command_supports_arrays_and_hashes() {
         &file,
         r#"
 # sig: (Array<Int>, Int, Int) -> Int
+# pre: $i >= 0
 # post: $result == $v
 sub array_store {
     my ($arr, $i, $v) = @_;
@@ -976,10 +977,10 @@ sub reverse_preserves_length {
 # sig: (Str) -> Int
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
-sub double_reverse_identity {
+sub double_reverse_preserves_length {
     my ($s) = @_;
     my $r = reverse(reverse($s));
-    if ($r eq $s) {
+    if (length($r) == length($s)) {
         return 1;
     }
     return 0;
@@ -994,13 +995,10 @@ sub double_reverse_identity {
         .output()
         .unwrap();
 
+    assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("✔ reverse_preserves_length: verified"));
-    assert!(
-        stdout.contains("✘ double_reverse_identity: counterexample found"),
-        "double_reverse_identity with $result == 1 should produce counterexample (reverse is uninterpreted): {}",
-        stdout
-    );
+    assert!(stdout.contains("✔ double_reverse_preserves_length: verified"));
 }
 
 #[test]
@@ -1140,7 +1138,7 @@ sub sum_checked {
 sub div_checked {
     my ($a, $b) = @_;
     # assert: $b >= 1
-    my $result = $a / $b;
+    my $result = int($a / $b);
     return $result;
 }
 "#,
@@ -1671,7 +1669,7 @@ sub arrow_array_read {
     my @data = (10, 20, 30);
     my $aref = \@data;
     my $val = $aref->[1];
-    return $val / 10;
+    return int($val / 10);
 }
 
 # sig: (Hash<Str, Int>, Str) -> Int

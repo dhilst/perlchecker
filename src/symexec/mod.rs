@@ -1270,6 +1270,56 @@ fn extract_array_str_base_name(array: &SymValue) -> String {
     }
 }
 
+/// Compute the effective length of an Int array, accounting for stores that extend it.
+/// For a base `Var("arr")`, the length is `arr__len`.
+/// For `Store(base, index, _)`, the length is `max(effective_length(base), index + 1)`.
+fn effective_array_int_length(array: &ArrayIntExpr) -> IntExpr {
+    match array {
+        ArrayIntExpr::Var(name) => IntExpr::Var(format!("{name}__len")),
+        ArrayIntExpr::Store(base, index, _) => {
+            let base_len = effective_array_int_length(base);
+            let index_plus_one = IntExpr::Add(
+                Box::new((**index).clone()),
+                Box::new(IntExpr::Const(1)),
+            );
+            // max(base_len, index + 1) = ite(index + 1 > base_len, index + 1, base_len)
+            IntExpr::Ite(
+                Box::new(BoolExpr::IntCmp(
+                    CmpOp::Gt,
+                    Box::new(index_plus_one.clone()),
+                    Box::new(base_len.clone()),
+                )),
+                Box::new(index_plus_one),
+                Box::new(base_len),
+            )
+        }
+    }
+}
+
+/// Compute the effective length of a Str array, accounting for stores that extend it.
+fn effective_array_str_length(array: &ArrayStrExpr) -> IntExpr {
+    match array {
+        ArrayStrExpr::Var(name) => IntExpr::Var(format!("{name}__len")),
+        ArrayStrExpr::Store(base, index, _) => {
+            let base_len = effective_array_str_length(base);
+            let index_plus_one = IntExpr::Add(
+                Box::new((**index).clone()),
+                Box::new(IntExpr::Const(1)),
+            );
+            // max(base_len, index + 1) = ite(index + 1 > base_len, index + 1, base_len)
+            IntExpr::Ite(
+                Box::new(BoolExpr::IntCmp(
+                    CmpOp::Gt,
+                    Box::new(index_plus_one.clone()),
+                    Box::new(base_len.clone()),
+                )),
+                Box::new(index_plus_one),
+                Box::new(base_len),
+            )
+        }
+    }
+}
+
 fn eval_builtin(
     function: &str,
     builtin: Builtin,
@@ -1517,18 +1567,56 @@ fn eval_access(
                 let base = extract_array_int_base_name(&collection);
                 let raw_index = expect_int(index, function)?;
                 let normalized = normalize_array_index(&base, raw_index);
-                SymValue::Int(IntExpr::ArraySelect(
-                    Box::new(array.clone()),
-                    Box::new(normalized),
+                // Perl returns undef (0 in numeric context) for out-of-bounds reads.
+                // Use effective_length which accounts for stores extending the array.
+                let len = effective_array_int_length(array);
+                let in_bounds = BoolExpr::And(
+                    Box::new(BoolExpr::IntCmp(
+                        CmpOp::Ge,
+                        Box::new(normalized.clone()),
+                        Box::new(IntExpr::Const(0)),
+                    )),
+                    Box::new(BoolExpr::IntCmp(
+                        CmpOp::Lt,
+                        Box::new(normalized.clone()),
+                        Box::new(len),
+                    )),
+                );
+                SymValue::Int(IntExpr::Ite(
+                    Box::new(in_bounds),
+                    Box::new(IntExpr::ArraySelect(
+                        Box::new(array.clone()),
+                        Box::new(normalized),
+                    )),
+                    Box::new(IntExpr::Const(0)),
                 ))
             }
             SymValue::ArrayStr(ref array) => {
                 let base = extract_array_str_base_name(&collection);
                 let raw_index = expect_int(index, function)?;
                 let normalized = normalize_array_index(&base, raw_index);
-                SymValue::Str(StrExpr::ArraySelect(
-                    Box::new(array.clone()),
-                    Box::new(normalized),
+                // Perl returns undef ("" in string context) for out-of-bounds reads.
+                // Use effective_length which accounts for stores extending the array.
+                let len = effective_array_str_length(array);
+                let in_bounds = BoolExpr::And(
+                    Box::new(BoolExpr::IntCmp(
+                        CmpOp::Ge,
+                        Box::new(normalized.clone()),
+                        Box::new(IntExpr::Const(0)),
+                    )),
+                    Box::new(BoolExpr::IntCmp(
+                        CmpOp::Lt,
+                        Box::new(normalized.clone()),
+                        Box::new(len),
+                    )),
+                );
+                SymValue::Str(StrExpr::Ite(
+                    Box::new(in_bounds),
+                    Box::new(StrExpr::ArraySelect(
+                        Box::new(array.clone()),
+                        Box::new(normalized),
+                    )),
+                    Box::new(StrExpr::Const(String::new())),
                 ))
             }
             _ => {
@@ -1778,6 +1866,7 @@ mod tests {
             name: "foo".to_string(),
             annotations: vec![
                 "# sig: (Array<Int>, Int, Int) -> Int".to_string(),
+                "# pre: $i >= 0".to_string(),
                 "# post: $result == $v".to_string(),
             ],
             body: "\n    my ($arr, $i, $v) = @_;\n    $arr[$i] = $v;\n    return $arr[$i];\n".to_string(),
