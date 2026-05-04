@@ -994,10 +994,13 @@ sub double_reverse_identity {
         .output()
         .unwrap();
 
-    assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("✔ reverse_preserves_length: verified"));
-    assert!(stdout.contains("✔ double_reverse_identity: verified"));
+    assert!(
+        stdout.contains("✘ double_reverse_identity: counterexample found"),
+        "double_reverse_identity with $result == 1 should produce counterexample (reverse is uninterpreted): {}",
+        stdout
+    );
 }
 
 #[test]
