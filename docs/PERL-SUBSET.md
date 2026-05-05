@@ -1,5 +1,7 @@
 # Verifiable Perl Subset Specification
 
+Tested against: **Perl v5.42.0** (x86_64-linux-thread-multi)
+
 ## Goal
 
 Define a Perl-like subset that is:
