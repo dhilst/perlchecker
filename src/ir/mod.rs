@@ -539,7 +539,41 @@ impl<'a> SsaBuilder<'a> {
                         // was never tracked. Parameters are always defined.
                         return Ok(SsaExpr::Int(1));
                     }
-                    // defined() on a non-variable expression: always defined
+                    // defined($hash{$key}): equivalent to exists($hash{$key})
+                    // because the checker does not model undef values — if a key
+                    // exists its value is always defined.
+                    if let Some(Expr::Access { kind: AccessKind::Hash, collection, index }) = args.first() {
+                        let key_expr = self.rewrite_expr(index, env, prefix)?;
+                        let companion_ssa = if let Some(existing) = self.exists_companions.get(collection) {
+                            existing.clone()
+                        } else {
+                            let exists_base = format!("{collection}__exists");
+                            let fresh_name = self.fresh_name(&exists_base);
+                            prefix.push(SsaStmt::Assign(
+                                fresh_name.clone(),
+                                SsaExpr::FreshHash {
+                                    value_int: true,
+                                    name: fresh_name.clone(),
+                                },
+                            ));
+                            self.exists_companions.insert(collection.clone(), fresh_name.clone());
+                            fresh_name
+                        };
+                        return Ok(SsaExpr::Ite {
+                            condition: Box::new(SsaExpr::Binary {
+                                left: Box::new(SsaExpr::Access {
+                                    kind: AccessKind::Hash,
+                                    collection: Box::new(SsaExpr::Var(companion_ssa)),
+                                    index: Box::new(key_expr),
+                                }),
+                                op: crate::ast::BinaryOp::Ne,
+                                right: Box::new(SsaExpr::Int(0)),
+                            }),
+                            then_expr: Box::new(SsaExpr::Int(1)),
+                            else_expr: Box::new(SsaExpr::Int(0)),
+                        });
+                    }
+                    // defined() on a non-variable, non-hash-access expression: always defined
                     return Ok(SsaExpr::Int(1));
                 }
                 // Chomp side-effect: chomp($var) modifies $var in place by
@@ -1015,6 +1049,13 @@ impl<'a> SsaBuilder<'a> {
                         element_int,
                         name: arr_name.clone(),
                     }));
+
+                    // Pin the fresh array's base length to 0 so that
+                    // effective_array_{int,str}_length — which recurses
+                    // down to Var("<arr_name>") and returns Var("<arr_name>__len") —
+                    // sees a constrained zero rather than a free variable.
+                    let base_len_name = format!("{arr_name}__len");
+                    lowered.push(SsaStmt::Assign(base_len_name, SsaExpr::Int(0)));
 
                     // Build stores iteratively: store element 0 at index 0, etc.
                     for (i, value_expr) in element_exprs.into_iter().enumerate() {
