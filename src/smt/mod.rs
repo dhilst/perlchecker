@@ -563,7 +563,20 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             };
             let minus_sign = Z3String::from_str("-").expect("minus literal");
             let neg_str = Z3String::concat(&[minus_sign, neg_digits]);
-            is_nonneg.ite(&pos_str, &neg_str)
+            let exact_str = is_nonneg.ite(&pos_str, &neg_str);
+            // Soundness: Perl stringifies integers exactly only within the
+            // range [-2^63, 2^64-1].  Outside this range, Perl converts to
+            // a float and uses scientific notation (e.g., "-1.8e+19").
+            // We model overflow as a fresh unconstrained string so that Z3
+            // cannot prove properties about overflowed stringifications.
+            let i64_min = Int::from_i64(i64::MIN);
+            // 2^64 - 1 = u64::MAX; express as i64::MAX + i64::MAX + 1
+            let u64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
+            let in_range = Bool::and(&[&encoded.ge(&i64_min), &encoded.le(&u64_max)]);
+            let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let fresh_name = format!("__fromint_overflow_{n}");
+            let overflow_str = Z3String::new_const(fresh_name);
+            in_range.ite(&exact_str, &overflow_str)
         }
         StrExpr::Reverse(value) => {
             let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
