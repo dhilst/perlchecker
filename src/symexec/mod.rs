@@ -972,12 +972,58 @@ fn eval_ssa_expr(
             kind,
             collection,
             index,
-        } => eval_access(
-            function,
-            *kind,
-            eval_ssa_expr(function, collection, env)?,
-            eval_ssa_expr(function, index, env)?,
-        )?,
+        } => {
+            let collection_val = eval_ssa_expr(function, collection, env)?;
+            let index_val = eval_ssa_expr(function, index, env)?;
+            let raw = eval_access(function, *kind, collection_val, index_val.clone())?;
+            if *kind == AccessKind::Hash {
+                if let Some(companion) = find_exists_companion(collection, env) {
+                    let key = match &index_val {
+                        SymValue::Str(s) => s.clone(),
+                        _ => return Ok(raw),
+                    };
+                    match raw {
+                        SymValue::Int(val) => {
+                            let exists_check = IntExpr::HashSelect(
+                                Box::new(companion),
+                                Box::new(key),
+                            );
+                            let key_exists = BoolExpr::IntCmp(
+                                CmpOp::Ne,
+                                Box::new(exists_check),
+                                Box::new(IntExpr::Const(0)),
+                            );
+                            SymValue::Int(IntExpr::Ite(
+                                Box::new(key_exists),
+                                Box::new(val),
+                                Box::new(IntExpr::Const(0)),
+                            ))
+                        }
+                        SymValue::Str(val) => {
+                            let exists_check = IntExpr::HashSelect(
+                                Box::new(companion),
+                                Box::new(key),
+                            );
+                            let key_exists = BoolExpr::IntCmp(
+                                CmpOp::Ne,
+                                Box::new(exists_check),
+                                Box::new(IntExpr::Const(0)),
+                            );
+                            SymValue::Str(StrExpr::Ite(
+                                Box::new(key_exists),
+                                Box::new(val),
+                                Box::new(StrExpr::Const(String::new())),
+                            ))
+                        }
+                        other => other,
+                    }
+                } else {
+                    raw
+                }
+            } else {
+                raw
+            }
+        }
         SsaExpr::Store {
             kind,
             collection,
@@ -1563,6 +1609,39 @@ fn normalize_array_index(array_base: &str, raw_index: IntExpr) -> IntExpr {
         Box::new(IntExpr::Add(Box::new(len), Box::new(raw_index.clone()))),
         Box::new(raw_index),
     )
+}
+
+/// Given a hash access collection expression (e.g. SsaExpr::Var("h__0")),
+/// find the corresponding exists companion HashIntExpr in the env.
+fn find_exists_companion(
+    collection: &SsaExpr,
+    env: &BTreeMap<String, SymValue>,
+) -> Option<HashIntExpr> {
+    let ssa_name = match collection {
+        SsaExpr::Var(name) => name,
+        _ => return None,
+    };
+    let base = ssa_name.rsplit_once("__").map(|(b, _)| b)?;
+    let exists_prefix = format!("{base}__exists__");
+    let mut best: Option<(&str, &SymValue)> = None;
+    for (key, val) in env.iter() {
+        if key.starts_with(&exists_prefix) {
+            match best {
+                None => best = Some((key, val)),
+                Some((prev_key, _)) => {
+                    let prev_n: usize = prev_key[exists_prefix.len()..].parse().unwrap_or(0);
+                    let cur_n: usize = key[exists_prefix.len()..].parse().unwrap_or(0);
+                    if cur_n > prev_n {
+                        best = Some((key, val));
+                    }
+                }
+            }
+        }
+    }
+    match best {
+        Some((_, SymValue::HashInt(h))) => Some(h.clone()),
+        _ => None,
+    }
 }
 
 fn eval_access(
