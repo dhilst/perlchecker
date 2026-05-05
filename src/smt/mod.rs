@@ -854,11 +854,25 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Const(_) | IntExpr::Var(_) => Bool::from_bool(true),
         IntExpr::Add(left, right)
         | IntExpr::Sub(left, right)
-        | IntExpr::Mul(left, right)
-        | IntExpr::BitAnd(left, right)
+        | IntExpr::Mul(left, right) => {
+            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+        }
+        IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+            // Soundness: Z3's int2bv wraps mod 2^64, but Perl saturates
+            // at UINT64_MAX when converting floats to unsigned integers
+            // for bitwise ops. Values >= 2^64 would wrap incorrectly.
+            // Guard: both operands must be < 2^64 and >= -(2^63) to
+            // ensure int2bv produces the correct two's complement pattern.
+            let l = encode_int(left);
+            let r = encode_int(right);
+            let uint64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
+            let two_pow_64 = Int::add(&[&uint64_max, &Int::from_i64(1)]);
+            let i64_min = Int::from_i64(i64::MIN);
+            let l_in_range = Bool::and(&[&l.ge(&i64_min), &l.lt(&two_pow_64)]);
+            let r_in_range = Bool::and(&[&r.ge(&i64_min), &r.lt(&two_pow_64)]);
+            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &l_in_range, &r_in_range])
         }
         IntExpr::Pow(left, right) => {
             // Soundness: Perl's ** with a negative exponent produces a float
@@ -871,11 +885,13 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
         IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
             // Soundness: Z3's int2bv wraps mod 2^64, but Perl's NV-to-UV
             // conversion saturates at UINT64_MAX for values >= 2^64.
-            // Assert the left operand is < 2^64 to prevent unsound wrapping.
+            // Assert the left operand is in [-(2^63), 2^64) to prevent
+            // unsound wrapping via int2bv.
             let l = encode_int(left);
             let uint64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
             let two_pow_64 = Int::add(&[&uint64_max, &Int::from_i64(1)]);
-            let l_in_range = l.lt(&two_pow_64);
+            let i64_min = Int::from_i64(i64::MIN);
+            let l_in_range = Bool::and(&[&l.ge(&i64_min), &l.lt(&two_pow_64)]);
             Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &l_in_range])
         }
         IntExpr::Div(left, right) | IntExpr::Mod(left, right) => Bool::and(&[
