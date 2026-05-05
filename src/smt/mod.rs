@@ -639,8 +639,13 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             let ctx = &Context::thread_local();
             let s = encode_str(string);
             let i = encode_int(index);
+            // Perl negative-index semantics: char_at($s, -1) means last char.
+            // Z3's str.at returns "" for negative i, so we normalize:
+            //   effective_i = ite(i >= 0, i, length(s) + i)
+            let zero = Int::from_i64(0);
+            let effective_i = i.ge(&zero).ite(&i, &Int::add(&[&s.length(), &i]));
             unsafe {
-                Z3String::wrap(ctx, z3_sys::Z3_mk_seq_at(ctx.get_z3_context(), s.get_z3_ast(), i.get_z3_ast()).unwrap())
+                Z3String::wrap(ctx, z3_sys::Z3_mk_seq_at(ctx.get_z3_context(), s.get_z3_ast(), effective_i.get_z3_ast()).unwrap())
             }
         }
         StrExpr::Ite(cond, then_str, else_str) => {
