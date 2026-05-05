@@ -11,6 +11,10 @@ pest PEG → AST → type checker → SSA/IR → CFG → symbolic execution → 
 tests cargo test --test cli_check         # integration tests only cargo run
 --quiet -- check FILE.pl  # verify a Perl file ```
 
+## Formatting
+
+- Markdown lines must not exceed 120 columns.
+
 ## Git
 
 - Use `--no-gpg-sign` for all commits in this repo.
