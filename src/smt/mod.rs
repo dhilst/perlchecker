@@ -365,12 +365,17 @@ fn encode_int(expr: &IntExpr) -> Int {
             r_too_large.ite(&Int::from_i64(0), &normal_result)
         }
         IntExpr::BitNot(value) => {
-            // ~x == -x - 1 in two's complement (algebraic identity).
-            // Using direct arithmetic avoids the bv2int(signed)/int2bv
-            // round-trip that causes Z3 timeouts when composed with
-            // other bitwise operations.
+            // Perl's ~ operator performs bitwise NOT on a 64-bit unsigned
+            // integer and returns the result as an unsigned value.
+            // The two's complement identity ~x == -x - 1 is correct for signed
+            // arithmetic but Perl interprets the result as unsigned 64-bit.
+            // For x >= 0: result = 2^64 - 1 - x.  For x < 0: result = -x - 1.
             let encoded = encode_int(value);
-            encoded.unary_minus() - Int::from_i64(1)
+            let signed_result = encoded.unary_minus() - Int::from_i64(1);
+            let is_nonneg = signed_result.ge(&Int::from_i64(0));
+            let two_pow_64 = Int::add(&[&Int::from_u64(u64::MAX), &Int::from_i64(1)]);
+            let unsigned_result = Int::add(&[&signed_result, &two_pow_64]);
+            is_nonneg.ite(&signed_result, &unsigned_result)
         }
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);

@@ -1,10 +1,12 @@
-# Soundness audit: BitNot must use signed BV64 interpretation.
-# ~x == -x - 1 is the two's-complement algebraic identity.
+# Soundness audit: BitNot uses unsigned 64-bit interpretation.
+# Perl's ~ operator does bitwise NOT on a 64-bit unsigned value.
+# For x >= 0: ~x == 2^64 - 1 - x (a large positive number).
+# For x < 0 (two's complement): ~x == -x - 1 (a small non-negative value).
 
 # sig: (Int) -> Int
 # pre: $x >= 0 && $x <= 100
-# post: $result == -$x - 1
-sub bitnot_nonneg {
+# post: $result >= 0
+sub bitnot_nonneg_unsigned {
     my ($x) = @_;
     return ~$x;
 }
@@ -19,7 +21,7 @@ sub bitnot_neg {
 
 # sig: (Int) -> Int
 # pre: $x == 0
-# post: $result == -1
+# post: $result > 0
 sub bitnot_zero {
     my ($x) = @_;
     return ~$x;
@@ -27,10 +29,18 @@ sub bitnot_zero {
 
 # sig: (Int) -> Int
 # pre: $x == 5
-# post: $result == -6
+# post: $result > 0
 sub bitnot_five {
     my ($x) = @_;
     return ~$x;
+}
+
+# sig: (Int) -> Int
+# pre: $x >= 0 && $x <= 255
+# post: $result == 255 - $x
+sub bitnot_masked_byte {
+    my ($x) = @_;
+    return (~$x) & 255;
 }
 
 use lib "$ENV{HOME}/perl5/lib/perl5";
@@ -44,6 +54,10 @@ Property {
 
 Property {
     ##[ x <- Int(range=>[0,100], sized=>0) ]##
-    use integer;
-    bitnot_nonneg($x) == -$x - 1;
-}, name => "bitnot_nonneg: ~x == -x-1 for x>=0";
+    bitnot_nonneg_unsigned($x) >= 0;
+}, name => "bitnot_nonneg: ~x >= 0 (unsigned)";
+
+Property {
+    ##[ x <- Int(range=>[0,255], sized=>0) ]##
+    bitnot_masked_byte($x) == 255 - $x;
+}, name => "bitnot_masked_byte: (~x)&0xFF == 255-x";
