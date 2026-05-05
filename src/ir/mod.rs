@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 use tracing::debug;
 
-use crate::ast::{AccessKind, BinaryOp, Builtin, Expr, FunctionAst, UnaryOp};
+use crate::ast::{AccessKind, BinaryOp, Builtin, Expr, FunctionAst, Stmt, UnaryOp};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaParam {
@@ -240,6 +240,35 @@ fn base_name(ssa_name: &str) -> &str {
         .unwrap_or(ssa_name)
 }
 
+/// Collect all variable names that are assigned (modified) in a statement list.
+/// Used to determine which variables need freshening in loop invariant induction.
+fn collect_assigned_vars(stmts: &[Stmt]) -> BTreeSet<String> {
+    let mut assigned = BTreeSet::new();
+    for stmt in stmts {
+        match stmt {
+            Stmt::Assign { name, .. } => { assigned.insert(name.clone()); }
+            Stmt::ArrayAssign { name, .. } => { assigned.insert(name.clone()); }
+            Stmt::HashAssign { name, .. } => { assigned.insert(name.clone()); }
+            Stmt::Push { array, .. } => { assigned.insert(array.clone()); }
+            Stmt::ArrayInit { name, .. } => { assigned.insert(name.clone()); }
+            Stmt::DerefAssign { ref_name, .. } => { assigned.insert(ref_name.clone()); }
+            Stmt::ArrowArrayAssign { ref_var, .. } => { assigned.insert(ref_var.clone()); }
+            Stmt::ArrowHashAssign { ref_var, .. } => { assigned.insert(ref_var.clone()); }
+            Stmt::GhostAssign { name, .. } => { assigned.insert(name.clone()); }
+            Stmt::If { then_branch, else_branch, .. } => {
+                assigned.extend(collect_assigned_vars(then_branch));
+                assigned.extend(collect_assigned_vars(else_branch));
+            }
+            Stmt::While { body, step, .. } => {
+                assigned.extend(collect_assigned_vars(body));
+                assigned.extend(collect_assigned_vars(step));
+            }
+            Stmt::Declare { .. } | Stmt::Return(_) | Stmt::LoopBoundExceeded
+            | Stmt::Last | Stmt::Next | Stmt::Die(_) | Stmt::Assert(_) => {}
+        }
+    }
+    assigned
+}
 
 struct SsaBuilder<'a> {
     function: &'a str,
@@ -1054,15 +1083,21 @@ impl<'a> SsaBuilder<'a> {
                         });
 
                         // --- Step 2: Preservation check ---
-                        // Create fresh symbolic variables for all variables in scope,
-                        // representing an arbitrary state where the invariant holds.
+                        // Create fresh symbolic variables only for variables that
+                        // are modified by the loop body. Unmodified variables (like
+                        // function parameters) keep their original constrained values
+                        // so that precondition knowledge is available during the
+                        // preservation check.
+                        let body_assigned = collect_assigned_vars(&full_body);
                         let pre_body_env = env.clone();
                         let mut fresh_env = env.clone();
                         for (perl_name, _ssa_name) in &pre_body_env {
-                            let fresh_ssa = self.fresh_name(perl_name);
-                            fresh_env.insert(perl_name.clone(), fresh_ssa.clone());
-                            // Emit an assignment to a fresh unconstrained symbolic variable.
-                            lowered.push(SsaStmt::Assign(fresh_ssa.clone(), SsaExpr::FreshVar(fresh_ssa)));
+                            if body_assigned.contains(perl_name) {
+                                let fresh_ssa = self.fresh_name(perl_name);
+                                fresh_env.insert(perl_name.clone(), fresh_ssa.clone());
+                                // Emit an assignment to a fresh unconstrained symbolic variable.
+                                lowered.push(SsaStmt::Assign(fresh_ssa.clone(), SsaExpr::FreshVar(fresh_ssa)));
+                            }
                         }
 
                         // Evaluate invariant and condition in the fresh env
