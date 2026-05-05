@@ -54,6 +54,25 @@ The subagent executes these phases in order:
 - Wait for completion, collect result
 - Track cumulative progress across rounds
 
+## Docs (Sphinx)
+
+```
+cd docs/sphinx
+make html                           # build HTML to _build/html/
+```
+
+Deploy to gh-pages:
+
+```
+cd docs/sphinx
+make html
+git checkout gh-pages
+cp -r _build/html/* .
+git add -A && git commit --no-gpg-sign -m "update docs"
+git push origin gh-pages
+git checkout master
+```
+
 ## Key Files
 
 | Path | Role |

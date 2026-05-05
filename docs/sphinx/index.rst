@@ -1,0 +1,55 @@
+perlchecker
+===========
+
+**Symbolic verification for a restricted Perl subset.**
+
+perlchecker is a command-line tool that formally verifies annotated Perl
+functions using symbolic execution and SMT solving (Z3). You write
+preconditions and postconditions as comments above your functions, and
+perlchecker either proves they hold for all valid inputs or returns a
+concrete counterexample.
+
+.. code-block:: perl
+
+   # sig: (I64, I64) -> I64
+   # pre: $y != 0
+   # post: $result == $x / $y
+   sub safe_division {
+       my ($x, $y) = @_;
+       return $x / $y;
+   }
+
+.. code-block:: console
+
+   $ perlchecker check division.pl
+   ✔ safe_division: verified
+
+How It Works
+------------
+
+.. code-block:: text
+
+   Perl Source
+     → Function Extraction
+       → Annotation Parsing
+         → PEG Parsing
+           → Type Checking
+             → SSA / IR Lowering
+               → CFG Construction
+                 → Symbolic Execution
+                   → SMT Encoding (Z3)
+                     → Verified ✔  or  Counterexample ✘
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents
+
+   getting_started
+   user_guide
+   annotation_reference
+   language_reference
+   verification_pipeline
+   configuration
+   examples
+   limitations
+   error_reference

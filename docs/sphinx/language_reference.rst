@@ -1,0 +1,471 @@
+Language Reference
+==================
+
+perlchecker supports a strict subset of Perl designed for SMT-based
+verification. This page documents every supported construct.
+
+Types
+-----
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Type
+     - Description
+   * - ``I64``
+     - 64-bit signed integer
+   * - ``Str``
+     - UTF-8 string (bounded to 32 characters in the SMT model)
+   * - ``Array<I64>``
+     - Ordered sequence of integers
+   * - ``Array<Str>``
+     - Ordered sequence of strings
+   * - ``Hash<Str, I64>``
+     - String-keyed map with integer values
+   * - ``Hash<Str, Str>``
+     - String-keyed map with string values
+
+There is no implicit coercion between ``I64`` and ``Str``. Using an operator
+that expects one type with a value of the other is a type error.
+
+Variables and Assignment
+------------------------
+
+**Declaration:**
+
+.. code-block:: perl
+
+   my $x;           # declare without initializing
+   my $x = 42;      # declare with initial value
+
+**Assignment:**
+
+.. code-block:: perl
+
+   $x = $x + 1;
+
+**Compound assignment operators:**
+
+``+=``, ``-=``, ``*=``, ``/=``, ``%=``, ``**=``,
+``&=``, ``|=``, ``^=``, ``<<=``, ``>>=``, ``.=``
+
+These desugar to the equivalent binary operation. For example,
+``$x += 1`` becomes ``$x = $x + 1``.
+
+**Increment and decrement:**
+
+``$x++`` and ``$x--`` desugar to ``$x = $x + 1`` and ``$x = $x - 1``.
+
+Arithmetic Operators
+--------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 65
+
+   * - Operator
+     - Example
+     - Notes
+   * - ``+``
+     - ``$x + $y``
+     - Addition
+   * - ``-``
+     - ``$x - $y``
+     - Subtraction
+   * - ``*``
+     - ``$x * $y``
+     - Multiplication
+   * - ``/``
+     - ``$x / $y``
+     - Truncating division. Paths where the divisor is 0 are discarded.
+   * - ``%``
+     - ``$x % $y``
+     - Modulo. Paths where the divisor is 0 are discarded.
+   * - ``**``
+     - ``$x ** $y``
+     - Exponentiation (right-associative)
+   * - ``-`` (unary)
+     - ``-$x``
+     - Negation
+
+Comparison Operators
+--------------------
+
+Numeric
+^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - Operator
+     - Description
+   * - ``<``
+     - Less than
+   * - ``<=``
+     - Less than or equal
+   * - ``>``
+     - Greater than
+   * - ``>=``
+     - Greater than or equal
+   * - ``==``
+     - Equal
+   * - ``!=``
+     - Not equal
+   * - ``<=>``
+     - Spaceship (three-way compare): returns -1, 0, or 1
+
+String
+^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - Operator
+     - Description
+   * - ``eq``
+     - Equal
+   * - ``ne``
+     - Not equal
+   * - ``lt``
+     - Less than (lexicographic)
+   * - ``gt``
+     - Greater than (lexicographic)
+   * - ``le``
+     - Less than or equal (lexicographic)
+   * - ``ge``
+     - Greater than or equal (lexicographic)
+   * - ``cmp``
+     - String compare: returns -1, 0, or 1
+
+Logical Operators
+-----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Operator
+     - Description
+   * - ``&&``, ``and``
+     - Logical AND (``and`` has lower precedence)
+   * - ``||``, ``or``
+     - Logical OR (``or`` has lower precedence)
+   * - ``!``, ``not``
+     - Logical NOT (``not`` has lower precedence)
+
+Bitwise Operators
+-----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 65
+
+   * - Operator
+     - Example
+     - Description
+   * - ``&``
+     - ``$x & $y``
+     - Bitwise AND
+   * - ``|``
+     - ``$x | $y``
+     - Bitwise OR
+   * - ``^``
+     - ``$x ^ $y``
+     - Bitwise XOR
+   * - ``~``
+     - ``~$x``
+     - Bitwise complement
+   * - ``<<``
+     - ``$x << $n``
+     - Left shift
+   * - ``>>``
+     - ``$x >> $n``
+     - Right shift
+
+String Operators
+----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 65
+
+   * - Operator
+     - Example
+     - Description
+   * - ``.``
+     - ``$a . $b``
+     - Concatenation
+   * - ``x``
+     - ``"ab" x 3``
+     - String repetition (count must be a constant)
+
+Control Flow
+------------
+
+if / elsif / else
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: perl
+
+   if ($x > 0) {
+       return 1;
+   } elsif ($x == 0) {
+       return 0;
+   } else {
+       return -1;
+   }
+
+unless
+^^^^^^
+
+Equivalent to ``if`` with a negated condition:
+
+.. code-block:: perl
+
+   unless ($x == 0) {
+       return $x;
+   }
+
+while
+^^^^^
+
+.. code-block:: perl
+
+   while ($x > 0) {
+       $x = $x - 1;
+   }
+
+Loops are **unrolled** to a bounded depth (default: 5 iterations).
+Use ``--max_loop_unroll`` to adjust.
+
+until
+^^^^^
+
+Equivalent to ``while`` with a negated condition:
+
+.. code-block:: perl
+
+   until ($x == 0) {
+       $x = $x - 1;
+   }
+
+for (C-style)
+^^^^^^^^^^^^^
+
+.. code-block:: perl
+
+   for (my $i = 0; $i < $n; $i++) {
+       $sum = $sum + $arr[$i];
+   }
+
+do-while / do-until
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: perl
+
+   do {
+       $x = $x - 1;
+   } while ($x > 0);
+
+   do {
+       $x = $x - 1;
+   } until ($x == 0);
+
+Statement Modifiers
+^^^^^^^^^^^^^^^^^^^
+
+A statement can be followed by ``if`` or ``unless`` to make it conditional:
+
+.. code-block:: perl
+
+   return $x if ($x > 0);
+   return 0 unless ($found == 1);
+   $x = $x + 1 if ($flag == 1);
+   die "negative" if ($x < 0);
+   die "bad" unless ($x >= 0);
+   last if ($done == 1);
+   next unless ($valid == 1);
+
+Loop Control
+------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - Statement
+     - Description
+   * - ``last``
+     - Exit the innermost loop (like ``break`` in C)
+   * - ``next``
+     - Skip to the next iteration (like ``continue`` in C)
+
+Both support statement modifiers: ``last if ($cond);``,
+``next unless ($cond);``.
+
+Built-in Functions
+------------------
+
+String Functions
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Signature
+     - Description
+   * - ``length($s) → I64``
+     - Number of characters
+   * - ``substr($s, $off, $len) → Str``
+     - Substring starting at ``$off`` with length ``$len``
+   * - ``substr($s, $off) → Str``
+     - Substring from ``$off`` to end of string
+   * - ``index($s, $sub) → I64``
+     - Position of ``$sub`` in ``$s``, or -1 if not found
+   * - ``index($s, $sub, $start) → I64``
+     - Same, searching from ``$start``
+   * - ``chomp($s) → Str``
+     - Remove trailing newline
+   * - ``reverse($s) → Str``
+     - Reverse the string
+   * - ``contains($s, $sub) → I64``
+     - 1 if ``$s`` contains ``$sub``, else 0
+   * - ``starts_with($s, $prefix) → I64``
+     - 1 if ``$s`` starts with ``$prefix``, else 0
+   * - ``ends_with($s, $suffix) → I64``
+     - 1 if ``$s`` ends with ``$suffix``, else 0
+   * - ``replace($s, $from, $to) → Str``
+     - Replace all occurrences of ``$from`` with ``$to``
+   * - ``char_at($s, $i) → Str``
+     - Character at position ``$i`` as a 1-character string
+   * - ``ord($s) → I64``
+     - ASCII code of the first character
+   * - ``chr($n) → Str``
+     - Character from ASCII code
+
+Numeric Functions
+^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Signature
+     - Description
+   * - ``abs($n) → I64``
+     - Absolute value
+   * - ``min($a, $b) → I64``
+     - Minimum of two integers
+   * - ``max($a, $b) → I64``
+     - Maximum of two integers
+   * - ``int($x) → I64``
+     - Truncate to integer
+
+Array Functions
+^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Signature
+     - Description
+   * - ``scalar(@arr) → I64``
+     - Number of elements in the array
+   * - ``push(@arr, $val)``
+     - Append ``$val`` to the end of ``@arr``
+   * - ``pop(@arr) → element``
+     - Remove and return the last element
+
+Array and Hash Operations
+-------------------------
+
+**Array access:**
+
+.. code-block:: perl
+
+   my $val = $arr[$i];     # read element at index $i
+   $arr[$i] = $new_val;    # write element at index $i
+
+**Hash access:**
+
+.. code-block:: perl
+
+   my $val = $h{"key"};    # read value for key
+   $h{$key} = $new_val;    # write value for key
+
+Arrays and hashes are modeled using Z3's Array theory (select/store). Reading
+a hash key that was never written returns an unconstrained symbolic value.
+
+Function Calls
+--------------
+
+Functions can call other annotated functions in the same file:
+
+.. code-block:: perl
+
+   my $result = other_function($x, $y);
+
+Calls are inlined during verification. The callee must be defined
+*before* the caller in the source file. Recursion is not allowed.
+
+Ternary Operator
+----------------
+
+.. code-block:: perl
+
+   my $result = ($x > 0) ? $x : -$x;
+
+Nested ternary expressions are supported.
+
+Error and Output Statements
+----------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Statement
+     - Description
+   * - ``die "msg"``
+     - Terminate execution with an error. If reachable, verification fails.
+   * - ``croak "msg"``
+     - Alias for ``die``
+   * - ``confess "msg"``
+     - Alias for ``die``
+   * - ``warn "msg"``
+     - No-op for verification
+   * - ``print $expr``
+     - No-op for verification
+   * - ``say $expr``
+     - No-op for verification
+
+Integer Literals
+----------------
+
+.. code-block:: perl
+
+   42           # decimal
+   0xFF         # hexadecimal
+   0o77         # octal
+   0b1010       # binary
+   1_000_000    # underscores allowed as visual separators
+
+String Literals
+---------------
+
+**Double-quoted** (supports escape sequences):
+
+.. code-block:: perl
+
+   "hello\nworld"    # \n, \t, \\, \" supported
+
+**Single-quoted** (minimal escaping):
+
+.. code-block:: perl
+
+   'hello'           # only \\ and \' are escape sequences

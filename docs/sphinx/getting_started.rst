@@ -1,0 +1,78 @@
+Getting Started
+===============
+
+Prerequisites
+-------------
+
+**Rust toolchain**
+   Install via `rustup <https://rustup.rs/>`_::
+
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+**Z3 SMT solver library**
+   perlchecker links against libz3 at build time.
+
+   *Ubuntu / Debian*::
+
+      sudo apt install libz3-dev
+
+   *Arch Linux*::
+
+      sudo pacman -S z3
+
+   *macOS (Homebrew)*::
+
+      brew install z3
+
+   *From source*: build Z3 from
+   `the Z3 GitHub repository <https://github.com/Z3Prover/z3>`_
+   and ensure the headers and shared library are on your include/library path.
+
+Building from Source
+--------------------
+
+Clone the repository and build with Cargo::
+
+   git clone https://github.com/dhilst/perlchecker.git
+   cd perlchecker
+   cargo build --release
+
+The binary is at ``target/release/perlchecker``.
+
+Quick Start
+-----------
+
+Create a file ``hello.pl``:
+
+.. code-block:: perl
+
+   # sig: (I64) -> I64
+   # pre: $x >= 0
+   # post: $result == $x
+   sub identity_with_pre {
+       my ($x) = @_;
+       return $x;
+   }
+
+Run the verifier:
+
+.. code-block:: console
+
+   $ cargo run --quiet -- check hello.pl
+   ✔ identity_with_pre: verified
+
+The tool proved that for every integer ``$x >= 0``, the function returns
+exactly ``$x``.
+
+What Just Happened?
+^^^^^^^^^^^^^^^^^^^
+
+1. perlchecker extracted the annotated function and its contracts.
+2. It parsed the function body into an AST, type-checked it, and lowered
+   it to SSA form.
+3. It symbolically executed all paths through the function, treating
+   ``$x`` as a symbolic (unconstrained) integer.
+4. For each path, it asked the Z3 SMT solver: "Given the precondition
+   ``$x >= 0`` and this path's constraints, can the postcondition
+   ``$result == $x`` ever be false?"
+5. Z3 answered "no" for every path — the function is verified.
