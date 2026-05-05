@@ -13,20 +13,20 @@ Types
 
    * - Type
      - Description
-   * - ``Int``
+   * - ``I64``
      - 64-bit signed integer
    * - ``Str``
      - UTF-8 string (bounded to 32 characters in the SMT model)
-   * - ``Array<Int>``
+   * - ``Array<I64>``
      - Ordered sequence of integers
    * - ``Array<Str>``
      - Ordered sequence of strings
-   * - ``Hash<Str, Int>``
+   * - ``Hash<Str, I64>``
      - String-keyed map with integer values
    * - ``Hash<Str, Str>``
      - String-keyed map with string values
 
-There is no implicit coercion between ``Int`` and ``Str``. Using an operator
+There is no implicit coercion between ``I64`` and ``Str``. Using an operator
 that expects one type with a value of the other is a type error.
 
 Variables and Assignment
@@ -318,31 +318,31 @@ String Functions
 
    * - Signature
      - Description
-   * - ``length($s) → Int``
+   * - ``length($s) → I64``
      - Number of characters
    * - ``substr($s, $off, $len) → Str``
      - Substring starting at ``$off`` with length ``$len``
    * - ``substr($s, $off) → Str``
      - Substring from ``$off`` to end of string
-   * - ``index($s, $sub) → Int``
+   * - ``index($s, $sub) → I64``
      - Position of ``$sub`` in ``$s``, or -1 if not found
-   * - ``index($s, $sub, $start) → Int``
+   * - ``index($s, $sub, $start) → I64``
      - Same, searching from ``$start``
    * - ``chomp($s) → Str``
      - Remove trailing newline
    * - ``reverse($s) → Str``
      - Reverse the string
-   * - ``contains($s, $sub) → Int``
+   * - ``contains($s, $sub) → I64``
      - 1 if ``$s`` contains ``$sub``, else 0
-   * - ``starts_with($s, $prefix) → Int``
+   * - ``starts_with($s, $prefix) → I64``
      - 1 if ``$s`` starts with ``$prefix``, else 0
-   * - ``ends_with($s, $suffix) → Int``
+   * - ``ends_with($s, $suffix) → I64``
      - 1 if ``$s`` ends with ``$suffix``, else 0
    * - ``replace($s, $from, $to) → Str``
      - Replace all occurrences of ``$from`` with ``$to``
    * - ``char_at($s, $i) → Str``
      - Character at position ``$i`` as a 1-character string
-   * - ``ord($s) → Int``
+   * - ``ord($s) → I64``
      - ASCII code of the first character
    * - ``chr($n) → Str``
      - Character from ASCII code
@@ -356,13 +356,13 @@ Numeric Functions
 
    * - Signature
      - Description
-   * - ``abs($n) → Int``
+   * - ``abs($n) → I64``
      - Absolute value
-   * - ``min($a, $b) → Int``
+   * - ``min($a, $b) → I64``
      - Minimum of two integers
-   * - ``max($a, $b) → Int``
+   * - ``max($a, $b) → I64``
      - Maximum of two integers
-   * - ``int($x) → Int``
+   * - ``int($x) → I64``
      - Truncate to integer
 
 Array Functions
@@ -374,7 +374,7 @@ Array Functions
 
    * - Signature
      - Description
-   * - ``scalar(@arr) → Int``
+   * - ``scalar(@arr) → I64``
      - Number of elements in the array
    * - ``push(@arr, $val)``
      - Append ``$val`` to the end of ``@arr``

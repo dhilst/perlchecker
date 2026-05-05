@@ -248,7 +248,7 @@
 that should be verified must have an annotation block — a contiguous group of
 <code class="docutils literal notranslate"><span class="pre">#</span></code>-prefixed comment lines — placed <em>immediately</em> above the <code class="docutils literal notranslate"><span class="pre">sub</span></code> keyword.
 Functions without annotations are ignored.</p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># pre: $x &gt;= 0</span>
 <span class="c1"># post: $result &gt;= 0</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">my_function</span><span class="w"> </span><span class="p">{</span>
@@ -355,14 +355,14 @@ See <a class="reference internal" href="error_reference.html"><span class="doc">
 <p>A file can contain multiple annotated functions. They are verified in source
 order. When function <code class="docutils literal notranslate"><span class="pre">B</span></code> calls function <code class="docutils literal notranslate"><span class="pre">A</span></code>, the verifier inlines <code class="docutils literal notranslate"><span class="pre">A</span></code>
 at the call site — it does not re-verify <code class="docutils literal notranslate"><span class="pre">A</span></code> separately for each caller.</p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># post: $result == $x + 1</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">inc</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nv">$x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
 <span class="p">}</span>
 
-<span class="c1"># sig: (Int) -&gt; Int</span>
+<span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># post: $result == $x + 1</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">call_inc</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>

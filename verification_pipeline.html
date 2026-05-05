@@ -363,9 +363,9 @@ up to <code class="docutils literal notranslate"><span class="pre">max_loop_unro
 <ul class="simple">
 <li><p>Every variable must be declared with <code class="docutils literal notranslate"><span class="pre">my</span></code> before use</p></li>
 <li><p>Declared but uninitialized variables cannot be read</p></li>
-<li><p>Arithmetic operators require <code class="docutils literal notranslate"><span class="pre">Int</span></code> operands</p></li>
+<li><p>Arithmetic operators require <code class="docutils literal notranslate"><span class="pre">I64</span></code> operands</p></li>
 <li><p>String operators require <code class="docutils literal notranslate"><span class="pre">Str</span></code> operands</p></li>
-<li><p>Array indices must be <code class="docutils literal notranslate"><span class="pre">Int</span></code>; hash keys must be <code class="docutils literal notranslate"><span class="pre">Str</span></code></p></li>
+<li><p>Array indices must be <code class="docutils literal notranslate"><span class="pre">I64</span></code>; hash keys must be <code class="docutils literal notranslate"><span class="pre">Str</span></code></p></li>
 <li><p>Precondition and postcondition expressions are type-checked too</p></li>
 <li><p>Reference aliases are tracked through branches and propagated to the
 postcondition (aliases created in both branches of an <code class="docutils literal notranslate"><span class="pre">if</span></code>/<code class="docutils literal notranslate"><span class="pre">else</span></code> are
@@ -428,7 +428,7 @@ is unsatisfiable, that branch is not explored.</p>
 <p><strong>Module:</strong> <code class="docutils literal notranslate"><span class="pre">src/smt/mod.rs</span></code></p>
 <p>For each completed path, translates symbolic expressions to Z3 formulas:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">Int</span></code> expressions → Z3 <code class="docutils literal notranslate"><span class="pre">Int</span></code> sort</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">I64</span></code> expressions → Z3 <code class="docutils literal notranslate"><span class="pre">I64</span></code> sort</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">Str</span></code> expressions → Z3 <code class="docutils literal notranslate"><span class="pre">String</span></code> sort</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">Bool</span></code> expressions → Z3 <code class="docutils literal notranslate"><span class="pre">Bool</span></code> sort</p></li>
 <li><p>Arrays → Z3 <code class="docutils literal notranslate"><span class="pre">Array</span></code> sort with <code class="docutils literal notranslate"><span class="pre">Select</span></code>/<code class="docutils literal notranslate"><span class="pre">Store</span></code></p></li>

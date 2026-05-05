@@ -22,15 +22,15 @@ Supported types:
 
    * - Type
      - Description
-   * - ``Int``
+   * - ``I64``
      - 64-bit signed integer
    * - ``Str``
      - UTF-8 string
-   * - ``Array<Int>``
+   * - ``Array<I64>``
      - Array of integers
    * - ``Array<Str>``
      - Array of strings
-   * - ``Hash<Str, Int>``
+   * - ``Hash<Str, I64>``
      - String-keyed hash with integer values
    * - ``Hash<Str, Str>``
      - String-keyed hash with string values
@@ -39,11 +39,11 @@ Examples:
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
-   # sig: (Int, Int) -> Int
+   # sig: (I64) -> I64
+   # sig: (I64, I64) -> I64
    # sig: (Str, Str) -> Str
-   # sig: (Array<Int>, Int) -> Int
-   # sig: (Hash<Str, Int>, Str) -> Int
+   # sig: (Array<I64>, I64) -> I64
+   # sig: (Hash<Str, I64>, Str) -> I64
 
 The number of types in the signature must match the number of parameters in the
 ``my (...) = @_;`` binding.
@@ -119,9 +119,9 @@ Examples:
 
 .. code-block:: perl
 
-   # extern: abs_val (Int) -> Int post: $result >= 0
-   # extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c
-   # extern: lookup (Hash<Str, Int>, Str) -> Int
+   # extern: abs_val (I64) -> I64 post: $result >= 0
+   # extern: clamp (I64, I64, I64) -> I64 pre: $b <= $c post: $result >= $b && $result <= $c
+   # extern: lookup (Hash<Str, I64>, Str) -> I64
 
 When a verified function calls an extern, perlchecker:
 
@@ -157,7 +157,7 @@ Examples:
 
 .. code-block:: perl
 
-   # sig: (Int, Int) -> Int
+   # sig: (I64, I64) -> I64
    # post: $result == $x + $y
    sub add_with_ghost {
        my ($x, $y) = @_;
@@ -167,7 +167,7 @@ Examples:
        return $sum;
    }
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # pre: $n >= 0
    # post: $result >= $n
    sub double_ghost {

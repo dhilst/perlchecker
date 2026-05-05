@@ -11,7 +11,7 @@ Functions without annotations are ignored.
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # pre: $x >= 0
    # post: $result >= 0
    sub my_function {
@@ -122,14 +122,14 @@ at the call site — it does not re-verify ``A`` separately for each caller.
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # post: $result == $x + 1
    sub inc {
        my ($x) = @_;
        return $x + 1;
    }
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # post: $result == $x + 1
    sub call_inc {
        my ($x) = @_;

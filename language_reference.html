@@ -258,19 +258,19 @@ verification. This page documents every supported construct.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">I64</span></code></p></td>
 <td><p>64-bit signed integer</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Str</span></code></p></td>
 <td><p>UTF-8 string (bounded to 32 characters in the SMT model)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Array&lt;Int&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Array&lt;I64&gt;</span></code></p></td>
 <td><p>Ordered sequence of integers</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Array&lt;Str&gt;</span></code></p></td>
 <td><p>Ordered sequence of strings</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Hash&lt;Str,</span> <span class="pre">Int&gt;</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Hash&lt;Str,</span> <span class="pre">I64&gt;</span></code></p></td>
 <td><p>String-keyed map with integer values</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Hash&lt;Str,</span> <span class="pre">Str&gt;</span></code></p></td>
@@ -279,7 +279,7 @@ verification. This page documents every supported construct.</p>
 </tbody>
 </table>
 </div>
-<p>There is no implicit coercion between <code class="docutils literal notranslate"><span class="pre">Int</span></code> and <code class="docutils literal notranslate"><span class="pre">Str</span></code>. Using an operator
+<p>There is no implicit coercion between <code class="docutils literal notranslate"><span class="pre">I64</span></code> and <code class="docutils literal notranslate"><span class="pre">Str</span></code>. Using an operator
 that expects one type with a value of the other is a type error.</p>
 </section>
 <section id="variables-and-assignment">
@@ -647,7 +647,7 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">length($s)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">length($s)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Number of characters</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">substr($s,</span> <span class="pre">$off,</span> <span class="pre">$len)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
@@ -656,10 +656,10 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">substr($s,</span> <span class="pre">$off)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
 <td><p>Substring from <code class="docutils literal notranslate"><span class="pre">$off</span></code> to end of string</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">index($s,</span> <span class="pre">$sub)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">index($s,</span> <span class="pre">$sub)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Position of <code class="docutils literal notranslate"><span class="pre">$sub</span></code> in <code class="docutils literal notranslate"><span class="pre">$s</span></code>, or -1 if not found</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">index($s,</span> <span class="pre">$sub,</span> <span class="pre">$start)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">index($s,</span> <span class="pre">$sub,</span> <span class="pre">$start)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Same, searching from <code class="docutils literal notranslate"><span class="pre">$start</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chomp($s)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
@@ -668,13 +668,13 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">reverse($s)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
 <td><p>Reverse the string</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">contains($s,</span> <span class="pre">$sub)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">contains($s,</span> <span class="pre">$sub)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>1 if <code class="docutils literal notranslate"><span class="pre">$s</span></code> contains <code class="docutils literal notranslate"><span class="pre">$sub</span></code>, else 0</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">starts_with($s,</span> <span class="pre">$prefix)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">starts_with($s,</span> <span class="pre">$prefix)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>1 if <code class="docutils literal notranslate"><span class="pre">$s</span></code> starts with <code class="docutils literal notranslate"><span class="pre">$prefix</span></code>, else 0</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ends_with($s,</span> <span class="pre">$suffix)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ends_with($s,</span> <span class="pre">$suffix)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>1 if <code class="docutils literal notranslate"><span class="pre">$s</span></code> ends with <code class="docutils literal notranslate"><span class="pre">$suffix</span></code>, else 0</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">replace($s,</span> <span class="pre">$from,</span> <span class="pre">$to)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
@@ -683,7 +683,7 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">char_at($s,</span> <span class="pre">$i)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
 <td><p>Character at position <code class="docutils literal notranslate"><span class="pre">$i</span></code> as a 1-character string</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ord($s)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ord($s)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>ASCII code of the first character</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chr($n)</span> <span class="pre">→</span> <span class="pre">Str</span></code></p></td>
@@ -707,16 +707,16 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">abs($n)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">abs($n)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Absolute value</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min($a,</span> <span class="pre">$b)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min($a,</span> <span class="pre">$b)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Minimum of two integers</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max($a,</span> <span class="pre">$b)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max($a,</span> <span class="pre">$b)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Maximum of two integers</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">int($x)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">int($x)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Truncate to integer</p></td>
 </tr>
 </tbody>
@@ -737,7 +737,7 @@ Use <code class="docutils literal notranslate"><span class="pre">--max_loop_unro
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">scalar(&#64;arr)</span> <span class="pre">→</span> <span class="pre">Int</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">scalar(&#64;arr)</span> <span class="pre">→</span> <span class="pre">I64</span></code></p></td>
 <td><p>Number of elements in the array</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">push(&#64;arr,</span> <span class="pre">$val)</span></code></p></td>

@@ -248,7 +248,7 @@ functions using symbolic execution and SMT solving (Z3). You write
 preconditions and postconditions as comments above your functions, and
 perlchecker either proves they hold for all valid inputs or returns a
 concrete counterexample.</p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int, Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64, I64) -&gt; I64</span>
 <span class="c1"># pre: $y != 0</span>
 <span class="c1"># post: $result == $x / $y</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">safe_division</span><span class="w"> </span><span class="p">{</span>

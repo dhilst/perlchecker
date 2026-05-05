@@ -136,9 +136,9 @@ Performs flow-sensitive type checking on the AST:
 
 - Every variable must be declared with ``my`` before use
 - Declared but uninitialized variables cannot be read
-- Arithmetic operators require ``Int`` operands
+- Arithmetic operators require ``I64`` operands
 - String operators require ``Str`` operands
-- Array indices must be ``Int``; hash keys must be ``Str``
+- Array indices must be ``I64``; hash keys must be ``Str``
 - Precondition and postcondition expressions are type-checked too
 - Reference aliases are tracked through branches and propagated to the
   postcondition (aliases created in both branches of an ``if``/``else`` are
@@ -208,7 +208,7 @@ Stage 8: SMT Encoding and Solving
 
 For each completed path, translates symbolic expressions to Z3 formulas:
 
-- ``Int`` expressions → Z3 ``Int`` sort
+- ``I64`` expressions → Z3 ``I64`` sort
 - ``Str`` expressions → Z3 ``String`` sort
 - ``Bool`` expressions → Z3 ``Bool`` sort
 - Arrays → Z3 ``Array`` sort with ``Select``/``Store``

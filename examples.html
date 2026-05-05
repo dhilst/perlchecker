@@ -247,7 +247,7 @@ perlchecker works in practice.</p>
 <section id="basic-verification">
 <h2>Basic Verification<a class="headerlink" href="#basic-verification" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/00_identity_with_pre.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># pre: $x &gt;= 0</span>
 <span class="c1"># post: $result == $x</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">identity_with_pre</span><span class="w"> </span><span class="p">{</span>
@@ -268,7 +268,7 @@ holds for all valid inputs.</p>
 <section id="finding-a-counterexample">
 <h2>Finding a Counterexample<a class="headerlink" href="#finding-a-counterexample" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/04_counterexample.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># post: $result &gt; $x</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">counterexample</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
@@ -293,7 +293,7 @@ greater than <code class="docutils literal notranslate"><span class="pre">$x</sp
 <section id="safe-division">
 <h2>Safe Division<a class="headerlink" href="#safe-division" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/09_safe_division.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int, Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64, I64) -&gt; I64</span>
 <span class="c1"># pre: $y != 0</span>
 <span class="c1"># post: $result == $x / $y</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">safe_division</span><span class="w"> </span><span class="p">{</span>
@@ -333,7 +333,7 @@ confirms this holds for all strings (up to the 32-character bound).</p>
 <section id="arrays">
 <h2>Arrays<a class="headerlink" href="#arrays" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/21_array_read_verified.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Array&lt;Int&gt;, Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Array&lt;I64&gt;, I64) -&gt; I64</span>
 <span class="c1"># post: $result == $arr[$i]</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">array_read_verified</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$arr</span><span class="p">,</span><span class="w"> </span><span class="nv">$i</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
@@ -351,14 +351,14 @@ it trivially satisfies the postcondition <code class="docutils literal notransla
 <section id="function-calls">
 <h2>Function Calls<a class="headerlink" href="#function-calls" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/27_function_call_verified.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># post: $result == $x + 1</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">inc</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nv">$x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
 <span class="p">}</span>
 
-<span class="c1"># sig: (Int) -&gt; Int</span>
+<span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># post: $result == $x + 1</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">function_call_verified</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">my</span><span class="w"> </span><span class="p">(</span><span class="nv">$x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">@_</span><span class="p">;</span>
@@ -378,7 +378,7 @@ returns <code class="docutils literal notranslate"><span class="pre">$x</span> <
 <section id="loops">
 <h2>Loops<a class="headerlink" href="#loops" title="Link to this heading">¶</a></h2>
 <p><strong>File:</strong> <code class="docutils literal notranslate"><span class="pre">examples/30_while_verified.pl</span></code></p>
-<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (Int) -&gt; Int</span>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="c1"># sig: (I64) -&gt; I64</span>
 <span class="c1"># pre: $x &gt;= 0 &amp;&amp; $x &lt;= 5</span>
 <span class="c1"># post: $result == 0</span>
 <span class="k">sub</span><span class="w"> </span><span class="nf">while_verified</span><span class="w"> </span><span class="p">{</span>

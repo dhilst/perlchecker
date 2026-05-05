@@ -12,7 +12,7 @@ Basic Verification
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # pre: $x >= 0
    # post: $result == $x
    sub identity_with_pre {
@@ -38,7 +38,7 @@ Finding a Counterexample
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # post: $result > $x
    sub counterexample {
        my ($x) = @_;
@@ -68,7 +68,7 @@ Safe Division
 
 .. code-block:: perl
 
-   # sig: (Int, Int) -> Int
+   # sig: (I64, I64) -> I64
    # pre: $y != 0
    # post: $result == $x / $y
    sub safe_division {
@@ -118,7 +118,7 @@ Arrays
 
 .. code-block:: perl
 
-   # sig: (Array<Int>, Int) -> Int
+   # sig: (Array<I64>, I64) -> I64
    # post: $result == $arr[$i]
    sub array_read_verified {
        my ($arr, $i) = @_;
@@ -141,14 +141,14 @@ Function Calls
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # post: $result == $x + 1
    sub inc {
        my ($x) = @_;
        return $x + 1;
    }
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # post: $result == $x + 1
    sub function_call_verified {
        my ($x) = @_;
@@ -173,7 +173,7 @@ Loops
 
 .. code-block:: perl
 
-   # sig: (Int) -> Int
+   # sig: (I64) -> I64
    # pre: $x >= 0 && $x <= 5
    # post: $result == 0
    sub while_verified {
