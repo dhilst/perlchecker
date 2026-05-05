@@ -68,7 +68,10 @@ the proposed expansion.
 
 ### 4a: PLAN sub-phase
 
+**First:** Update `docs/PERL-SUBSET.md` to describe the new feature. This is the source of truth for the supported subset and must be updated before implementation begins.
+
 Decide which files need changes:
+- `docs/PERL-SUBSET.md` — subset specification (**update first**)
 - `src/parser/perl_subset.pest` — grammar rules
 - `src/parser/mod.rs` — parse tree → AST conversion
 - `src/ast/mod.rs` — AST types, type checker
@@ -86,6 +89,10 @@ Make the code changes. Requirements:
 - Each expansion MUST include at least one example file (`examples/round<ROUND>_dev.pl`) with annotated functions that exercise the new feature
 - Example must have `# sig:`, `# pre:`, `# post:` annotations
 - Functions must be verifiable (postconditions must hold)
+- If the feature introduces or changes types, builtins, or semantics, update:
+  - `README.md` (supported types, examples, annotation reference)
+  - `docs/sphinx/` (relevant .rst files)
+  - Narrative comments in affected `examples/*.pl` files
 
 ### 4c: QA sub-phase
 

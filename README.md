@@ -5,7 +5,7 @@ Symbolic verification for a restricted Perl subset.
 perlchecker formally verifies annotated Perl functions using symbolic execution and SMT solving (Z3). Write preconditions and postconditions as comments above your functions, and perlchecker either proves they hold for all valid inputs or returns a concrete counterexample.
 
 ```perl
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y != 0
 # post: $result == $x / $y
 sub safe_division {
@@ -48,10 +48,10 @@ Options:
 ### `# sig:` — Type Signature (required)
 
 ```perl
-# sig: (Int, Str) -> Int
+# sig: (I64, Str) -> I64
 ```
 
-Supported types: `Int`, `Str`, `Array<Int>`, `Array<Str>`, `Hash<Str, Int>`, `Hash<Str, Str>`.
+Supported types: `I64`, `Str`, `Array<I64>`, `Array<Str>`, `Hash<Str, I64>`, `Hash<Str, Str>`.
 
 ### `# pre:` — Precondition (optional)
 
@@ -72,8 +72,8 @@ Use `$result` to refer to the return value.
 Declare contracts for functions defined outside the file:
 
 ```perl
-# extern: abs_val (Int) -> Int post: $result >= 0
-# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c
+# extern: abs_val (I64) -> I64 post: $result >= 0
+# extern: clamp (I64, I64, I64) -> I64 pre: $b <= $c post: $result >= $b && $result <= $c
 ```
 
 ### `# ghost:` — Ghost Variables

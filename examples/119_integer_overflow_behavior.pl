@@ -1,4 +1,4 @@
-# Round 119: Perl integer overflow behavior diverges from perlchecker Int semantics
+# Round 119: Perl integer overflow behavior diverges from perlchecker I64 semantics
 
 # sig: (I64) -> I64
 # pre: $dummy == 0

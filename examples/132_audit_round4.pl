@@ -1,7 +1,7 @@
 # Audit Round 4: Exponentiation ** with negative exponent — floor vs truncation
 #
 # Z3's Int.power returns Real, and the checker converts back via real2int (floor).
-# But Perl returns a float, and when used as Int, it truncates toward zero.
+# But Perl returns a float, and when used as I64, it truncates toward zero.
 # For negative fractional results: floor(-0.5) = -1, but trunc(-0.5) = 0.
 # This causes unsoundness: checker verifies (-x)**-1 == -1, but Perl disagrees.
 

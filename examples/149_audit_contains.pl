@@ -2,7 +2,7 @@
 # Round 149: Soundness audit — contains, starts_with, ends_with
 # =============================================================
 # Verify edge cases: empty needle always true, empty haystack
-# with non-empty needle false, boolean-to-Int mapping (0/1).
+# with non-empty needle false, boolean-to-I64 mapping (0/1).
 
 # --- Edge case 1: contains with empty needle always returns 1 ---
 # sig: (Str) -> I64

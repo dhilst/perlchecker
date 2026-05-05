@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); if echo \"$INPUT\" | jq -r '.tool_input.command' 2>/dev/null | grep -q 'git commit'; then bash \"$CLAUDE_PROJECT_DIR/scripts/check-doc-terms.sh\" || exit 2; bash \"$CLAUDE_PROJECT_DIR/scripts/check-subset-sync.sh\" || exit 2; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); if echo \"$INPUT\" | jq -r '.tool_input.command' 2>/dev/null | grep -q 'git commit'; then if git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | grep -q '^docs/sphinx/'; then bash \"$CLAUDE_PROJECT_DIR/scripts/deploy-docs.sh\"; fi; fi",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

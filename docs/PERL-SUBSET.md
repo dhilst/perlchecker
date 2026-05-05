@@ -1,31 +1,26 @@
 # Verifiable Perl Subset Specification
 
-## 🎯 Goal
+## Goal
 
-Define a **Perl-like subset** that is:
+Define a Perl-like subset that is:
 
 * Large enough to express real programs
 * Small enough to be symbolically executed and verified
-* Compatible with SMT-based reasoning
+* Compatible with SMT-based reasoning (Z3 with BV(64) + strings + arrays)
 
 ---
 
-# 🧱 1. Types
+# 1. Types
 
 ## Primitive Types
 
 ```text
 I64
 Str
-Bool (derived from expressions)
 ```
 
-### Notes
-
 * No implicit coercion between `I64` and `Str`
-* All variables are statically typed via `# sig`
-
----
+* All variables are statically typed via `# sig:`
 
 ## Composite Types
 
@@ -39,8 +34,6 @@ Array<Str>
 * Indexed by integers
 * Access via: `$arr[i]`
 
----
-
 ### Hashes
 
 ```text
@@ -48,27 +41,35 @@ Hash<Str, I64>
 Hash<Str, Str>
 ```
 
-* Key-value maps
+* Key-value maps with string keys
 * Access via: `$h{"key"}`
 
----
+## Reference Types
+
+```text
+\$scalar    -> RefI64, RefStr
+\@array     -> RefArrayI64, RefArrayStr
+\%hash      -> RefHashI64, RefHashStr
+```
+
+* Dereference via: `$$ref`
+* Arrow access: `$ref->[i]`, `$ref->{"key"}`
 
 ## Restrictions
 
-* No nested structures
-* No references
+* No nested structures beyond one level of reference
 * No autovivification
 
 ---
 
-# 🧱 2. Functions
+# 2. Functions
 
 ## Syntax
 
 ```perl
 # sig: (I64, Str) -> Str
 # pre: ...
-# pos: ...
+# post: ...
 sub foo {
   my ($x, $y) = @_;
   ...
@@ -76,16 +77,12 @@ sub foo {
 }
 ```
 
----
-
 ## Rules
 
 * Pure functions only
 * No global variables
 * Fixed arity
 * Explicit `return`
-
----
 
 ## Function Calls
 
@@ -96,296 +93,262 @@ $z = foo($x, $y);
 ### Constraints
 
 * Only annotated functions
-* Same file (initially)
+* Same file
 * No recursion
 * No dynamic dispatch
 
 ---
 
-# 🧱 3. Variables and Assignment
+# 3. Variables and Assignment
 
 ```perl
 my $x = expr;
 $x = expr;
+$x++;
+$x--;
+```
+
+## Compound Assignment
+
+```perl
+$x += expr;  $x -= expr;  $x *= expr;
+$x /= expr;  $x %= expr;  $x **= expr;
+$x .= expr;
+$x <<= expr;  $x >>= expr;
+$x &= expr;  $x |= expr;  $x ^= expr;
 ```
 
 ### Rules
 
 * All variables declared with `my`
 * No aliasing
-* SSA transformation applied later
+* SSA transformation applied internally
 
 ---
 
-# 🧱 4. Expressions
+# 4. Expressions
 
----
-
-## Numeric
+## Arithmetic Operators
 
 ```perl
-+ - * / %
++ - * / % **
+```
+
+## String Operators
+
+```perl
+.     # concatenation
+x     # repetition
+```
+
+## Numeric Comparison
+
+```perl
 < <= > >= == !=
+<=>   # spaceship (three-way comparison)
 ```
 
----
+## String Comparison
 
-## ⚠️ Division Semantics
-
-### Perl behavior (reference)
-
-* Division by zero → runtime error
-
----
-
-### Subset rule
-
-```text
-x / y is defined only if y ≠ 0
+```perl
+eq ne lt gt le ge
+cmp   # three-way string comparison
 ```
 
-### Encoding requirement
-
-* Add constraint:
-
-```text
-y ≠ 0
-```
-
-* If solver finds `y = 0`:
-  → treat as invalid execution path (discard)
-
----
-
-## ⚠️ Modulo Semantics
-
-### Perl behavior
-
-* Result has same sign as divisor
-
----
-
-### Subset definition (must fix semantics)
-
-Choose one:
-
-#### Option A (recommended — SMT-friendly)
-
-```text
-x % y = remainder(x, y)
-```
-
-Where:
-
-* matches SMT (Euclidean or implementation-defined)
-
-#### Option B (Perl-accurate)
-
-```text
-sign(x % y) = sign(y)
-```
-
----
-
-### Required constraint
-
-```text
-y ≠ 0
-```
-
----
-
-## Boolean
+## Logical Operators
 
 ```perl
 && || !
+and or not    # low-precedence forms
 ```
 
+## Bitwise Operators
+
+```perl
+& | ^ ~
+<< >>
+```
+
+## Ternary
+
+```perl
+$cond ? $a : $b
+```
+
+## Division Semantics
+
+* `x / y` is defined only if `y != 0`
+* Division by zero paths are treated as invalid (discarded)
+* Use `int($x / $y)` for truncating integer division
+
+## Modulo Semantics
+
+* `x % y` is defined only if `y != 0`
+* Result follows SMT semantics
+
 ---
+
+# 5. Builtin Functions
+
+## Numeric
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `abs($x)` | `I64 -> I64` | Absolute value |
+| `min($a, $b)` | `(I64, I64) -> I64` | Minimum |
+| `max($a, $b)` | `(I64, I64) -> I64` | Maximum |
+| `int($x)` | `I64 -> I64` | Integer truncation |
 
 ## String
 
-```perl
-$a . $b
-length($x)
-$x eq $y
-$x ne $y
-substr($x, i, n)
-index($x, $y)
-```
-
----
-
-## Array Length via scalar(@arr)
-
-```perl
-scalar(@arr)
-```
-
-**Type signature:** `Array<T> → I64`
-
-**Semantics:**
-
-Returns the number of elements in an array. The scalar builtin is specifically designed for use with arrays in scalar context.
-
-**Grammar:**
-
-```text
-scalar_call = { "scalar" ~ "(" ~ "@" ~ ident ~ ")" }
-```
-
-**Note on naming:** The `@` prefix is required in scalar() calls; it denotes array context. Variables used elsewhere in the program use the `$` prefix.
-
-**Symbolic execution:**
-
-```
-scalar(@arr) → IntExpr::Var("arr__len")
-```
-
-The symbolic execution engine creates a companion length variable (`{array_name}__len`) for each array parameter. This variable is free/unconstrained unless bounded in a `# pre:` annotation.
-
-**Example usage:**
-
-```perl
-# sig: (Array<I64>) -> I64
-# pre: scalar(@arr) > 0
-# post: $result == scalar(@arr)
-sub get_array_length {
-    my ($arr) = @_;
-    return scalar(@arr);
-}
-```
-
-**SMT encoding:**
-
-```
-scalar(@arr) encodes to (I64::new_const "arr__len")
-```
-
-The length variable is unconstrained in the SMT solver unless explicitly bounded by preconditions.
-
----
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `length($s)` | `Str -> I64` | String length |
+| `substr($s, $i)` | `(Str, I64) -> Str` | Substring from position |
+| `substr($s, $i, $n)` | `(Str, I64, I64) -> Str` | Substring with length |
+| `index($s, $t)` | `(Str, Str) -> I64` | Find substring position |
+| `index($s, $t, $p)` | `(Str, Str, I64) -> I64` | Find substring from position |
+| `ord($s)` | `Str -> I64` | Character to ordinal |
+| `chr($n)` | `I64 -> Str` | Ordinal to character |
+| `chomp($s)` | `Str -> Str` | Remove trailing newline |
+| `reverse($s)` | `Str -> Str` | Reverse string |
+| `contains($s, $t)` | `(Str, Str) -> I64` | Substring containment (0/1) |
+| `starts_with($s, $t)` | `(Str, Str) -> I64` | Prefix check (0/1) |
+| `ends_with($s, $t)` | `(Str, Str) -> I64` | Suffix check (0/1) |
+| `replace($s, $old, $new)` | `(Str, Str, Str) -> Str` | String replacement |
+| `char_at($s, $i)` | `(Str, I64) -> Str` | Character at index |
 
 ## Array
 
-```perl
-$arr[i]
-$arr[i] = v
-```
-
----
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `scalar(@arr)` | `Array<T> -> I64` | Array length |
+| `push(@arr, $v)` | statement | Append element |
+| `pop(@arr)` | `Array<T> -> T` | Remove and return last element |
 
 ## Hash
 
-```perl
-$h{"key"}
-$h{"key"} = v
-```
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `exists($h{"key"})` | `Hash -> I64` | Check if key exists (0/1) |
+| `defined($expr)` | `any -> I64` | Check if value is defined (0/1) |
 
 ---
 
-## Restrictions
-
-* No implicit conversions
-* No mixed-type arithmetic
-
----
-
-# 🧱 5. Control Flow
-
----
+# 6. Control Flow
 
 ## If / Elsif / Else
 
 ```perl
-if ($cond) {
-  ...
-} elsif ($cond2) {
-  ...
-} else {
-  ...
-}
+if ($cond) { ... }
+elsif ($cond2) { ... }
+else { ... }
 ```
 
----
+## Unless
+
+```perl
+unless ($cond) { ... }
+```
+
+## While / Until
+
+```perl
+while ($cond) { ... }
+until ($cond) { ... }
+```
+
+## Do-While / Do-Until
+
+```perl
+do { ... } while ($cond);
+do { ... } until ($cond);
+```
+
+## For (C-style)
+
+```perl
+for (my $i = 0; $i < $n; $i++) { ... }
+```
+
+## Foreach
+
+```perl
+foreach my $x (@arr) { ... }
+```
+
+## Loop Control
+
+```perl
+last;                    # break
+last if ($cond);         # conditional break
+last unless ($cond);
+next;                    # continue
+next if ($cond);         # conditional continue
+next unless ($cond);
+```
+
+## Statement Modifiers
+
+```perl
+return $x if ($cond);
+return $x unless ($cond);
+$x = $y if ($cond);
+$x = $y unless ($cond);
+die "msg" if ($cond);
+die "msg" unless ($cond);
+```
 
 ## Semantics
 
-* `elsif` → nested `if`
+* Loops are bounded-unrolled (configurable via `--max_loop_unroll`)
 * Each branch creates a symbolic path
 
 ---
 
-# 🧱 6. Loops (Bounded)
+# 7. Annotations
 
----
-
-## While
-
-```perl
-while ($cond) {
-  ...
-}
-```
-
----
-
-## For
-
-```perl
-for (init; cond; step) {
-  ...
-}
-```
-
----
-
-## Constraints
-
-```text
-MAX_LOOP_UNROLL = N
-```
-
----
-
-## Semantics
-
-* Loops unrolled into nested conditionals
-* Execution stops after bound
-
----
-
-# 🧱 7. Annotations
-
----
-
-## Signature
+## Signature (required)
 
 ```perl
 # sig: (T1, T2, ...) -> T
 ```
 
----
-
-## Preconditions
+## Precondition (optional)
 
 ```perl
 # pre: condition
 ```
 
----
-
-## Postconditions
+## Postcondition (required)
 
 ```perl
-# pos: condition
+# post: condition
 ```
 
 * `$result` refers to return value
 
----
+## External Function Contracts
 
-## Loop Invariants (future)
+```perl
+# extern: func_name (T1, T2) -> T pre: ... post: ...
+```
+
+## Ghost Variables
+
+```perl
+# ghost: $var = expr
+```
+
+Specification-only variables for capturing intermediate state.
+
+## Assertions
+
+```perl
+# assert: condition
+```
+
+## Loop Invariants
 
 ```perl
 # inv: condition
@@ -393,148 +356,103 @@ MAX_LOOP_UNROLL = N
 
 ---
 
-# 🧱 8. Memory Model
+# 8. Regex (Limited)
+
+```perl
+$x =~ /pattern/
+$x !~ /pattern/
+```
+
+Desugared to string operations at the parser level.
 
 ---
+
+# 9. Error Handling
+
+```perl
+die "message";
+croak "message";
+confess "message";
+warn "message";
+```
+
+## Output
+
+```perl
+print expr;
+say expr;
+```
+
+---
+
+# 10. Memory Model
 
 ## Arrays
 
 ```text
-Array(I64 → T)
+Array(I64 -> T)
 ```
-
----
 
 ## Hashes
 
 ```text
-Array(Str → T)
+Array(Str -> T)
 ```
-
----
 
 ## Operations
 
-* Read:
-
-```text
-select(arr, i)
-```
-
-* Write:
-
-```text
-store(arr, i, v)
-```
+* Read: `select(arr, i)`
+* Write: `store(arr, i, v)`
+* Missing keys return unconstrained symbolic values
 
 ---
 
-## Missing Keys
-
-* Return unconstrained symbolic value
-
----
-
-# 🧱 9. Execution Semantics
-
----
+# 11. Execution Semantics
 
 ## Symbolic Execution
 
-* Inputs → symbolic variables
-* Branches → fork states
-* Path conditions tracked
-
----
+* Inputs become symbolic variables
+* Branches fork states
+* Path conditions tracked per path
 
 ## Function Calls
 
-* Inlined
+* Inlined at call site
 * SSA renaming applied
-
----
 
 ## Loop Handling
 
-* Bounded unrolling only
-
----
+* Bounded unrolling only (configurable limit)
 
 ## Arithmetic Safety
 
-* Division/modulo by zero → invalid path
-* Such paths must be discarded
+* Division/modulo by zero creates an invalid path (discarded)
 
 ---
 
-# 🧱 10. Forbidden Features
+# 12. Forbidden Features
+
+* `eval(...)` — dynamic code execution
+* `$_`, `@_` (beyond parameter binding) — implicit variables
+* `wantarray` — context sensitivity
+* Unbounded recursion
+* Global variables
+* Dynamic dispatch
+* Implicit type coercions
+* Nested data structures (beyond single reference level)
+* File/network IO (beyond `print`/`say`/`warn`)
 
 ---
 
-## Dynamic Features
-
-```perl
-eval(...)
-```
-
----
-
-## References
-
-```perl
-\$x
-\@arr
-```
-
----
-
-## Regex
-
-```perl
-$x =~ /.../
-```
-
----
-
-## Implicit Variables
-
-```perl
-$_
-@_
-```
-
----
-
-## IO
-
-```perl
-print
-<>
-```
-
----
-
-## Context Sensitivity
-
-```perl
-wantarray
-```
-
----
-
-# 🧱 11. Safety Constraints
-
----
+# 13. Safety Constraints
 
 ## Required Limits
 
 ```text
-MAX_LOOP_UNROLL
-MAX_PATHS
-SOLVER_TIMEOUT
+MAX_LOOP_UNROLL   (default: 9)
+MAX_PATHS         (default: 1024)
+SOLVER_TIMEOUT    (default: 5000ms)
 ```
-
----
 
 ## Error Conditions
 
@@ -545,27 +463,21 @@ SOLVER_TIMEOUT
 
 ---
 
-# 🧭 Summary
+# Summary
 
 This subset supports:
 
-* Numeric (including `/` and `%`) and string computation
-* Structured control flow
-* Function composition
-* Arrays and hashes
+* 64-bit integer (I64) and string computation
+* Bitwise operations
+* Structured control flow (if/elsif/else, unless, loops, foreach)
+* Function composition (with inlining)
+* Arrays and hashes (with references)
+* Rich string operations
+* Contract-based verification (pre/post/assert/invariant)
 
 While avoiding:
 
-* dynamic Perl semantics
-* aliasing
-* undecidable constructs
-
----
-
-# 🧠 Final Principle
-
-This is not full Perl.
-
-It is:
-
-> A statically analyzable, constraint-oriented language with Perl syntax
+* Dynamic Perl semantics
+* Aliasing
+* Unbounded constructs
+* Undecidable features

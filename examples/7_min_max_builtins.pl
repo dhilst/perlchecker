@@ -6,7 +6,7 @@
 # directly in contracts.
 #
 # BOUNDARY PUSH: min() and max() as builtin functions taking
-# two Int arguments and returning Int, desugared to ite.
+# two I64 arguments and returning I64, desugared to ite.
 # =============================================================
 
 # --- min returns the smaller of two values ---

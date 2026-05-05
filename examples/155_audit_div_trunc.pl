@@ -1,10 +1,10 @@
-# Soundness audit: Int division truncation
+# Soundness audit: I64 division truncation
 #
 # Perl's `/` returns a float (7/2 == 3.5), but the checker previously
-# modeled Int / Int as truncating division (7/2 == 3). This unsoundness
+# modeled I64 / I64 as truncating division (7/2 == 3). This unsoundness
 # meant the checker could verify postconditions that fail at runtime.
 #
-# Fix: bare `/` on Int operands is now rejected; use int($x / $y) to
+# Fix: bare `/` on I64 operands is now rejected; use int($x / $y) to
 # make truncation explicit (matching Perl's int() semantics).
 
 # This function correctly uses int() for truncating division.

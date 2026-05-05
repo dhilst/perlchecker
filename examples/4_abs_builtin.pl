@@ -7,7 +7,7 @@
 #
 # BOUNDARY PUSH: abs() as a builtin function (not user-defined),
 # analogous to how length()/substr()/index()/scalar() are
-# already builtin. abs($x) returns the absolute value of Int.
+# already builtin. abs($x) returns the absolute value of I64.
 # =============================================================
 
 # --- Use abs() builtin to get absolute value ---

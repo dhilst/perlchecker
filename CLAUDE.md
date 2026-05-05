@@ -54,6 +54,32 @@ The subagent executes these phases in order:
 - Wait for completion, collect result
 - Track cumulative progress across rounds
 
+## Perl Subset Specification
+
+`docs/PERL-SUBSET.md` is the **source of truth** for what the tool supports. When expanding the subset (adding types, builtins, operators, control flow), update `docs/PERL-SUBSET.md` **before** implementing. The expansion plan phase must include the PERL-SUBSET.md diff.
+
+Run `scripts/check-subset-sync.sh` to verify the spec matches the implementation (types, builtins, operators, annotations).
+
+## Update Checklist
+
+After every change, verify all of the following before committing:
+
+1. **`docs/PERL-SUBSET.md` matches implementation** — the spec is the source of truth; update it first when expanding the subset. Run `scripts/check-subset-sync.sh`
+2. **All tests pass, no regressions** — `cargo test` must pass with zero failures
+3. **Documentation is updated** — README.md, docs/sphinx/, and example comments must reflect any changes to types, builtins, or semantics. Run `scripts/check-doc-terms.sh`
+4. **Sphinx docs built and gh-pages deployed** — if docs/sphinx/ changed, run `scripts/deploy-docs.sh` (auto-triggered by PostToolUse hook)
+
+### Automation
+
+- **PreToolUse hook** (`.claude/settings.json`): blocks `git commit` if `scripts/check-doc-terms.sh` or `scripts/check-subset-sync.sh` fail
+- **PostToolUse hook** (`.claude/settings.json`): auto-deploys gh-pages when a commit touches `docs/sphinx/`
+
+### Canonical type names
+
+Source of truth: `src/annotations/mod.rs` (`parse_type` function).
+
+Current: `I64`, `Str`, `Array<I64>`, `Array<Str>`, `Hash<Str, I64>`, `Hash<Str, Str>`
+
 ## Docs (Sphinx)
 
 ```
@@ -61,16 +87,10 @@ cd docs/sphinx
 make html                           # build HTML to _build/html/
 ```
 
-Deploy to gh-pages:
+Deploy to gh-pages (auto-deployed by PostToolUse hook when sphinx docs change):
 
 ```
-cd docs/sphinx
-make html
-git checkout gh-pages
-cp -r _build/html/* .
-git add -A && git commit --no-gpg-sign -m "update docs"
-git push origin gh-pages
-git checkout master
+bash scripts/deploy-docs.sh         # manual deploy
 ```
 
 ## Key Files
@@ -88,3 +108,7 @@ git checkout master
 | `examples/` | Test Perl files |
 | `docs/EXPANSION-META-PLAN.md` | Meta-plan template |
 | `docs/ROUNDS-5-9-PLAN.md` | Current round plans |
+| `docs/PERL-SUBSET.md` | Subset spec (source of truth) |
+| `scripts/check-doc-terms.sh` | Doc staleness checker |
+| `scripts/check-subset-sync.sh` | Subset spec vs impl sync checker |
+| `scripts/deploy-docs.sh` | gh-pages deploy script |
