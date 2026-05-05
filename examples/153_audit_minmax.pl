@@ -8,7 +8,7 @@
 #   - commutativity: min(x,y)==min(y,x), max(x,y)==max(y,x)
 
 # --- min(x, x) == x (identity) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result == $x
 sub min_identity {
@@ -17,7 +17,7 @@ sub min_identity {
 }
 
 # --- max(x, x) == x (identity) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result == $x
 sub max_identity {
@@ -26,7 +26,7 @@ sub max_identity {
 }
 
 # --- min(-5, -3) == -5 (negative numbers) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0
 # post: $result == -5
 sub min_negative_concrete {
@@ -35,7 +35,7 @@ sub min_negative_concrete {
 }
 
 # --- max(-5, -3) == -3 (negative numbers) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0
 # post: $result == -3
 sub max_negative_concrete {
@@ -44,7 +44,7 @@ sub max_negative_concrete {
 }
 
 # --- min is commutative: min(x,y) == min(y,x) ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result == min($y, $x)
 sub min_commutative {
@@ -53,7 +53,7 @@ sub min_commutative {
 }
 
 # --- max is commutative: max(x,y) == max(y,x) ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result == max($y, $x)
 sub max_commutative {
@@ -62,7 +62,7 @@ sub max_commutative {
 }
 
 # --- min returns value <= both args ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result <= $x && $result <= $y
 sub min_le_both {
@@ -71,7 +71,7 @@ sub min_le_both {
 }
 
 # --- max returns value >= both args ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result >= $x && $result >= $y
 sub max_ge_both {
@@ -80,7 +80,7 @@ sub max_ge_both {
 }
 
 # --- min(x, y) is one of x or y ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result == $x || $result == $y
 sub min_is_arg {
@@ -89,7 +89,7 @@ sub min_is_arg {
 }
 
 # --- max(x, y) is one of x or y ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result == $x || $result == $y
 sub max_is_arg {
@@ -98,7 +98,7 @@ sub max_is_arg {
 }
 
 # --- min(x, y) <= max(x, y) always ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result <= max($x, $y)
 sub min_le_max {

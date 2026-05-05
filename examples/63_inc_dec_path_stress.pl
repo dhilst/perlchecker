@@ -9,7 +9,7 @@
 # A for-loop uses $i++ while the body branches on even/odd parity,
 # accumulating into $acc. With $n in [1,4], the loop runs up to 4
 # iterations creating 2^4 = 16 paths (bounded by unroll limit).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 4
 # post: $result >= 1 && $result <= 10
 sub inc_branch_accumulate {
@@ -31,7 +31,7 @@ sub inc_branch_accumulate {
 # Uses $x-- in a while loop with a conditional last that exits
 # early when a threshold is hit. Precondition bounds ensure the
 # loop terminates within unroll limits and postcondition is tight.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 3 && $x <= 5
 # post: $result >= 1 && $result <= 3
 sub dec_while_early_exit {
@@ -49,7 +49,7 @@ sub dec_while_early_exit {
 # Two parameters create a 2x2 branch matrix. Each branch path
 # uses either ++ or -- to adjust a result variable differently,
 # then a final inc ensures minimum is above zero.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 1 && $result <= 12
 sub nested_inc_dec_matrix {
@@ -78,7 +78,7 @@ sub nested_inc_dec_matrix {
 # Uses $i++ as the loop step. Inside, a ternary selects between
 # incrementing or decrementing $val based on loop index parity.
 # Bounded loop creates path explosion manageable by unroll.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $start >= 0 && $start <= 5
 # post: $result >= 2 && $result <= 7
 sub for_ternary_inc_dec {
@@ -97,7 +97,7 @@ sub for_ternary_inc_dec {
 # A while loop uses $counter-- with a conditional next that skips
 # accumulation for certain values, creating divergent paths per
 # iteration. Tests interaction of next + decrement.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 3 && $n <= 5
 # post: $result >= 1 && $result <= 3
 sub dec_while_with_next {

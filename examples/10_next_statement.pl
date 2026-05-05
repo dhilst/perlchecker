@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 3
 # post: $result >= 0
 sub sum_even_indices {

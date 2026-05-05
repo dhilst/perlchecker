@@ -10,7 +10,7 @@
 # Short strings get their first 2 chars, longer strings get their
 # first 5 chars. Each branch uses a different substr length based on
 # the length constraint established by the condition.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 4 && length($s) <= 20
 # post: $result >= 2 && $result <= 5
 sub branch_prefix_length {
@@ -31,7 +31,7 @@ sub branch_prefix_length {
 # Extracts a prefix, checks if it contains a pattern, then
 # returns a different value per branch. Exercises cross-theory
 # reasoning: string extraction feeds containment predicate.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 6 && length($s) <= 12
 # post: $result >= 3 && $result <= 12
 sub substr_contains_branch {
@@ -52,7 +52,7 @@ sub substr_contains_branch {
 # Three paths based on length ranges, each extracting a different
 # fixed-size prefix and returning its length. Verifier must prove
 # extraction length matches the literal used in substr.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 15
 # post: $result >= 1 && $result <= 4
 sub multi_path_prefix {
@@ -75,7 +75,7 @@ sub multi_path_prefix {
 # --- Function 4: Length arithmetic with concat then substr ---
 # Concatenates strings, computes length of result, uses substr
 # on the concatenation. Verifier reasons about length(a.b) = length(a)+length(b).
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 3 && length($a) <= 5 && length($b) >= 2 && length($b) <= 4
 # post: $result >= 5 && $result <= 9
 sub concat_then_extract {
@@ -92,7 +92,7 @@ sub concat_then_extract {
 # Multiple conditions involving length and contains results,
 # creating 4 paths. Each path extracts a different prefix and
 # computes a different bounded integer result.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 6 && length($s) <= 10
 # post: $result >= 1 && $result <= 10
 sub cascade_length_contains {

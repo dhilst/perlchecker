@@ -7,7 +7,7 @@
 
 # --- Function 1: Clamp value to range using nested min/max ---
 # Classic clamping pattern: min(max(x, lo), hi)
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $lo >= 0 && $lo <= 5 && $hi >= 6 && $hi <= 10 && $x >= -10 && $x <= 20
 # post: $result >= 0 && $result <= 10
 sub clamp_value {
@@ -18,7 +18,7 @@ sub clamp_value {
 
 # --- Function 2: Absolute distance with clamped inputs ---
 # Computes abs(min(a,b) - max(c,d)), a distance between composed values.
-# sig: (Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 5 && $b >= 0 && $b <= 5 && $c >= 0 && $c <= 5 && $d >= 0 && $d <= 5
 # post: $result >= 0 && $result <= 5
 sub abs_min_max_distance {
@@ -33,7 +33,7 @@ sub abs_min_max_distance {
 # --- Function 3: Branch-dependent clamping ---
 # Different clamp ranges depending on a condition, creating
 # separate ITE trees per branch.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -10 && $x <= 10 && $mode >= 0 && $mode <= 1
 # post: $result >= 0 && $result <= 8
 sub branch_clamp {
@@ -50,7 +50,7 @@ sub branch_clamp {
 # --- Function 4: Abs result in further branching ---
 # Uses abs() result in a comparison that creates further branches,
 # multiplying ITE paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -5 && $x <= 5 && $y >= -5 && $y <= 5
 # post: $result >= 0 && $result <= 10
 sub abs_branch_cascade {
@@ -67,7 +67,7 @@ sub abs_branch_cascade {
 
 # --- Function 5: Triple composition with nested abs ---
 # Nests abs inside min/max creating deep ITE trees.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= -4 && $a <= 4 && $b >= -4 && $b <= 4 && $c >= -4 && $c <= 4
 # post: $result >= 0 && $result <= 8
 sub triple_abs_composition {

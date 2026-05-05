@@ -10,7 +10,7 @@
 # Returns one of three sentinel values depending on input range.
 # The postcondition is a 3-way disjunction; each path satisfies
 # exactly one disjunct.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result == -1 || $result == 0 || $result == 1
 sub sign_classify {
@@ -27,7 +27,7 @@ sub sign_classify {
 # --- Function 2: Nested branches with 4-way disjunction ---
 # Two boolean conditions create 4 paths; each path returns a
 # different value from the disjunction set {10, 20, 30, 40}.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 50 && $b >= 0 && $b <= 50
 # post: $result == 10 || $result == 20 || $result == 30 || $result == 40
 sub quadrant_value {
@@ -51,7 +51,7 @@ sub quadrant_value {
 # Searches for a threshold crossing in a bounded loop. Returns
 # either the iteration index where crossing happens or -1 if not
 # found. Postcondition: result is -1 OR in valid index range.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $start >= 0 && $start <= 5 && $step >= 1 && $step <= 3
 # post: $result == -1 || ($result >= 0 && $result <= 4)
 sub find_threshold {
@@ -72,7 +72,7 @@ sub find_threshold {
 # --- Function 4: Cascading conditions with 5-way disjunction ---
 # Classifies input into 5 buckets using elsif chain. Each bucket
 # maps to a different disjunct in the postcondition.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result == 1 || $result == 2 || $result == 3 || $result == 4 || $result == 5
 sub bucket_classify {
@@ -95,7 +95,7 @@ sub bucket_classify {
 # produces a result satisfying one of two disjuncts: either the
 # result equals a+b or the result equals a-b (when a>=b).
 # The verifier must reason about which disjunct holds per path.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20 && $mode >= 0 && $mode <= 3
 # post: $result == $a + $b || $result == $a - $b || $result == $a * 2 || $result == $b * 2
 sub multi_op_select {

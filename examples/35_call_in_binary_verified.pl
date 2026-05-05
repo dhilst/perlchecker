@@ -1,11 +1,11 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub inc {
     my ($x) = @_;
     return $x + 1;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 2
 sub call_in_binary {
     my ($x) = @_;

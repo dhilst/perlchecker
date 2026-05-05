@@ -21,7 +21,7 @@ Each round follows: PERL DEV → CHECKER → JUDGE → IMPLEMENTER+QA → ORCHES
 
 **Example (`examples/round5_dev.pl`):**
 ```perl
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 0 && $n <= 5 && $step > 0 && $step <= 10
 # post: $result == $n * $step
 sub mul_by_add {
@@ -52,7 +52,7 @@ sub mul_by_add {
 
 **Example (`examples/round6_dev.pl`):**
 ```perl
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result > 0
 sub ensure_positive {
@@ -85,7 +85,7 @@ sub ensure_positive {
 
 **Example (`examples/round7_dev.pl`):**
 ```perl
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $lo <= $hi
 # post: $result >= $lo && $result <= $hi
 sub clamp_minmax {
@@ -120,7 +120,7 @@ Actually — **Revised Feature:** `last` statement for loop early exit.
 
 **Example (`examples/round8_dev.pl`):**
 ```perl
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 1 && $n <= 5 && $target >= 0 && $target <= 10
 # post: $result >= 0 && $result < $n
 sub find_index {
@@ -146,7 +146,7 @@ sub find_index {
 
 **Feature:** Negative integer literals as atoms (e.g., `my $x = -1;` without needing `0 - 1`).
 
-**Rationale:** Currently `-1` parses as `UnaryOp::Neg(Int(1))` which works but `-1` as a literal in annotations/preconditions may behave differently. This round validates that negative constants work end-to-end and adds explicit test coverage. If they already work, this is a "validation round" with no code changes — just examples.
+**Rationale:** Currently `-1` parses as `UnaryOp::Neg(I64(1))` which works but `-1` as a literal in annotations/preconditions may behave differently. This round validates that negative constants work end-to-end and adds explicit test coverage. If they already work, this is a "validation round" with no code changes — just examples.
 
 **Layers touched:** Possibly none (validate existing behavior) or grammar (allow `-` in `int` rule for literal form).
 
@@ -157,7 +157,7 @@ sub find_index {
 
 **Example (`examples/round9_dev.pl`):**
 ```perl
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -50 && $x <= 50
 # post: $result >= 0
 sub distance_from_origin {

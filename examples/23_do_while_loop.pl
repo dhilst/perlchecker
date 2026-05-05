@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result == $n
 sub count_do_while {
@@ -10,7 +10,7 @@ sub count_do_while {
     return $i;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 10 && $x <= 20
 # post: $result >= 0 && $result < 10
 sub reduce_below_ten {

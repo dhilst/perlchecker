@@ -9,7 +9,7 @@
 # --- Function 1: 4 sequential if/else = 16 paths ---
 # Each binary decision adds a different power of 2, creating
 # 16 distinct results from 0 (all else) to 15 (all if).
-# sig: (Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10 && $c >= 0 && $c <= 10 && $d >= 0 && $d <= 10
 # post: $result >= 0 && $result <= 15
 sub sixteen_paths {
@@ -42,7 +42,7 @@ sub sixteen_paths {
 # 5 sequential if/else blocks. The first decision includes a die
 # on a narrow condition, pruning some paths. Each surviving path
 # contributes different addends.
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10 && $c >= 0 && $c <= 10 && $d >= 0 && $d <= 10 && $e >= 0 && $e <= 10
 # post: $result >= 0 && $result <= 31
 sub pruned_thirty_two_paths {
@@ -81,7 +81,7 @@ sub pruned_thirty_two_paths {
 # A 3-iteration loop with a binary branch each iteration creates
 # 2^3 = 8 distinct paths. Each path yields a different sum
 # depending on whether $x > $i at each step.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
 # post: $result >= 3 && $result <= 18
 sub loop_branch_eight_paths {
@@ -103,7 +103,7 @@ sub loop_branch_eight_paths {
 # the range computation more interesting. Each decision adds either
 # a larger or smaller value. The verifier must compute the global
 # min/max across all 16 paths.
-# sig: (Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64) -> I64
 # pre: $w >= 0 && $w <= 10 && $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10 && $z >= 0 && $z <= 10
 # post: $result >= 4 && $result <= 40
 sub weighted_sixteen_paths {

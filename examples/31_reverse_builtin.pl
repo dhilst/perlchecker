@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result == length($s)
 sub reverse_preserves_length {
@@ -8,7 +8,7 @@ sub reverse_preserves_length {
     return $len;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 2 && length($s) <= 5
 # post: $result >= 2
 sub reverse_at_least_two {

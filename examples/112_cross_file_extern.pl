@@ -1,7 +1,7 @@
 # Declare an external function's contract
-# extern: external_abs (Int) -> Int post: $result >= 0
+# extern: external_abs (I64) -> I64 post: $result >= 0
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result >= 0
 sub use_external_abs {
@@ -10,9 +10,9 @@ sub use_external_abs {
     return $result;
 }
 
-# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c
+# extern: clamp (I64, I64, I64) -> I64 pre: $b <= $c post: $result >= $b && $result <= $c
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -1000 && $x <= 1000
 # post: $result >= 0 && $result <= 100
 sub use_clamp {

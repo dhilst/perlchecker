@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 3
 sub for_verified {
     my ($x) = @_;

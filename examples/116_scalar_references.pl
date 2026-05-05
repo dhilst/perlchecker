@@ -1,6 +1,6 @@
 # Round 116: Scalar references with static alias resolution
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result == 10
 sub ref_write {
@@ -10,7 +10,7 @@ sub ref_write {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result == $x * 2
 sub ref_read {
@@ -20,7 +20,7 @@ sub ref_read {
     return $y;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n > 0
 # post: $result == $n + 5
 sub ref_chain {

@@ -16,7 +16,7 @@
 # Actually max is $a=4,$b=6 => 24, or $a=5... no $a<$b and $a+$b<=10
 # means $a<=4. With $a=4,$b=6: product=24. With $a=3,$b=7: 21.
 # Tightest: $a=4,$b=6 => 24. So result <= 34 (24+10).
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $b >= 1 && $a + $b <= 10 && $a < $b
 # post: $result >= 2 && $result <= 34
 sub sum_bounded_pair {
@@ -37,7 +37,7 @@ sub sum_bounded_pair {
 # Since $x < $y < $z and all >= 1, minimum is $x=1,$y=2,$z=3.
 # With sum <= 12: max is e.g. $x=1,$y=2,$z=9 or $x=2,$y=3,$z=7.
 # The ordering guarantees $z > $y > $x, so $z - $x >= 2 always.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $x >= 1 && $y >= 1 && $z >= 1 && $x < $y && $y < $z && $x + $y + $z <= 12
 # post: $result >= 2 && $result <= 11
 sub ordered_triple_diff {
@@ -56,7 +56,7 @@ sub ordered_triple_diff {
 # With $a + $b <= 8: max individual is 7 (if other is 1).
 # The branch $a > $b is sometimes true, sometimes false,
 # but result is always the larger value which is <= 7.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $b >= 1 && $a * $b > 0 && $a + $b <= 8
 # post: $result >= 1 && $result <= 7
 sub product_sign_bounded {
@@ -80,7 +80,7 @@ sub product_sign_bounded {
 # $p=3,$q=6 => 18+3-6=15. $p=2,$q=7 => 14+2-7=9.
 # So range includes [4..19]. Let's use a safe bound.
 # Min: $p=2,$q=2 => 4. Max: $p=4,$q=5 => 19.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $p >= 2 && $q >= 2 && $p + $q <= 9 && $p <= $q
 # post: $result >= 4 && $result <= 19
 sub interdependent_bounds {
@@ -99,7 +99,7 @@ sub interdependent_bounds {
 # If $m == $n: result = $m * 2 (range 2..6 since $m+$n<=6 means $m<=3)
 # If $m != $n (i.e., $m < $n): result = $m + $n (range 3..6)
 # Overall: result in [2, 6].
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $m >= 1 && $n >= 1 && $m + $n <= 6 && $m <= $n
 # post: $result >= 2 && $result <= 6
 sub diamond_constraint {

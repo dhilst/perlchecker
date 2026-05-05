@@ -1,4 +1,4 @@
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 3 && length($sub) == 1
 # post: $result >= 0 && $result <= 1
 sub check_contains {
@@ -7,7 +7,7 @@ sub check_contains {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5
 # post: $result == 1
 sub self_contains {

@@ -9,7 +9,7 @@
 # when the exponent is 0, return 1 directly instead of relying on
 # Z3's power function.
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result == 1
 sub any_pow_zero {
@@ -17,7 +17,7 @@ sub any_pow_zero {
     return $x ** 0;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0
 # post: $result == 1
 sub zero_pow_zero {
@@ -25,7 +25,7 @@ sub zero_pow_zero {
     return $x ** 0;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == $x
 sub pow_one_identity {
@@ -33,7 +33,7 @@ sub pow_one_identity {
     return $x ** 1;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == $x * $x
 sub pow_two_is_square {

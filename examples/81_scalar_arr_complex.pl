@@ -10,7 +10,7 @@
 # Pushes elements then computes expressions using scalar(@arr) - 1,
 # scalar(@arr) * 2, and branches on the computed values.
 # After 3 pushes: len=3, so len-1=2, len*2=6, sum=8.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 5 && $b >= 1 && $b <= 5 && $c >= 1 && $c <= 5
 # post: $result == 8
 sub scalar_arithmetic {
@@ -28,7 +28,7 @@ sub scalar_arithmetic {
 # Pushes 4 elements, pops one, then branches on comparisons involving
 # scalar(@arr) and the popped value. The length after 4 push + 1 pop = 3.
 # Creates 4 paths depending on relationships between popped value and length.
-# sig: (Array<Int>, Int, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 5 && $b >= 1 && $b <= 5 && $c >= 1 && $c <= 5 && $d >= 1 && $d <= 5
 # post: $result >= 1 && $result <= 8
 sub scalar_branch_paths {
@@ -58,7 +58,7 @@ sub scalar_branch_paths {
 # Pushes 3 elements, then iterates scalar(@arr) times accumulating
 # a counter. The loop bound depends on array length tracked symbolically.
 # After 3 pushes: len=3, loop runs 3 times, acc=3.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10 && $c >= 1 && $c <= 10
 # post: $result == 3
 sub scalar_loop_bound {
@@ -81,7 +81,7 @@ sub scalar_loop_bound {
 # After 4 push + 2 pop: len=2. top1+top2 in [2..20].
 # If sum > len (sum>2): return sum + len = sum + 2, range [5..22]
 # If sum <= len (sum<=2, only when both are 1): return len * 3 = 6
-# sig: (Array<Int>, Int, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 5 && $b >= 1 && $b <= 5 && $c >= 1 && $c <= 5 && $d >= 1 && $d <= 5
 # post: $result >= 5 && $result <= 12
 sub scalar_pop_arithmetic {
@@ -105,7 +105,7 @@ sub scalar_pop_arithmetic {
 # Pushes 3 elements, then uses scalar(@arr) in multiple arithmetic
 # expressions and branches on the results combined with input values.
 # After 3 pushes: len=3. Tests len+x, len*y creating 4 paths.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $x >= 1 && $x <= 5 && $y >= 1 && $y <= 5 && $z >= 1 && $z <= 5
 # post: $result >= 3 && $result <= 15
 sub scalar_nested_paths {

@@ -1,6 +1,6 @@
 # Round 44: Loop control modifiers (next if, last if, next unless, last unless)
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 0
 sub sum_odd {
@@ -14,7 +14,7 @@ sub sum_odd {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 0 && $result <= 6
 sub sum_until_three {
@@ -28,7 +28,7 @@ sub sum_until_three {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 0
 sub sum_skip_zero {
@@ -42,7 +42,7 @@ sub sum_skip_zero {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 2 && $n <= 5
 # post: $result >= 0 && $result <= 1
 sub stop_unless_small {

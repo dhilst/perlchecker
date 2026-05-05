@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 100
 # post: $result >= 1
 sub croak_on_zero {
@@ -7,7 +7,7 @@ sub croak_on_zero {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 50
 # post: $result >= 0
 sub confess_negative {
@@ -16,7 +16,7 @@ sub confess_negative {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == $x * 2
 sub die_guard {
@@ -26,7 +26,7 @@ sub die_guard {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == $x
 sub bare_die_in_branch {

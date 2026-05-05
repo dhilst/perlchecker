@@ -29,7 +29,7 @@ Build a symbolic execution engine that:
 
 * Types:
 
-  * `Int` only
+  * `I64` only
 
 * Control flow:
 
@@ -190,7 +190,7 @@ Found 2 annotated functions:
 Parse:
 
 ```
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x > 0
 # pos: $result > $x
 ```

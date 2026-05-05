@@ -8,7 +8,7 @@
 # --- Function 1: For-loop at 5 iterations with conditional body ---
 # Each iteration has an if/else that depends on the loop variable,
 # creating 2^5 = 32 potential paths through unrolling.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result >= 5 && $result <= 55
 sub for_branch_stress {
@@ -28,7 +28,7 @@ sub for_branch_stress {
 # --- Function 2: While-loop with multiple exit conditions ---
 # Counts up while two conditions hold. With x in [1,5], loop runs
 # at most 5 times (bounded by both x and the counter limit).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result >= 1 && $result <= 5
 sub while_multi_exit {
@@ -44,7 +44,7 @@ sub while_multi_exit {
 # --- Function 3: Do-while with accumulator and branch ---
 # Accumulates values with different increments depending on parity.
 # Runs exactly n times (n in [1,5]). Odd iterations add 3, even add 1.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 1 && $result <= 13
 sub do_while_accum_branch {
@@ -65,7 +65,7 @@ sub do_while_accum_branch {
 # --- Function 4: Until-loop with ternary in body ---
 # Decrements from x down to 0, accumulating either 2 or 1 at each
 # step depending on whether current value exceeds a threshold.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result >= 1 && $result <= 10
 sub until_ternary_body {
@@ -84,7 +84,7 @@ sub until_ternary_body {
 # Builds up a result using nested conditions inside a do-until loop.
 # With n in [1,4], iterates 1 to 4 times. Each iteration classifies
 # the counter into three ranges producing different increments.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 4
 # post: $result >= 2 && $result <= 11
 sub do_until_nested {

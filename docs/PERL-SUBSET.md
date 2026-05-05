@@ -15,14 +15,14 @@ Define a **Perl-like subset** that is:
 ## Primitive Types
 
 ```text
-Int
+I64
 Str
 Bool (derived from expressions)
 ```
 
 ### Notes
 
-* No implicit coercion between `Int` and `Str`
+* No implicit coercion between `I64` and `Str`
 * All variables are statically typed via `# sig`
 
 ---
@@ -32,7 +32,7 @@ Bool (derived from expressions)
 ### Arrays
 
 ```text
-Array<Int>
+Array<I64>
 Array<Str>
 ```
 
@@ -44,7 +44,7 @@ Array<Str>
 ### Hashes
 
 ```text
-Hash<Str, Int>
+Hash<Str, I64>
 Hash<Str, Str>
 ```
 
@@ -66,7 +66,7 @@ Hash<Str, Str>
 ## Syntax
 
 ```perl
-# sig: (Int, Str) -> Str
+# sig: (I64, Str) -> Str
 # pre: ...
 # pos: ...
 sub foo {
@@ -222,7 +222,7 @@ index($x, $y)
 scalar(@arr)
 ```
 
-**Type signature:** `Array<T> → Int`
+**Type signature:** `Array<T> → I64`
 
 **Semantics:**
 
@@ -247,7 +247,7 @@ The symbolic execution engine creates a companion length variable (`{array_name}
 **Example usage:**
 
 ```perl
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) > 0
 # post: $result == scalar(@arr)
 sub get_array_length {
@@ -259,7 +259,7 @@ sub get_array_length {
 **SMT encoding:**
 
 ```
-scalar(@arr) encodes to (Int::new_const "arr__len")
+scalar(@arr) encodes to (I64::new_const "arr__len")
 ```
 
 The length variable is unconstrained in the SMT solver unless explicitly bounded by preconditions.
@@ -400,7 +400,7 @@ MAX_LOOP_UNROLL = N
 ## Arrays
 
 ```text
-Array(Int → T)
+Array(I64 → T)
 ```
 
 ---

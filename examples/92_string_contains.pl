@@ -10,7 +10,7 @@
 # If the string contains "ab", concatenate a suffix and return length;
 # otherwise extract a prefix via substr and return its length. The
 # verifier must track string length through both paths.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 12
 # post: $result >= 3 && $result <= 15
 sub contains_branch_ops {
@@ -31,7 +31,7 @@ sub contains_branch_ops {
 # Tests both prefix and suffix conditions independently, creating
 # 4 distinct paths (both/start-only/end-only/neither). Each path
 # computes a different bounded result from string length.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 4 && length($s) <= 10
 # post: $result >= 1 && $result <= 12
 sub four_path_prefix_suffix {
@@ -56,7 +56,7 @@ sub four_path_prefix_suffix {
 # Checks three different substrings for containment, sums the
 # results (each 0 or 1) to get a count of matching patterns.
 # The verifier must reason that each contains returns 0 or 1.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 6 && length($s) <= 12
 # post: $result >= 0 && $result <= 3
 sub count_patterns {
@@ -72,7 +72,7 @@ sub count_patterns {
 # Uses contains + starts_with + length in nested conditions. The
 # outer branch splits on length comparison, the inner branches
 # split on string property checks, creating 6 total paths.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 10
 # post: $result >= 2 && $result <= 13
 sub property_length_combo {
@@ -103,7 +103,7 @@ sub property_length_combo {
 # Extracts a prefix, checks contains on the prefix, then uses
 # that result to decide further string operations. Chains
 # multiple containment checks on different substrings of the input.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 8 && length($s) <= 14
 # post: $result >= 2 && $result <= 14
 sub cascading_contains_substr {

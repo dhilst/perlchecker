@@ -1,4 +1,4 @@
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: $i >= 0
 # post: $result == $v
 sub array_write_verified {

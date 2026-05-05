@@ -8,7 +8,7 @@
 # --- Function 1: Absolute value of negative-shifted input ---
 # Shifts input by a negative constant, takes abs, and verifies
 # the result is always non-negative and bounded.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -5 && $x <= 5
 # post: $result >= 0 && $result <= 15
 sub abs_negative_shift {
@@ -22,7 +22,7 @@ sub abs_negative_shift {
 # Branches on sign of input, applies different abs/min combos.
 # Negative branch: clamp abs(x) to at most 5 via min.
 # Non-negative branch: clamp x to at most 3 via min.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= 0 && $result <= 5
 sub sign_branch_abs_min {
@@ -40,7 +40,7 @@ sub sign_branch_abs_min {
 # Computes distance from -5, then clamps the result between 0 and 8
 # using max and min. Multiple branches based on input sign create
 # different constraint paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -8 && $x <= 8
 # post: $result >= 0 && $result <= 8
 sub distance_from_neg_bound {
@@ -59,7 +59,7 @@ sub distance_from_neg_bound {
 # Four branches based on sign comparisons with negative constants,
 # each applying a different combination of abs/min/max. The verifier
 # must track sign constraints through each branch to prove bounds.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -10 && $x <= 10 && $y >= -10 && $y <= 10
 # post: $result >= 0 && $result <= 20
 sub multi_branch_sign_reasoning {
@@ -81,7 +81,7 @@ sub multi_branch_sign_reasoning {
 # Computes abs values with negative offsets at each stage, creating
 # a chain of ITE expansions. Each step depends on the prior abs
 # result compared against a negative threshold.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -6 && $x <= 6
 # post: $result >= 0 && $result <= 12
 sub cascading_abs_neg_offsets {

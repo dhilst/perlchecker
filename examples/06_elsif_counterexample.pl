@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result > $x
 sub elsif_counterexample {
     my ($x) = @_;

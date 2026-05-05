@@ -8,7 +8,7 @@
 
 # --- Cascading return-if guards: 4 exit paths ---
 # Each guard peels off a range; the final return covers the rest.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 1 && $result <= 4
 sub classify_quartile {
@@ -21,7 +21,7 @@ sub classify_quartile {
 
 # --- Mixed return-if and return-unless: 5 exit paths ---
 # Guards combine positive and negative conditions on two inputs.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20
 # post: $result >= 0 && $result <= 40
 sub guarded_sum {
@@ -35,7 +35,7 @@ sub guarded_sum {
 
 # --- Arithmetic with guard returns and die for unreachable path ---
 # Computes a bounded ratio with early returns for edge cases.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 0 && $n <= 50 && $d >= 1 && $d <= 10
 # post: $result >= 0 && $result <= 50
 sub bounded_ratio {
@@ -49,7 +49,7 @@ sub bounded_ratio {
 }
 
 # --- Absolute difference with directional guards: 4 paths ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -50 && $x <= 50 && $y >= -50 && $y <= 50
 # post: $result >= 0 && $result <= 100
 sub abs_diff {
@@ -62,7 +62,7 @@ sub abs_diff {
 
 # --- Multi-condition priority classifier: 5 exit paths ---
 # Priority is determined by thresholds on two variables.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $urgency >= 0 && $urgency <= 10 && $impact >= 0 && $impact <= 10
 # post: $result >= 1 && $result <= 5
 sub priority_level {

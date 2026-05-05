@@ -5,7 +5,7 @@
 # reflect the correct length.
 
 # --- push twice, pop once: net +1 ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0 && $n <= 10
 # post: $result == $n + 1
 sub push_push_pop_len {
@@ -18,7 +18,7 @@ sub push_push_pop_len {
 
 # --- assign beyond current length extends the array ---
 # In Perl, $arr[10] = 5 on a 3-element array makes scalar(@arr) == 11.
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) == 3
 # post: $result == 11
 sub assign_extends_length {
@@ -28,7 +28,7 @@ sub assign_extends_length {
 }
 
 # --- assign within bounds does not change length ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 3
 # post: $result == $n
 sub assign_within_bounds_len {

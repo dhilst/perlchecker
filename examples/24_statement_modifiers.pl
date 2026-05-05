@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= 0
 sub abs_with_modifier {
@@ -7,7 +7,7 @@ sub abs_with_modifier {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result <= 50
 sub cap_at_fifty {

@@ -10,7 +10,7 @@
 # Verifies the fundamental roundtrip property: for a valid ASCII code,
 # ord(chr(n)) == n. Uses conditional to branch on the range and still
 # guarantee the roundtrip identity holds on both paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 48 && $n <= 122
 # post: $result == $n
 sub ord_chr_roundtrip {
@@ -28,7 +28,7 @@ sub ord_chr_roundtrip {
 # Classifies a character code into digit (48-57), uppercase (65-90),
 # lowercase (97-122), or other. Returns a distinct category code for
 # each range. Creates 4 paths through the elsif chain.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 48 && $n <= 122
 # post: $result >= 1 && $result <= 4
 sub classify_char_code {
@@ -50,7 +50,7 @@ sub classify_char_code {
 # Converts an uppercase letter code to lowercase by adding 32.
 # Verifies the result is in the lowercase ASCII range.
 # Uses chr/ord roundtrip combined with arithmetic.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 65 && $n <= 90
 # post: $result >= 97 && $result <= 122
 sub to_lower_via_ord {
@@ -65,7 +65,7 @@ sub to_lower_via_ord {
 # Takes a code that could be upper or lower case. If uppercase,
 # converts to lowercase code; if already lowercase, returns as-is.
 # Verifies the output is always in the lowercase range.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 65 && $n <= 122 && ($n <= 90 || $n >= 97)
 # post: $result >= 97 && $result <= 122
 sub normalize_to_lower {
@@ -84,7 +84,7 @@ sub normalize_to_lower {
 # Takes two character codes, classifies each (digit vs letter),
 # and accumulates a score based on the classification of each.
 # Creates 4 paths (2 conditions x 2 branches each).
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 48 && $a <= 90 && $b >= 48 && $b <= 90
 # post: $result >= 2 && $result <= 20
 sub dual_char_score {

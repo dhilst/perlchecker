@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 5
 # post: $result == $n
 sub count_with_inc {
@@ -12,7 +12,7 @@ sub count_with_inc {
     return $count;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result == 0
 sub dec_to_zero {
@@ -24,7 +24,7 @@ sub dec_to_zero {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 5
 # post: $result == $n
 sub for_with_inc {

@@ -9,7 +9,7 @@
 # --- Function 1: Reverse preserves length, branch on original ---
 # Takes a string, reverses it, asserts length is preserved,
 # then branches on original string length to return different values.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 3 && length($s) <= 10
 # post: $result >= 3 && $result <= 20
 sub reverse_length_branch {
@@ -29,7 +29,7 @@ sub reverse_length_branch {
 # branches on prefix length vs original length relationship.
 # The verifier must know length(reverse(s)) == length(s) to
 # prove that substr on the reversal is valid.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 4 && length($s) <= 8
 # post: $result >= 2 && $result <= 8
 sub reverse_substr_branch {
@@ -48,7 +48,7 @@ sub reverse_substr_branch {
 # --- Function 3: Chained reverse + length arithmetic ---
 # Uses length(reverse(s)) in arithmetic with another integer,
 # then branches multiple times on computed values.
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 3 && length($s) <= 7 && $k >= 1 && $k <= 5
 # post: $result >= 1 && $result <= 12
 sub reverse_length_arithmetic {
@@ -77,7 +77,7 @@ sub reverse_length_arithmetic {
 # uses their lengths (which are fixed by the substr args) in
 # branching logic. Verifier must reason about substr producing
 # a string of known length and reverse preserving length.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 9
 # post: $result >= 3 && $result <= 9
 sub double_reverse_substr {
@@ -101,7 +101,7 @@ sub double_reverse_substr {
 # Complex branching using reverse length preservation with die
 # to prune impossible paths. The verifier must use the axiom
 # that length(reverse(s)) == length(s) to prove die is unreachable.
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 4 && length($s) <= 6 && $m >= 1 && $m <= 3
 # post: $result >= 1 && $result <= 12
 sub reverse_die_prune {

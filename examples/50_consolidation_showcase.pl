@@ -6,7 +6,7 @@
 # arrays (push/pop/scalar), strings, function calls, and modifiers.
 
 # --- Feature: Clamping with early return + unless modifier ---
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $target >= 0 && $target <= 10 && $lo >= 0 && $hi >= $lo && $hi <= 10
 # post: $result >= $lo && $result <= $hi
 sub clamp_full {
@@ -17,7 +17,7 @@ sub clamp_full {
 }
 
 # --- Feature: Array push/pop round-trip ---
-# sig: (Array<Int>, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64) -> I64
 # pre: scalar(@arr) == 0 && $a >= 0 && $a <= 100 && $b >= 0 && $b <= 100 && $c >= 0 && $c <= 100
 # post: $result == $a + $b + $c
 sub stack_sum {
@@ -33,7 +33,7 @@ sub stack_sum {
 }
 
 # --- Feature: String operations with length and starts_with ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && starts_with($s, "hello") == 1
 # post: $result >= 5
 sub hello_length {
@@ -43,7 +43,7 @@ sub hello_length {
 }
 
 # --- Feature: Bitwise manipulation round-trip ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == $x
 sub bit_roundtrip {
@@ -55,7 +55,7 @@ sub bit_roundtrip {
 }
 
 # --- Feature: Loop + conditions + last + ternary ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 1 && $n <= 4 && $threshold >= 0 && $threshold <= 20
 # post: $result >= 0 && $result <= $threshold
 sub complex_accumulate {
@@ -72,7 +72,7 @@ sub complex_accumulate {
 }
 
 # --- Feature: Intra-file function call + elsif chain ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 0 && $result <= 100
 sub identity {
@@ -80,7 +80,7 @@ sub identity {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $score >= 0 && $score <= 100
 # post: $result >= 1 && $result <= 4
 sub grade_band {
@@ -98,7 +98,7 @@ sub grade_band {
 }
 
 # --- Feature: Loop with next (skip) + modulo ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 0
 sub sum_odd_indices {
@@ -113,7 +113,7 @@ sub sum_odd_indices {
 }
 
 # --- Feature: Die guarded by precondition (unreachable) ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $b != 0 && $a >= 0 && $a <= 100 && $b >= 1 && $b <= 10
 # post: $result >= 0
 sub safe_divide {

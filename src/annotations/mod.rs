@@ -235,11 +235,11 @@ fn split_signature_types(raw: &str) -> Vec<&str> {
 
 fn parse_type(function: &str, raw_type: &str) -> std::result::Result<Type, AnnotationError> {
     match raw_type {
-        "Int" => Ok(Type::Int),
+        "I64" => Ok(Type::I64),
         "Str" => Ok(Type::Str),
-        "Array<Int>" => Ok(Type::ArrayInt),
+        "Array<I64>" => Ok(Type::ArrayI64),
         "Array<Str>" => Ok(Type::ArrayStr),
-        "Hash<Str, Int>" => Ok(Type::HashInt),
+        "Hash<Str, I64>" => Ok(Type::HashI64),
         "Hash<Str, Str>" => Ok(Type::HashStr),
         other => Err(AnnotationError::UnsupportedType {
             function: function.to_string(),
@@ -485,10 +485,10 @@ mod tests {
 
     #[test]
     fn parses_extern_with_postcondition_only() {
-        let ext = parse_extern_line("# extern: abs_val (Int) -> Int post: $result >= 0").unwrap();
+        let ext = parse_extern_line("# extern: abs_val (I64) -> I64 post: $result >= 0").unwrap();
         assert_eq!(ext.name, "abs_val");
-        assert_eq!(ext.param_types, vec![Type::Int]);
-        assert_eq!(ext.return_type, Type::Int);
+        assert_eq!(ext.param_types, vec![Type::I64]);
+        assert_eq!(ext.return_type, Type::I64);
         assert_eq!(ext.precondition, Expr::Bool(true));
         assert_eq!(
             ext.postcondition,
@@ -503,12 +503,12 @@ mod tests {
     #[test]
     fn parses_extern_with_pre_and_post() {
         let ext = parse_extern_line(
-            "# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c",
+            "# extern: clamp (I64, I64, I64) -> I64 pre: $b <= $c post: $result >= $b && $result <= $c",
         )
         .unwrap();
         assert_eq!(ext.name, "clamp");
-        assert_eq!(ext.param_types, vec![Type::Int, Type::Int, Type::Int]);
-        assert_eq!(ext.return_type, Type::Int);
+        assert_eq!(ext.param_types, vec![Type::I64, Type::I64, Type::I64]);
+        assert_eq!(ext.return_type, Type::I64);
         // precondition: $b <= $c
         assert!(ext.precondition != Expr::Bool(true));
         // postcondition: $result >= $b && $result <= $c
@@ -517,17 +517,17 @@ mod tests {
 
     #[test]
     fn parses_extern_with_no_conditions() {
-        let ext = parse_extern_line("# extern: noop (Int) -> Int").unwrap();
+        let ext = parse_extern_line("# extern: noop (I64) -> I64").unwrap();
         assert_eq!(ext.name, "noop");
-        assert_eq!(ext.param_types, vec![Type::Int]);
-        assert_eq!(ext.return_type, Type::Int);
+        assert_eq!(ext.param_types, vec![Type::I64]);
+        assert_eq!(ext.return_type, Type::I64);
         assert_eq!(ext.precondition, Expr::Bool(true));
         assert_eq!(ext.postcondition, Expr::Bool(true));
     }
 
     #[test]
     fn rejects_extern_with_missing_arrow() {
-        let err = parse_extern_line("# extern: bad (Int) Int").unwrap_err();
+        let err = parse_extern_line("# extern: bad (I64) I64").unwrap_err();
         assert!(matches!(err, AnnotationError::InvalidExternDeclaration { .. }));
     }
 
@@ -536,7 +536,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int, Int) -> Int".to_string(),
+                "# sig: (I64, I64) -> I64".to_string(),
                 "# pre: $x > 0 && $y > 0".to_string(),
                 "# pos: $result > $x + $y * 2".to_string(),
             ],
@@ -547,8 +547,8 @@ mod tests {
         let spec = parse_function_spec(&function).unwrap();
 
         assert_eq!(spec.name, "foo");
-        assert_eq!(spec.arg_types, vec![Type::Int, Type::Int]);
-        assert_eq!(spec.ret_type, Type::Int);
+        assert_eq!(spec.arg_types, vec![Type::I64, Type::I64]);
+        assert_eq!(spec.ret_type, Type::I64);
         assert_eq!(
             spec.post,
             Expr::Binary {
@@ -604,7 +604,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: Int, Int -> Int".to_string(),
+                "# sig: Int, Int -> I64".to_string(),
                 "# post: $result > 0".to_string(),
             ],
             body: "\n    my ($x, $y) = @_;\n    return $x + $y;\n".to_string(),
@@ -617,7 +617,7 @@ mod tests {
             error,
             AnnotationError::InvalidSignature {
                 function: "foo".to_string(),
-                signature: "Int, Int -> Int".to_string(),
+                signature: "Int, Int -> I64".to_string(),
             }
         );
     }
@@ -627,7 +627,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# pre: $z > 0".to_string(),
                 "# post: $result > $x".to_string(),
             ],
@@ -651,7 +651,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result >= $x".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return $x;\n".to_string(),

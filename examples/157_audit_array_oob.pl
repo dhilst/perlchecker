@@ -9,7 +9,7 @@
 # array returns 0 (the Perl-correct undef value). The branch ($oob > 0) is never
 # taken, so $result is always 0.
 
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) == 3
 # post: $result == 0
 sub oob_read_returns_zero {

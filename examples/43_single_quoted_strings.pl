@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1
 # post: $result >= 0
 sub single_quote_concat {
@@ -8,7 +8,7 @@ sub single_quote_concat {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == 1
 sub sq_compare {

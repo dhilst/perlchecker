@@ -4,7 +4,7 @@
 
 # Complex path stress test: nested conditions with caps
 # This creates 2^4 = 16 paths through the function
-# sig: (Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10 && $c >= 0 && $c <= 10 && $d >= 0 && $d <= 10
 # post: $result >= 0 && $result <= 20
 sub sum_with_caps {
@@ -34,7 +34,7 @@ sub sum_with_caps {
 }
 
 # Loop with early exit via last + ternary transform on array elements
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $len >= 1 && $len <= 4
 # post: $result >= 0 && $result <= 1
 sub search_with_transform {
@@ -52,7 +52,7 @@ sub search_with_transform {
 }
 
 # Nested ternary chain creating complex constraint paths
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result >= 0 && $result <= 4
 sub classify {
@@ -62,7 +62,7 @@ sub classify {
 }
 
 # Combined arithmetic + ternary paths with loop and next
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 0
 sub sum_transformed_odds {
@@ -78,7 +78,7 @@ sub sum_transformed_odds {
 }
 
 # Multi-branch classification with early return
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0 && $result <= 3
 sub quadrant {

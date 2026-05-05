@@ -1,6 +1,6 @@
 # Round 117: Arrow dereference for array and hash references
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 42
 sub arrow_array_write {
@@ -11,7 +11,7 @@ sub arrow_array_write {
     return $data[0];
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 2
 sub arrow_array_read {
@@ -22,7 +22,7 @@ sub arrow_array_read {
     return $val / 10;
 }
 
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: $key eq "name"
 # post: $result == 1
 sub arrow_hash_write {

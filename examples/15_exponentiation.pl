@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result >= 1
 sub square {
@@ -7,7 +7,7 @@ sub square {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 4
 # post: $result >= 1
 sub two_to_n {

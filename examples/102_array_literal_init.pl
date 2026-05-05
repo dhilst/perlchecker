@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 3
 # post: $result >= 10 && $result <= 30
 sub lookup_table {
@@ -8,7 +8,7 @@ sub lookup_table {
     return $table[$idx];
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 3
 # post: $result >= 0
 sub sum_first_n {

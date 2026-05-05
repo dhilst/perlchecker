@@ -1,6 +1,6 @@
 # Ghost variables: verification-only state for richer annotations
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result == $x + $y
 sub sum_with_ghost {
@@ -11,7 +11,7 @@ sub sum_with_ghost {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= $n
 sub double_ghost {
@@ -22,7 +22,7 @@ sub double_ghost {
     return $result;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0
 sub ghost_tracks_intermediate {

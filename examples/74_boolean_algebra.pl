@@ -9,7 +9,7 @@
 # --- Function 1: De Morgan's law verification ---
 # Verifies !(a && b) == (!a || !b) for boolean inputs.
 # Both branches compute the same result, proving the law holds.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1
 # post: $result == 1
 sub de_morgan_and {
@@ -50,7 +50,7 @@ sub de_morgan_and {
 # --- Function 2: XOR from AND/OR/NOT ---
 # Implements XOR(a, b) = (a || b) && !(a && b) and verifies it
 # equals the direct computation (a != b) ? 1 : 0.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1
 # post: $result == 1
 sub xor_equivalence {
@@ -97,7 +97,7 @@ sub xor_equivalence {
 # --- Function 3: Majority vote 2-of-3 ---
 # Returns 1 if at least 2 of the 3 inputs are 1, else 0.
 # The postcondition verifies tight bounds: result is always 0 or 1.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1 && $c >= 0 && $c <= 1
 # post: $result >= 0 && $result <= 1
 sub majority_2of3 {
@@ -118,7 +118,7 @@ sub majority_2of3 {
 # Returns the conjunction of all three implications.
 # With all inputs constrained to 0/1, the verifier must reason
 # through 16 input combinations.
-# sig: (Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1 && $c >= 0 && $c <= 1 && $d >= 0 && $d <= 1
 # post: $result >= 0 && $result <= 1
 sub implication_chain {
@@ -154,7 +154,7 @@ sub implication_chain {
 # Returns 1 if at least 3 of 5 inputs are 1. The sum ranges
 # from 0 to 5, and the verifier must handle 32 input combinations
 # through the conditional paths.
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1 && $c >= 0 && $c <= 1 && $d >= 0 && $d <= 1 && $e >= 0 && $e <= 1
 # post: $result >= 0 && $result <= 1
 sub majority_3of5 {

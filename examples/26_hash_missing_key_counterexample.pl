@@ -1,4 +1,4 @@
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # post: $result == 0
 sub hash_missing_key_counterexample {
     my ($h, $k) = @_;

@@ -8,7 +8,7 @@
 # --- Function 1: Square with overflow guard ---
 # Computes x**2, but dies if the result would exceed a threshold.
 # Precondition bounds x tightly so die is unreachable.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result >= 1 && $result <= 100
 sub square_bounded {
@@ -22,7 +22,7 @@ sub square_bounded {
 # Computes x**3 and clamps to a ceiling if too large.
 # With x in [1,4], x**3 is in [1,64]. Clamp at 50 means
 # result is always in [1,50].
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 4
 # post: $result >= 1 && $result <= 50
 sub cube_clamped {
@@ -42,7 +42,7 @@ sub cube_clamped {
 # a bounded result. For x in [1,3]: x**2 in [1,9], 2**x in [2,8].
 # When x**2 >= 2**x, returns x**2 - 2**x + 1 (non-negative).
 # When x**2 < 2**x, returns 2**x - x**2 + 1 (positive).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 3
 # post: $result >= 1
 sub power_compare_branch {
@@ -61,7 +61,7 @@ sub power_compare_branch {
 # --- Function 4: Nested exponent guards with multiple paths ---
 # Checks x**2 and y**2 independently, creating 4 paths based on
 # whether each exceeds a threshold. Returns a category 1-4.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 5 && $y >= 0 && $y <= 5
 # post: $result >= 1 && $result <= 4
 sub dual_square_classify {
@@ -89,7 +89,7 @@ sub dual_square_classify {
 # Iterates and accumulates x**2 at each step. Exits early if
 # accumulator exceeds threshold. With x in [1,2] and n in [1,3],
 # accumulates at most 3*4=12. Returns result clamped to [0,10].
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 2 && $n >= 1 && $n <= 3
 # post: $result >= 1 && $result <= 10
 sub power_accumulate_exit {

@@ -9,7 +9,7 @@
 
 # --- Nested 2x3 with if/else in inner loop ---
 # Outer 2 iters, inner 3 iters, each with if/else => 2^6 = 64 paths max
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 5 && $y >= 0 && $y <= 5
 # post: $result >= 0 && $result <= 30
 sub nested_branch_accum {
@@ -32,7 +32,7 @@ sub nested_branch_accum {
 # --- Nested 2x2 with last in inner loop ---
 # Inner loop exits early when accumulator exceeds threshold,
 # creating divergent path counts per outer iteration.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $val >= 1 && $val <= 3 && $cap >= 1 && $cap <= 10
 # post: $result >= 0 && $result <= 12
 sub nested_early_exit {
@@ -52,7 +52,7 @@ sub nested_early_exit {
 # --- Nested 3x2 with conditional accumulation ---
 # Outer 3 iters, inner 2 iters. Condition depends on both
 # loop counters, creating different branch patterns per iter.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $base >= 0 && $base <= 4
 # post: $result >= 0 && $result <= 30
 sub nested_counter_dep {
@@ -75,7 +75,7 @@ sub nested_counter_dep {
 # --- Nested 2x2 with last and if/else combo ---
 # Both last and branching in inner loop. Outer loop also
 # has a condition check, creating cross-level path interaction.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 5 && $b >= 1 && $b <= 5
 # post: $result >= 0 && $result <= 20
 sub nested_combo_stress {

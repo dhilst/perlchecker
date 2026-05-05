@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 100 && $b >= 0 && $b <= 100
 # post: ($result == -1 || $result == 0 || $result == 1)
 sub compare {
@@ -7,7 +7,7 @@ sub compare {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $b >= 0
 # post: $result >= 0
 sub abs_diff_via_spaceship {

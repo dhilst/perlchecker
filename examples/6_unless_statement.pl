@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result == $x + 1
 sub unless_basic {
@@ -12,7 +12,7 @@ sub unless_basic {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 50
 # post: $result >= 0
 sub unless_no_else {
@@ -24,7 +24,7 @@ sub unless_no_else {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20
 # post: $result == $a + $b
 sub unless_desugar_equiv {

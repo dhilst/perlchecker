@@ -1,5 +1,5 @@
 # Function 1: Sum positive array elements using foreach
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
 # post: $result >= 0
 sub sum_positive {
@@ -14,7 +14,7 @@ sub sum_positive {
 }
 
 # Function 2: Count elements matching a condition
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 4
 # post: $result >= 0 && $result <= 4
 sub count_positive {
@@ -29,7 +29,7 @@ sub count_positive {
 }
 
 # Function 3: Find maximum using foreach
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
 # post: $result >= -1000
 sub find_max {

@@ -8,7 +8,7 @@
 
 # --- Function 1: Warn in every branch of nested if/elsif/else ---
 # Despite warn in all branches, the arithmetic result is unaffected.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 20
 # post: $result >= 3 && $result <= 42
 sub warn_in_nested_branches {
@@ -44,7 +44,7 @@ sub warn_in_nested_branches {
 # --- Function 2: Warn before and after loop operations ---
 # A for-loop with warn before each accumulation step.
 # The warn should not change the computed sum.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 1 && $result <= 15
 sub warn_in_loop_body {
@@ -62,7 +62,7 @@ sub warn_in_loop_body {
 # --- Function 3: Warn before last/next in while-loop ---
 # Complex control with warn right before early exit (last) and
 # skip (next). Verifies warn doesn't affect loop termination logic.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 5 && $threshold >= 2 && $threshold <= 4
 # post: $result >= 0 && $result <= 12
 sub warn_before_exits {
@@ -89,7 +89,7 @@ sub warn_before_exits {
 # --- Function 4: Warn mixed with ternary and do-while ---
 # Uses warn before a ternary expression inside a do-while loop.
 # Demonstrates no interference with conditional expressions.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 4
 # post: $result >= 2 && $result <= 8
 sub warn_with_ternary_loop {
@@ -109,7 +109,7 @@ sub warn_with_ternary_loop {
 # --- Function 5: Dense warn saturation in multi-path function ---
 # Every possible statement position has a warn call.
 # Postcondition depends purely on arithmetic, not on warn.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 5 && $b >= 0 && $b <= 5
 # post: $result >= 0 && $result <= 35
 sub warn_saturation {

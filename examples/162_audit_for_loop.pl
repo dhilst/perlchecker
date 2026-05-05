@@ -18,7 +18,7 @@
 # --- KEY TEST: user variable named $__broke must not be clobbered ---
 # Previously UNSOUND: desugaring declared its own $__broke = 0,
 # clobbering the user's $__broke = 42.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 5 && $x <= 10
 # post: $result == 42
 sub flag_name_no_clobber {
@@ -34,7 +34,7 @@ sub flag_name_no_clobber {
 }
 
 # --- KEY TEST: user variable named $__skipped must not be clobbered ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 5
 # post: $result == 42
 sub skip_flag_no_clobber {
@@ -50,7 +50,7 @@ sub skip_flag_no_clobber {
 }
 
 # --- last skips step: $i stays at 3 ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 5 && $x <= 10
 # post: $result == 3
 sub last_skips_step {
@@ -65,7 +65,7 @@ sub last_skips_step {
 }
 
 # --- next executes step: sum skips $i==2 but step still increments ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n == 5
 # post: $result == 8
 sub next_runs_step {
@@ -84,7 +84,7 @@ sub next_runs_step {
 
 # --- combined last+next: step interaction ---
 # next at even, last at 5: step runs after next but not after last
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 1
 # post: $result == 5
 sub last_next_step_interaction {

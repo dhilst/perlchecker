@@ -9,7 +9,7 @@
 # so calls only execute on the non-short-circuited path.
 
 # A helper that requires $x > 5
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 5
 # post: $result == 1
 sub only_above_five {
@@ -20,7 +20,7 @@ sub only_above_five {
 # Previously unsound: checker verified $result == 99 even though
 # Perl returns $x (which is 0..5) on the else branch for $x <= 5.
 # After fix: correctly finds counterexample at x = 0.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub and_short_circuit_fixed {
@@ -34,7 +34,7 @@ sub and_short_circuit_fixed {
 }
 
 # A helper that requires $x > 5
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 5
 # post: $result == 0
 sub big_returns_zero {
@@ -43,7 +43,7 @@ sub big_returns_zero {
 }
 
 # Test || short-circuit: ensures right side not evaluated when left is true
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub or_short_circuit_fixed {
@@ -57,7 +57,7 @@ sub or_short_circuit_fixed {
 }
 
 # Verify that plain && / || (no function calls) still work correctly
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 100 && $y >= 0 && $y <= 100
 # post: $result >= 0
 sub plain_and_or {

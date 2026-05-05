@@ -4,7 +4,7 @@
 # (-1) | 0 == 18446744073709551615 (MSB=1, treated as unsigned UV)
 # (-1) ^ (-1) == 0 (MSB=0, treated as signed IV)
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x == -1 && $y == 5
 # post: $result == 5
 sub bitand_neg1_five {
@@ -13,7 +13,7 @@ sub bitand_neg1_five {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x == -1 && $y == -1
 # post: $result == 0
 sub bitxor_neg1_neg1 {
@@ -22,7 +22,7 @@ sub bitxor_neg1_neg1 {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x == -3 && $y == 7
 # post: $result == 5
 sub bitand_neg3_seven {
@@ -33,7 +33,7 @@ sub bitand_neg3_seven {
 
 # Perl produces unsigned (UV) for bitwise results with MSB=1.
 # (-1) | 0 gives UV 18446744073709551615, which is >= 0.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x == -1 && $y == 0
 # post: $result >= 0
 sub bitor_neg1_zero_unsigned {
@@ -42,7 +42,7 @@ sub bitor_neg1_zero_unsigned {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x == -3 && $y == 4
 # post: $result >= 0
 sub bitor_neg3_four_unsigned {

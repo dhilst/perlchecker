@@ -7,7 +7,7 @@
 
 # --- 5 sequential if/else branches, each caps a component ---
 # Creates 2^5 = 32 paths through the function
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20 && $c >= 0 && $c <= 20 && $d >= 0 && $d <= 20 && $e >= 0 && $e <= 20
 # post: $result >= 0 && $result <= 50
 sub five_way_cap {
@@ -43,7 +43,7 @@ sub five_way_cap {
 
 # --- Die-as-assert to prune impossible paths ---
 # The die statements reduce the path space by eliminating branches
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 100 && $y >= 1 && $y <= 100
 # post: $result >= 2 && $result <= 200
 sub guarded_sum {
@@ -69,7 +69,7 @@ sub guarded_sum {
 
 # --- Deeply nested if/else creating exponential paths with bounded result ---
 # Each branch adjusts a score; die prunes impossible intermediate states
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $v1 >= 0 && $v1 <= 10 && $v2 >= 0 && $v2 <= 10 && $v3 >= 0 && $v3 <= 10 && $v4 >= 0 && $v4 <= 10 && $v5 >= 0 && $v5 <= 10
 # post: $result >= 0 && $result <= 5
 sub count_high {
@@ -94,7 +94,7 @@ sub count_high {
 }
 
 # --- Ternary chain with die guard creating constrained paths ---
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10 && $c >= 1 && $c <= 10
 # post: $result >= 3 && $result <= 30
 sub ternary_multiply {
@@ -111,7 +111,7 @@ sub ternary_multiply {
 
 # --- Mixed branching: nested ifs + early return + ternary ---
 # 32 paths from 5 conditions; result is always bounded
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 4 && $b >= 0 && $b <= 4 && $c >= 0 && $c <= 4 && $d >= 0 && $d <= 4 && $e >= 0 && $e <= 4
 # post: $result >= 0 && $result <= 20
 sub weighted_flags {

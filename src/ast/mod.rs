@@ -9,34 +9,34 @@ use crate::annotations::FunctionSpec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
-    Int,
+    I64,
     Str,
-    ArrayInt,
+    ArrayI64,
     ArrayStr,
-    HashInt,
+    HashI64,
     HashStr,
-    RefInt,
+    RefI64,
     RefStr,
-    RefArrayInt,
+    RefArrayI64,
     RefArrayStr,
-    RefHashInt,
+    RefHashI64,
     RefHashStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ExprType {
-    Int,
+    I64,
     Bool,
     Str,
-    ArrayInt,
+    ArrayI64,
     ArrayStr,
-    HashInt,
+    HashI64,
     HashStr,
-    RefInt,
+    RefI64,
     RefStr,
-    RefArrayInt,
+    RefArrayI64,
     RefArrayStr,
-    RefHashInt,
+    RefHashI64,
     RefHashStr,
 }
 
@@ -424,13 +424,13 @@ fn type_check_stmts(
                     }
                     let target_type = target_state.ty.expect("initialized variables must have a type");
                     let ref_type = match target_type {
-                        Type::Int => Type::RefInt,
+                        Type::I64 => Type::RefI64,
                         Type::Str => Type::RefStr,
                         _ => {
                             return Err(TypeCheckError::TypeMismatch {
                                 function: function.to_string(),
                                 context: "reference creation",
-                                expected: "Int or Str",
+                                expected: "I64 or Str",
                                 found: render_expr_type(expr_type_from_type(target_type)),
                             });
                         }
@@ -459,13 +459,13 @@ fn type_check_stmts(
                     }
                     let target_type = target_state.ty.expect("initialized variables must have a type");
                     let ref_type = match target_type {
-                        Type::ArrayInt => Type::RefArrayInt,
+                        Type::ArrayI64 => Type::RefArrayI64,
                         Type::ArrayStr => Type::RefArrayStr,
                         _ => {
                             return Err(TypeCheckError::TypeMismatch {
                                 function: function.to_string(),
                                 context: "array reference creation",
-                                expected: "Array<Int> or Array<Str>",
+                                expected: "Array<I64> or Array<Str>",
                                 found: render_expr_type(expr_type_from_type(target_type)),
                             });
                         }
@@ -494,13 +494,13 @@ fn type_check_stmts(
                     }
                     let target_type = target_state.ty.expect("initialized variables must have a type");
                     let ref_type = match target_type {
-                        Type::HashInt => Type::RefHashInt,
+                        Type::HashI64 => Type::RefHashI64,
                         Type::HashStr => Type::RefHashStr,
                         _ => {
                             return Err(TypeCheckError::TypeMismatch {
                                 function: function.to_string(),
                                 context: "hash reference creation",
-                                expected: "Hash<Str, Int> or Hash<Str, Str>",
+                                expected: "Hash<Str, I64> or Hash<Str, Str>",
                                 found: render_expr_type(expr_type_from_type(target_type)),
                             });
                         }
@@ -560,7 +560,7 @@ fn type_check_stmts(
                     index,
                     &env,
                     &assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     &alias_map,
                 )?;
@@ -679,13 +679,13 @@ fn type_check_stmts(
                 // Infer type from first element, check all elements match
                 let first_type = infer_expr_type(function, &elements[0], &env, &assumptions, signatures, &alias_map)?;
                 let array_type = match first_type {
-                    ExprType::Int => Type::ArrayInt,
+                    ExprType::I64 => Type::ArrayI64,
                     ExprType::Str => Type::ArrayStr,
                     _ => {
                         return Err(TypeCheckError::TypeMismatch {
                             function: function.to_string(),
                             context: "array init element",
-                            expected: "Int or Str",
+                            expected: "I64 or Str",
                             found: render_expr_type(first_type),
                         });
                     }
@@ -723,7 +723,7 @@ fn type_check_stmts(
                     index,
                     &env,
                     &assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     &alias_map,
                 )?;
@@ -996,7 +996,7 @@ fn infer_expr_type(
     alias_map: &AliasMap,
 ) -> std::result::Result<ExprType, TypeCheckError> {
     match expr {
-        Expr::Int(_) => Ok(ExprType::Int),
+        Expr::Int(_) => Ok(ExprType::I64),
         Expr::Bool(_) => Ok(ExprType::Bool),
         Expr::String(_) => Ok(ExprType::Str),
         Expr::Variable(name) => env
@@ -1024,11 +1024,11 @@ fn infer_expr_type(
                     expr,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             UnaryOp::Not => {
                 expect_expr_type(
@@ -1050,11 +1050,11 @@ fn infer_expr_type(
                     expr,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
         },
         Expr::Binary { left, op, right } => match op {
@@ -1067,7 +1067,7 @@ fn infer_expr_type(
                     left,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1077,15 +1077,15 @@ fn infer_expr_type(
                     right,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             BinaryOp::Concat => {
                 let left_ty = infer_expr_type(function, left, env, assumptions, signatures, alias_map)?;
-                if left_ty != ExprType::Str && left_ty != ExprType::Int {
+                if left_ty != ExprType::Str && left_ty != ExprType::I64 {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
                         context: "concat operand",
@@ -1094,7 +1094,7 @@ fn infer_expr_type(
                     });
                 }
                 let right_ty = infer_expr_type(function, right, env, assumptions, signatures, alias_map)?;
-                if right_ty != ExprType::Str && right_ty != ExprType::Int {
+                if right_ty != ExprType::Str && right_ty != ExprType::I64 {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
                         context: "concat operand",
@@ -1121,7 +1121,7 @@ fn infer_expr_type(
                     right,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1134,7 +1134,7 @@ fn infer_expr_type(
                     left,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1144,7 +1144,7 @@ fn infer_expr_type(
                     right,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1157,7 +1157,7 @@ fn infer_expr_type(
                     left,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1167,7 +1167,7 @@ fn infer_expr_type(
                     right,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1217,7 +1217,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             BinaryOp::And | BinaryOp::Or => {
                 expect_expr_type(
@@ -1264,17 +1264,17 @@ fn infer_expr_type(
                         index,
                         env,
                         assumptions,
-                        ExprType::Int,
+                        ExprType::I64,
                         signatures,
                         alias_map,
                     )?;
                     match collection_type {
-                        ExprType::ArrayInt => Ok(ExprType::Int),
+                        ExprType::ArrayI64 => Ok(ExprType::I64),
                         ExprType::ArrayStr => Ok(ExprType::Str),
                         _ => Err(TypeCheckError::TypeMismatch {
                             function: function.to_string(),
                             context: "array access",
-                            expected: "Array<Int> or Array<Str>",
+                            expected: "Array<I64> or Array<Str>",
                             found: render_expr_type(collection_type),
                         }),
                     }
@@ -1291,12 +1291,12 @@ fn infer_expr_type(
                         alias_map,
                     )?;
                     match collection_type {
-                        ExprType::HashInt => Ok(ExprType::Int),
+                        ExprType::HashI64 => Ok(ExprType::I64),
                         ExprType::HashStr => Ok(ExprType::Str),
                         _ => Err(TypeCheckError::TypeMismatch {
                             function: function.to_string(),
                             context: "hash access",
-                            expected: "Hash<Str, Int> or Hash<Str, Str>",
+                            expected: "Hash<Str, I64> or Hash<Str, Str>",
                             found: render_expr_type(collection_type),
                         }),
                     }
@@ -1351,7 +1351,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Substr => {
                 let [value, start, len] = args.as_slice() else {
@@ -1373,7 +1373,7 @@ fn infer_expr_type(
                     start,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1383,7 +1383,7 @@ fn infer_expr_type(
                     len,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1454,12 +1454,12 @@ fn infer_expr_type(
                         start,
                         env,
                         assumptions,
-                        ExprType::Int,
+                        ExprType::I64,
                         signatures,
                         alias_map,
                     )?;
                 }
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Scalar => {
                 let [array] = args.as_slice() else {
@@ -1474,11 +1474,11 @@ fn infer_expr_type(
                     alias_map,
                 )?;
                 match array_type {
-                    ExprType::ArrayInt | ExprType::ArrayStr => Ok(ExprType::Int),
+                    ExprType::ArrayI64 | ExprType::ArrayStr => Ok(ExprType::I64),
                     _ => Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
                         context: "scalar argument",
-                        expected: "Array<Int> or Array<Str>",
+                        expected: "Array<I64> or Array<Str>",
                         found: render_expr_type(array_type),
                     }),
                 }
@@ -1493,11 +1493,11 @@ fn infer_expr_type(
                     value,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Min | Builtin::Max => {
                 let [left, right] = args.as_slice() else {
@@ -1509,7 +1509,7 @@ fn infer_expr_type(
                     left,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1519,11 +1519,11 @@ fn infer_expr_type(
                     right,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Ord => {
                 let [value] = args.as_slice() else {
@@ -1539,7 +1539,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Chr => {
                 let [value] = args.as_slice() else {
@@ -1551,7 +1551,7 @@ fn infer_expr_type(
                     value,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1571,7 +1571,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Reverse => {
                 let [value] = args.as_slice() else {
@@ -1594,7 +1594,7 @@ fn infer_expr_type(
                     unreachable!("int arity is enforced by the parser");
                 };
                 let arg_type = infer_expr_type(function, value, env, assumptions, signatures, alias_map)?;
-                if arg_type != ExprType::Str && arg_type != ExprType::Int {
+                if arg_type != ExprType::Str && arg_type != ExprType::I64 {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
                         context: "int argument",
@@ -1602,7 +1602,7 @@ fn infer_expr_type(
                         found: render_expr_type(arg_type),
                     });
                 }
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Contains => {
                 let [haystack, needle] = args.as_slice() else {
@@ -1628,7 +1628,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::StartsWith => {
                 let [string, prefix] = args.as_slice() else {
@@ -1654,7 +1654,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::EndsWith => {
                 let [string, suffix] = args.as_slice() else {
@@ -1680,7 +1680,7 @@ fn infer_expr_type(
                     signatures,
                     alias_map,
                 )?;
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
             Builtin::Replace => {
                 let [string, from, to] = args.as_slice() else {
@@ -1738,7 +1738,7 @@ fn infer_expr_type(
                     index,
                     env,
                     assumptions,
-                    ExprType::Int,
+                    ExprType::I64,
                     signatures,
                     alias_map,
                 )?;
@@ -1764,7 +1764,7 @@ fn infer_expr_type(
                 } else {
                     let _arg_type = infer_expr_type(function, value, env, assumptions, signatures, alias_map)?;
                 }
-                Ok(ExprType::Int)
+                Ok(ExprType::I64)
             }
         },
         Expr::Ternary { condition, then_expr, else_expr } => {
@@ -1810,12 +1810,12 @@ fn infer_expr_type(
             }
             let ty = state.ty.expect("initialized variables must have a type");
             match ty {
-                Type::HashInt | Type::HashStr => {}
+                Type::HashI64 | Type::HashStr => {}
                 _ => {
                     return Err(TypeCheckError::TypeMismatch {
                         function: function.to_string(),
                         context: "exists argument",
-                        expected: "Hash<Str, Int> or Hash<Str, Str>",
+                        expected: "Hash<Str, I64> or Hash<Str, Str>",
                         found: render_expr_type(expr_type_from_type(ty)),
                     });
                 }
@@ -1831,7 +1831,7 @@ fn infer_expr_type(
                 signatures,
                 alias_map,
             )?;
-            Ok(ExprType::Int)
+            Ok(ExprType::I64)
         }
         Expr::Ref(target) => {
             // \$x — reference creation
@@ -1850,12 +1850,12 @@ fn infer_expr_type(
             }
             let target_type = target_state.ty.expect("initialized variables must have a type");
             match target_type {
-                Type::Int => Ok(ExprType::RefInt),
+                Type::I64 => Ok(ExprType::RefI64),
                 Type::Str => Ok(ExprType::RefStr),
                 _ => Err(TypeCheckError::TypeMismatch {
                     function: function.to_string(),
                     context: "reference creation",
-                    expected: "Int or Str",
+                    expected: "I64 or Str",
                     found: render_expr_type(expr_type_from_type(target_type)),
                 }),
             }
@@ -1876,12 +1876,12 @@ fn infer_expr_type(
             }
             let target_type = target_state.ty.expect("initialized variables must have a type");
             match target_type {
-                Type::ArrayInt => Ok(ExprType::RefArrayInt),
+                Type::ArrayI64 => Ok(ExprType::RefArrayI64),
                 Type::ArrayStr => Ok(ExprType::RefArrayStr),
                 _ => Err(TypeCheckError::TypeMismatch {
                     function: function.to_string(),
                     context: "array reference creation",
-                    expected: "Array<Int> or Array<Str>",
+                    expected: "Array<I64> or Array<Str>",
                     found: render_expr_type(expr_type_from_type(target_type)),
                 }),
             }
@@ -1902,12 +1902,12 @@ fn infer_expr_type(
             }
             let target_type = target_state.ty.expect("initialized variables must have a type");
             match target_type {
-                Type::HashInt => Ok(ExprType::RefHashInt),
+                Type::HashI64 => Ok(ExprType::RefHashI64),
                 Type::HashStr => Ok(ExprType::RefHashStr),
                 _ => Err(TypeCheckError::TypeMismatch {
                     function: function.to_string(),
                     context: "hash reference creation",
-                    expected: "Hash<Str, Int> or Hash<Str, Str>",
+                    expected: "Hash<Str, I64> or Hash<Str, Str>",
                     found: render_expr_type(expr_type_from_type(target_type)),
                 }),
             }
@@ -1926,7 +1926,7 @@ fn infer_expr_type(
                 index,
                 env,
                 assumptions,
-                ExprType::Int,
+                ExprType::I64,
                 signatures,
                 alias_map,
             )?;
@@ -1985,22 +1985,22 @@ fn expect_assignable_type(
     found: ExprType,
 ) -> std::result::Result<Type, TypeCheckError> {
     match found {
-        ExprType::Int => Ok(Type::Int),
+        ExprType::I64 => Ok(Type::I64),
         ExprType::Str => Ok(Type::Str),
-        ExprType::ArrayInt => Ok(Type::ArrayInt),
+        ExprType::ArrayI64 => Ok(Type::ArrayI64),
         ExprType::ArrayStr => Ok(Type::ArrayStr),
-        ExprType::HashInt => Ok(Type::HashInt),
+        ExprType::HashI64 => Ok(Type::HashI64),
         ExprType::HashStr => Ok(Type::HashStr),
-        ExprType::RefInt => Ok(Type::RefInt),
+        ExprType::RefI64 => Ok(Type::RefI64),
         ExprType::RefStr => Ok(Type::RefStr),
-        ExprType::RefArrayInt => Ok(Type::RefArrayInt),
+        ExprType::RefArrayI64 => Ok(Type::RefArrayI64),
         ExprType::RefArrayStr => Ok(Type::RefArrayStr),
-        ExprType::RefHashInt => Ok(Type::RefHashInt),
+        ExprType::RefHashI64 => Ok(Type::RefHashI64),
         ExprType::RefHashStr => Ok(Type::RefHashStr),
         ExprType::Bool => Err(TypeCheckError::TypeMismatch {
             function: function.to_string(),
             context,
-            expected: "Int, Str, Array<Int>, Array<Str>, Hash<Str, Int>, or Hash<Str, Str>",
+            expected: "I64, Str, Array<I64>, Array<Str>, Hash<Str, I64>, or Hash<Str, Str>",
             found: render_expr_type(found),
         }),
     }
@@ -2285,20 +2285,20 @@ fn collection_element_type(
         });
     }
     match (kind, state.ty.expect("initialized variables must have a type")) {
-        (AccessKind::Array, Type::ArrayInt) => Ok(ExprType::Int),
+        (AccessKind::Array, Type::ArrayI64) => Ok(ExprType::I64),
         (AccessKind::Array, Type::ArrayStr) => Ok(ExprType::Str),
-        (AccessKind::Hash, Type::HashInt) => Ok(ExprType::Int),
+        (AccessKind::Hash, Type::HashI64) => Ok(ExprType::I64),
         (AccessKind::Hash, Type::HashStr) => Ok(ExprType::Str),
         (AccessKind::Array, ty) => Err(TypeCheckError::TypeMismatch {
             function: function.to_string(),
             context: "array assignment",
-            expected: "Array<Int> or Array<Str>",
+            expected: "Array<I64> or Array<Str>",
             found: render_expr_type(expr_type_from_type(ty)),
         }),
         (AccessKind::Hash, ty) => Err(TypeCheckError::TypeMismatch {
             function: function.to_string(),
             context: "hash assignment",
-            expected: "Hash<Str, Int> or Hash<Str, Str>",
+            expected: "Hash<Str, I64> or Hash<Str, Str>",
             found: render_expr_type(expr_type_from_type(ty)),
         }),
     }
@@ -2306,35 +2306,35 @@ fn collection_element_type(
 
 fn expr_type_from_type(ty: Type) -> ExprType {
     match ty {
-        Type::Int => ExprType::Int,
+        Type::I64 => ExprType::I64,
         Type::Str => ExprType::Str,
-        Type::ArrayInt => ExprType::ArrayInt,
+        Type::ArrayI64 => ExprType::ArrayI64,
         Type::ArrayStr => ExprType::ArrayStr,
-        Type::HashInt => ExprType::HashInt,
+        Type::HashI64 => ExprType::HashI64,
         Type::HashStr => ExprType::HashStr,
-        Type::RefInt => ExprType::RefInt,
+        Type::RefI64 => ExprType::RefI64,
         Type::RefStr => ExprType::RefStr,
-        Type::RefArrayInt => ExprType::RefArrayInt,
+        Type::RefArrayI64 => ExprType::RefArrayI64,
         Type::RefArrayStr => ExprType::RefArrayStr,
-        Type::RefHashInt => ExprType::RefHashInt,
+        Type::RefHashI64 => ExprType::RefHashI64,
         Type::RefHashStr => ExprType::RefHashStr,
     }
 }
 
 fn render_expr_type(ty: ExprType) -> &'static str {
     match ty {
-        ExprType::Int => "Int",
+        ExprType::I64 => "I64",
         ExprType::Bool => "Bool",
         ExprType::Str => "Str",
-        ExprType::ArrayInt => "Array<Int>",
+        ExprType::ArrayI64 => "Array<I64>",
         ExprType::ArrayStr => "Array<Str>",
-        ExprType::HashInt => "Hash<Str, Int>",
+        ExprType::HashI64 => "Hash<Str, I64>",
         ExprType::HashStr => "Hash<Str, Str>",
-        ExprType::RefInt => "Ref<Int>",
+        ExprType::RefI64 => "Ref<I64>",
         ExprType::RefStr => "Ref<Str>",
-        ExprType::RefArrayInt => "Ref<Array<Int>>",
+        ExprType::RefArrayI64 => "Ref<Array<I64>>",
         ExprType::RefArrayStr => "Ref<Array<Str>>",
-        ExprType::RefHashInt => "Ref<Hash<Str, Int>>",
+        ExprType::RefHashI64 => "Ref<Hash<Str, I64>>",
         ExprType::RefHashStr => "Ref<Hash<Str, Str>>",
     }
 }
@@ -2462,7 +2462,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result > $x".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return $y;\n".to_string(),
@@ -2487,7 +2487,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result >= $x".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    my $y;\n    return $y;\n".to_string(),
@@ -2530,7 +2530,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Str) -> Int".to_string(),
+                "# sig: (Str) -> I64".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return $x + 1;\n".to_string(),
@@ -2546,7 +2546,7 @@ mod tests {
             TypeCheckError::TypeMismatch {
                 function: "foo".to_string(),
                 context: "arithmetic operand",
-                expected: "Int",
+                expected: "I64",
                 found: "Str",
             }
         );
@@ -2557,7 +2557,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int, Int) -> Int".to_string(),
+                "# sig: (I64, I64) -> I64".to_string(),
                 "# post: $result == $x".to_string(),
             ],
             body: "\n    my ($x, $y) = @_;\n    return int($x / $y);\n".to_string(),
@@ -2574,7 +2574,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int, Int) -> Int".to_string(),
+                "# sig: (I64, I64) -> I64".to_string(),
                 "# post: $result == $x".to_string(),
             ],
             body: "\n    my ($x, $y) = @_;\n    return $x / $y;\n".to_string(),
@@ -2592,7 +2592,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int, Int) -> Int".to_string(),
+                "# sig: (I64, I64) -> I64".to_string(),
                 "# post: $result == $x % $y".to_string(),
             ],
             body: "\n    my ($x, $y) = @_;\n    return $x % $y;\n".to_string(),
@@ -2653,7 +2653,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Array<Int>, Int, Int) -> Int".to_string(),
+                "# sig: (Array<I64>, I64, I64) -> I64".to_string(),
                 "# post: $result == $v".to_string(),
             ],
             body: "\n    my ($arr, $i, $v) = @_;\n    $arr[$i] = $v;\n    return $arr[$i];\n".to_string(),
@@ -2670,7 +2670,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Hash<Str, Int>, Int) -> Int".to_string(),
+                "# sig: (Hash<Str, I64>, I64) -> I64".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
             body: "\n    my ($h, $k) = @_;\n    return $h{$k};\n".to_string(),
@@ -2687,7 +2687,7 @@ mod tests {
                 function: "foo".to_string(),
                 context: "hash key",
                 expected: "Str",
-                found: "Int",
+                found: "I64",
             }
         );
     }

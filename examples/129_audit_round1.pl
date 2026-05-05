@@ -5,7 +5,7 @@
 # implements floor-modulo semantics matching Perl.
 
 # Test: modulo with negative divisor, result follows divisor sign
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y == -3 && $x == 7
 # post: $result == 5
 sub mod_add_fixed {
@@ -14,7 +14,7 @@ sub mod_add_fixed {
 }
 
 # Test: modulo with positive divisor, negative dividend
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y == 3 && $x == -7
 # post: $result == -5
 sub mod_add_neg_dividend {
@@ -23,7 +23,7 @@ sub mod_add_neg_dividend {
 }
 
 # Test: general property — when divisor > 0, result of % is non-negative
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y > 0 && $y < 100
 # post: $result >= 0 && $result < $y
 sub mod_nonneg_when_positive_divisor {

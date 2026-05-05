@@ -13,7 +13,7 @@
 # $sum + $n - 10 >= 0 only when $n >= 10 and $sum >= 0.
 # Before fix: checker rejected this (freshened $n had no lower bound).
 # After fix: checker correctly verifies it.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 11 && $n <= 100
 # post: $result >= 0
 sub param_bounded_accumulator {
@@ -29,7 +29,7 @@ sub param_bounded_accumulator {
 }
 
 # Standard invariant (no parameter dependence) still works.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 100
 # post: $result == $n * 5
 sub standard_multiply {
@@ -45,7 +45,7 @@ sub standard_multiply {
 }
 
 # Wrong postcondition must still be caught.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 11 && $n <= 100
 # post: $result == 999
 sub wrong_post_caught {
@@ -61,7 +61,7 @@ sub wrong_post_caught {
 }
 
 # Multi-parameter: both parameters constrained, invariant uses both.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 1 && $n <= 50 && $k >= 2 && $k <= 10
 # post: $result == $n * $k
 sub two_param_loop {

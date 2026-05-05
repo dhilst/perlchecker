@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 65 && $n <= 90
 # post: $result >= 97 && $result <= 122
 sub to_lower_code {
@@ -7,7 +7,7 @@ sub to_lower_code {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 65 && $n <= 90
 # post: $result == $n + 32
 sub ord_chr_roundtrip {

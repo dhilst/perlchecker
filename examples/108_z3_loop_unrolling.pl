@@ -1,7 +1,7 @@
 # Function 1: Sum integers 0..n-1 using while loop.
 # With the increased default unroll limit (9), this works for n up to 8
 # whereas the old limit of 5 would fail for n > 5.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 8
 # post: $result == $n * ($n - 1) / 2
 sub sum_to_n {
@@ -17,7 +17,7 @@ sub sum_to_n {
 
 # Function 2: Bounded factorial using while loop.
 # The increased unroll limit allows verifying up to n=7.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 7
 # post: $result >= 1
 sub factorial_bounded {
@@ -32,7 +32,7 @@ sub factorial_bounded {
 }
 
 # Function 3: Count down from n to 0, verifying the loop ran to completion.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 8
 # post: $result == 0
 sub count_down {

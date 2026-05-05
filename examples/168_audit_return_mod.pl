@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 # Test 1: Multiple early returns with 'if' modifier - basic case
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 20
 # post: $result >= 1 && $result <= 3
 sub classify_basic {
@@ -14,7 +14,7 @@ sub classify_basic {
 }
 
 # Test 2: return with 'unless' modifier
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 20
 # post: $result >= 0 && $result <= 1
 sub is_positive {
@@ -25,7 +25,7 @@ sub is_positive {
 
 # Test 3: Multiple return-if in sequence with tight constraints
 # This tests that path conditions accumulate correctly
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 100
 # post: $result == 1 || $result == 2 || $result == 3 || $result == 4
 sub multi_return {
@@ -37,7 +37,7 @@ sub multi_return {
 }
 
 # Test 4: return-unless with arithmetic in return value
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub abs_like {
@@ -47,7 +47,7 @@ sub abs_like {
 }
 
 # Test 5: return-if with expression in return value
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 1 && $result <= 11
 sub add_one_if_positive {
@@ -58,7 +58,7 @@ sub add_one_if_positive {
 
 # Test 6: return value depends on path condition being true
 # On the x>=y path, x-y>=0; on the x<y path, y-x>0.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 0
 sub safe_difference {
@@ -69,7 +69,7 @@ sub safe_difference {
 
 # Test 7: unless with compound condition and path reasoning
 # After "return 0 unless (x>3 && y>3)", continuation has x>3 AND y>3
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result == 0 || $result >= 8
 sub unless_compound {

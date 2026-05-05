@@ -4,7 +4,7 @@
 # pop returns the last element and decrements the array length.
 
 # --- push then pop returns the pushed value ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0 && $n <= 10 && $val >= 0
 # post: $result == $val
 sub push_pop {
@@ -15,7 +15,7 @@ sub push_pop {
 }
 
 # --- two pops return elements in reverse order ---
-# sig: (Array<Int>, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0 && $n <= 10
 # post: $result == $b
 sub pop_middle {

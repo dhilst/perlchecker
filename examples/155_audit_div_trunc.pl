@@ -8,7 +8,7 @@
 # make truncation explicit (matching Perl's int() semantics).
 
 # This function correctly uses int() for truncating division.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y != 0
 # post: $result == int($x / $y)
 sub truncating_division {

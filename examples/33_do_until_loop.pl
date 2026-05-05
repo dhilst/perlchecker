@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 10 && $x <= 50
 # post: $result >= 0 && $result < 10
 sub reduce_until {
@@ -10,7 +10,7 @@ sub reduce_until {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result == $n * 2
 sub double_until {

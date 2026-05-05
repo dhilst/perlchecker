@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub declaration_then_assign {
     my ($x) = @_;

@@ -6,7 +6,7 @@
 # which was unconstrained — an unsoundness.
 
 # --- pop on empty array returns 0 (undef numified) ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0
 # post: $result == 0
 sub pop_empty_is_zero {
@@ -16,7 +16,7 @@ sub pop_empty_is_zero {
 }
 
 # --- pop beyond array bounds returns 0 ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 3 && $arr[0] == 10 && $arr[1] == 20 && $arr[2] == 30
 # post: $result == 0
 sub pop_four_from_three {
@@ -29,7 +29,7 @@ sub pop_four_from_three {
 }
 
 # --- normal pop still works correctly ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 3 && $arr[0] == 10 && $arr[1] == 20 && $arr[2] == 30
 # post: $result == 30
 sub pop_returns_last {
@@ -39,7 +39,7 @@ sub pop_returns_last {
 }
 
 # --- push then scalar returns correct new length ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 2 && $val >= 0
 # post: $result == 3
 sub push_then_scalar {
@@ -50,7 +50,7 @@ sub push_then_scalar {
 }
 
 # --- length stays at 0 after pop on empty ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0
 # post: $result == 0
 sub pop_empty_length_stays_zero {

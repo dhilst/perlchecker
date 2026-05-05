@@ -17,7 +17,7 @@
 # --- Previously unsound: now correctly rejected as counterexample ---
 # In Perl: -(~5) overflows i64, becomes float, stringifies as
 # "-1.84467440737096e+19" (NOT "-18446744073709551610").
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n == 5
 # post: $result == 1
 sub inttostr_overflow_unsound {
@@ -31,7 +31,7 @@ sub inttostr_overflow_unsound {
 }
 
 # --- SOUND: within i64 range, negative stringify is correct ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= -999 && $n <= -1
 # post: $result == $n
 sub inttostr_neg_roundtrip {
@@ -42,7 +42,7 @@ sub inttostr_neg_roundtrip {
 }
 
 # --- SOUND: stringified negative always starts with "-" ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= -99 && $n <= -1
 # post: $result == 0
 sub inttostr_neg_starts_minus {

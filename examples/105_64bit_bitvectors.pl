@@ -1,6 +1,6 @@
 # Round 105: 64-bit bitvectors for bitwise operations
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0
 sub shift_left_large {
@@ -9,7 +9,7 @@ sub shift_left_large {
     return $result;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0 && $result <= 255
 sub bitwise_and {
@@ -17,7 +17,7 @@ sub bitwise_and {
     return $a & $b;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0
 sub bitwise_or {

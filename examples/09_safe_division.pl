@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $y != 0
 # post: $result == $x / $y
 sub safe_division {

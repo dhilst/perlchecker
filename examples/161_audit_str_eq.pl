@@ -13,7 +13,7 @@
 # --- Exploit: a 33-char constant made ne trivially true ---
 # Before the fix, the checker said "verified" because the variable $s
 # was bounded to 32 chars and could never equal the 33-char target.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1
 # post: $result == 1
 sub ne_long_const_unsound {
@@ -23,7 +23,7 @@ sub ne_long_const_unsound {
 }
 
 # --- Correct: when length is explicitly bounded below the constant ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 32
 # post: $result == 1
 sub ne_long_const_with_bound {
@@ -33,7 +33,7 @@ sub ne_long_const_with_bound {
 }
 
 # --- Correct: eq with a constant within MAX_STR_LEN ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "hello"
 # post: $result == 1
 sub eq_short_const {
@@ -42,7 +42,7 @@ sub eq_short_const {
 }
 
 # --- Correct: ne with empty string when nonempty ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result == 1
 sub ne_empty_nonempty {

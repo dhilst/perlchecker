@@ -9,7 +9,7 @@
 # --- Function 1: Stride-2 loop summing even indices ---
 # Iterates with stride 2 over range [0,8), visiting 0,2,4,6.
 # Accumulates the index values. 4 iterations within unroll limit.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == 12
 sub stride2_sum_even {
@@ -26,7 +26,7 @@ sub stride2_sum_even {
 # Steps by 3 over [0,12): visits 0,3,6,9. Each iteration adds
 # either $i or 1 depending on whether $i > $threshold.
 # Creates 2^4 = 16 paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $threshold >= 0 && $threshold <= 12
 # post: $result >= 4 && $result <= 19
 sub stride3_conditional_accum {
@@ -46,7 +46,7 @@ sub stride3_conditional_accum {
 # --- Function 3: Multiplicative stride (i *= 2) for log iteration ---
 # Starts at 1, multiplies by 2 each step: visits 1,2,4,8.
 # Stops when i >= 16. 4 iterations. Accumulates a count.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 20
 # post: $result == 4
 sub mult_stride_count {
@@ -62,7 +62,7 @@ sub mult_stride_count {
 # --- Function 4: Stride-4 loop with branch on parity ---
 # Steps by 4 over [0,16): visits 0,4,8,12. Each iteration
 # checks if $val > $i and adds different amounts.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $val >= 0 && $val <= 10
 # post: $result >= 4 && $result <= 40
 sub stride4_parity_branch {
@@ -83,7 +83,7 @@ sub stride4_parity_branch {
 # Stride-2 loop with nested conditionals that depend on both
 # the loop variable and the parameter. Creates rich path space.
 # Loop visits 1,3,5: 3 iterations with 3 branches each = 27 paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 3 && $result <= 60
 sub mixed_stride_nested {

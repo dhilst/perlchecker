@@ -8,7 +8,7 @@
 # --- Ternary guards division safely ---
 # When $x == 0, Perl takes the else branch (returns 0).
 # The then-branch division is only reachable when $x != 0.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= -10 && $result <= 10
 sub guarded_div {
@@ -18,7 +18,7 @@ sub guarded_div {
 }
 
 # --- Nested ternary with guarded division ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= 0 && $result <= 100
 sub nested_guarded {
@@ -28,7 +28,7 @@ sub nested_guarded {
 }
 
 # --- Ternary as function argument ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10
 # post: $result >= 1 && $result <= 10
 sub ternary_as_arg {
@@ -39,7 +39,7 @@ sub ternary_as_arg {
 
 # --- Bool-result ternary ---
 # When both branches yield booleans, tests the AND/OR encoding.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= -10 && $result <= 20
 sub bool_ternary_in_cond {

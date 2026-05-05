@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # post: $result >= 0
 sub bounded_string_counterexample {
     my ($x) = @_;

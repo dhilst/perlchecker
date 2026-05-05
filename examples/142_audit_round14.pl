@@ -21,7 +21,7 @@ sub replace_multiple {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "aaaa"
 # post: $result == 0
 sub replace_removes_all_a {

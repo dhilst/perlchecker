@@ -2,7 +2,7 @@
 # In Perl, chomp($s) removes the trailing newline from $s IN PLACE.
 # The checker was only returning the count but not updating the variable.
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "hello\n"
 # post: $result == 5
 sub chomp_shortens_string {
@@ -11,7 +11,7 @@ sub chomp_shortens_string {
     return length($s);
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "world\n"
 # post: $result == 1
 sub chomp_returns_count {
@@ -20,7 +20,7 @@ sub chomp_returns_count {
     return $n;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "no_newline"
 # post: $result == 10
 sub chomp_no_newline_unchanged {

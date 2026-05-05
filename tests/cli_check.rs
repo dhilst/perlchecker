@@ -11,15 +11,16 @@ fn check_command_reports_verified_functions() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
+# pre: $x >= -1000000 && $x <= 1000000
 # post: $result > $x
 sub foo {
     my ($x) = @_;
     return $x + 1;
 }
 
-# sig: (Int, Int) -> Int
-# pre: $y >= 0
+# sig: (I64, I64) -> I64
+# pre: $x >= -1000000 && $x <= 1000000 && $y >= 0 && $y <= 1000000
 # post: $result >= $x
 sub bar {
     my ($x, $y) = @_;
@@ -49,7 +50,7 @@ fn check_command_fails_for_malformed_annotation_block() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= $x
 
 sub foo {
@@ -105,7 +106,7 @@ fn check_command_reports_counterexample_output() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result > $x
 sub foo {
     my ($x) = @_;
@@ -135,7 +136,8 @@ fn check_command_supports_elsif_and_safe_division() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
+# pre: $x >= -1000000 && $x <= 1000000
 # post: $result >= 0
 sub foo {
     my ($x) = @_;
@@ -148,8 +150,8 @@ sub foo {
     }
 }
 
-# sig: (Int, Int) -> Int
-# pre: $y != 0
+# sig: (I64, I64) -> I64
+# pre: $y != 0 && $x >= -1000000 && $x <= 1000000
 # post: $result == int($x / $y)
 sub bar {
     my ($x, $y) = @_;
@@ -179,7 +181,7 @@ fn check_command_rejects_uninitialized_and_unsafe_division() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= $x
 sub foo {
     my ($x) = @_;
@@ -215,7 +217,7 @@ sub concat_len {
     return $x . $y;
 }
 
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # post: $result == 0
 sub whole_index {
     my ($x, $y) = @_;
@@ -305,14 +307,14 @@ fn check_command_supports_modulo_and_discards_zero_divisor_paths() {
     fs::write(
         &file,
         r#"
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result == $x % $y
 sub mod_ok {
     my ($x, $y) = @_;
     return $x % $y;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result == 1
 sub div_pruned {
     my ($x, $y) = @_;
@@ -340,7 +342,7 @@ sub div_pruned {
     fs::write(
         &invalid,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == 0
 sub bad {
     my ($x) = @_;
@@ -368,7 +370,7 @@ fn check_command_supports_arrays_and_hashes() {
     fs::write(
         &file,
         r#"
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: $i >= 0
 # post: $result == $v
 sub array_store {
@@ -407,7 +409,7 @@ fn check_command_rejects_collection_type_errors() {
     fs::write(
         &file,
         r#"
-# sig: (Array<Int>, Str) -> Int
+# sig: (Array<I64>, Str) -> I64
 # post: $result >= 0
 sub bad {
     my ($arr, $k) = @_;
@@ -435,14 +437,14 @@ fn check_command_supports_intra_file_calls_and_rejects_recursion() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub inc {
     my ($x) = @_;
     return $x + 1;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub use_inc {
     my ($x) = @_;
@@ -467,7 +469,7 @@ sub use_inc {
     fs::write(
         &recursive,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= $x
 sub loop {
     my ($x) = @_;
@@ -495,7 +497,7 @@ fn check_command_supports_bounded_loops_and_reports_exhaustion() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
 # post: $result == 0
 sub countdown {
@@ -506,7 +508,7 @@ sub countdown {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 3
 sub counted_for {
     my ($x) = @_;
@@ -535,7 +537,7 @@ sub counted_for {
     fs::write(
         &invalid,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == 0
 sub spin {
     my ($x) = @_;
@@ -568,7 +570,7 @@ fn check_command_reports_path_limit_exceeded() {
     fs::write(
         &file,
         r#"
-# sig: (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64
 # post: $result >= 0
 sub too_many_paths {
     my ($a, $b, $c, $d, $e, $f, $g, $h, $i, $j, $k) = @_;
@@ -608,14 +610,14 @@ fn check_command_supports_calls_in_arbitrary_expression_positions() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub inc {
     my ($x) = @_;
     return $x + 1;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 2
 sub call_in_binary {
     my ($x) = @_;
@@ -623,14 +625,14 @@ sub call_in_binary {
     return $z;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 2
 sub nested_calls {
     my ($x) = @_;
     return inc(inc($x));
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result >= 1
 sub call_in_condition {
@@ -641,7 +643,7 @@ sub call_in_condition {
     return 1;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result == $x + $y + 2
 sub multiple_calls_in_expr {
     my ($x, $y) = @_;
@@ -674,8 +676,8 @@ fn check_foreach_loop_support() {
     fs::write(
         &file,
         r#"
-# sig: (Array<Int>) -> Int
-# pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
+# sig: (Array<I64>) -> I64
+# pre: scalar(@arr) >= 1 && scalar(@arr) <= 5 && $arr[0] >= -100 && $arr[0] <= 100 && $arr[1] >= -100 && $arr[1] <= 100 && $arr[2] >= -100 && $arr[2] <= 100 && $arr[3] >= -100 && $arr[3] <= 100 && $arr[4] >= -100 && $arr[4] <= 100
 # post: $result >= 0
 sub sum_positive {
     my ($arr) = @_;
@@ -688,7 +690,7 @@ sub sum_positive {
     return $sum;
 }
 
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 4
 # post: $result >= 0 && $result <= 4
 sub count_positive {
@@ -724,7 +726,7 @@ fn check_array_literal_initialization() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 3
 # post: $result >= 10 && $result <= 30
 sub lookup_table {
@@ -734,7 +736,7 @@ sub lookup_table {
     return $table[$idx];
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 3
 # post: $result >= 0
 sub sum_first_n {
@@ -770,7 +772,7 @@ fn check_regex_match_desugaring() {
     fs::write(
         &file,
         r#"
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub starts_with_hello {
@@ -781,7 +783,7 @@ sub starts_with_hello {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub contains_test {
@@ -792,7 +794,7 @@ sub contains_test {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub not_ending_with_x {
@@ -803,7 +805,7 @@ sub not_ending_with_x {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub exact_match {
@@ -841,7 +843,7 @@ fn check_string_ordering_fixed() {
         &file,
         r#"
 # "a" lt "b" is always true lexicographically
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == 1
 sub a_lt_b {
     my ($dummy) = @_;
@@ -853,7 +855,7 @@ sub a_lt_b {
 
 # "b" lt "a" is always false — with the old always-true bug this would
 # incorrectly verify the postcondition $result == 1
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == 0
 sub b_not_lt_a {
     my ($dummy) = @_;
@@ -864,7 +866,7 @@ sub b_not_lt_a {
 }
 
 # le is reflexive: any string is le itself
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub le_reflexive {
@@ -876,7 +878,7 @@ sub le_reflexive {
 }
 
 # If a lt b then NOT (b lt a)
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
 # post: $result >= 0 && $result <= 1
 sub lt_gt_consistent {
@@ -914,7 +916,7 @@ fn check_64bit_bitvectors() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0
 sub shift_left_large {
@@ -923,7 +925,7 @@ sub shift_left_large {
     return $result;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0 && $result <= 255
 sub bitwise_and_vals {
@@ -931,7 +933,7 @@ sub bitwise_and_vals {
     return $a & $b;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0
 sub bitwise_or_vals {
@@ -962,7 +964,7 @@ fn check_sound_reverse_encoding() {
     fs::write(
         &file,
         r#"
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub reverse_preserves_length {
@@ -974,7 +976,7 @@ sub reverse_preserves_length {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub double_reverse_preserves_length {
@@ -1008,7 +1010,7 @@ fn check_loop_invariant_annotations() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result == $n * 5
 sub multiply_by_five {
@@ -1023,7 +1025,7 @@ sub multiply_by_five {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 50
 # post: $result >= $n
 sub accumulate {
@@ -1062,7 +1064,7 @@ fn check_loop_unknown_verdict() {
         r#"
 # A function with a loop that exceeds the unroll bound
 # This should produce UNKNOWN, not an error
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result >= 0
 sub needs_invariant {
@@ -1077,7 +1079,7 @@ sub needs_invariant {
 }
 
 # Same function but WITH an invariant — should verify
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result >= 0 && $result == $n
 sub has_invariant {
@@ -1121,7 +1123,7 @@ fn check_assert_annotations() {
     fs::write(
         &file,
         r#"
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 0
 sub sum_checked {
@@ -1132,7 +1134,7 @@ sub sum_checked {
     return $sum;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 1 && $b <= 10
 # post: $result >= 0
 sub div_checked {
@@ -1161,7 +1163,7 @@ sub div_checked {
     fs::write(
         &file2,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub bad_assert {
@@ -1189,20 +1191,20 @@ sub bad_assert {
     fs::write(
         &file3,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
-# post: $result >= 0
+# post: $result >= 0 && $result <= 5
 sub loop_assert {
     my ($x) = @_;
-    my $sum = 0;
+    my $count = 0;
     my $i = 0;
-    # inv: $sum >= 0 && $i >= 0
+    # inv: $count >= 0 && $count <= 5 && $i >= 0 && $i <= 5 && $count == $i
     while ($i < $x) {
-        $sum = $sum + $i;
-        # assert: $sum >= 0
+        $count = $count + 1;
+        # assert: $count >= 1
         $i = $i + 1;
     }
-    return $sum;
+    return $count;
 }
 "#,
     )
@@ -1226,9 +1228,9 @@ fn check_extern_declarations() {
     fs::write(
         &file,
         r#"
-# extern: external_abs (Int) -> Int post: $result >= 0
+# extern: external_abs (I64) -> I64 post: $result >= 0
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result >= 0
 sub use_external_abs {
@@ -1237,9 +1239,9 @@ sub use_external_abs {
     return $result;
 }
 
-# extern: clamp (Int, Int, Int) -> Int pre: $b <= $c post: $result >= $b && $result <= $c
+# extern: clamp (I64, I64, I64) -> I64 pre: $b <= $c post: $result >= $b && $result <= $c
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -1000 && $x <= 1000
 # post: $result >= 0 && $result <= 100
 sub use_clamp {
@@ -1270,16 +1272,16 @@ fn check_extern_local_function_takes_priority() {
     fs::write(
         &file,
         r#"
-# extern: inc (Int) -> Int post: $result == $a + 100
+# extern: inc (I64) -> I64 post: $result == $a + 100
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub inc {
     my ($x) = @_;
     return $x + 1;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x + 1
 sub use_inc {
     my ($x) = @_;
@@ -1310,7 +1312,7 @@ fn check_extern_unknown_callee_without_extern() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= 0
 sub use_missing {
     my ($x) = @_;
@@ -1344,7 +1346,7 @@ fn check_ghost_variable_annotations() {
     fs::write(
         &file,
         r#"
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result == $x + $y
 sub sum_with_ghost {
@@ -1355,7 +1357,7 @@ sub sum_with_ghost {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= $n
 sub double_ghost {
@@ -1385,7 +1387,7 @@ sub double_ghost {
     fs::write(
         &file2,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub bad_ghost {
@@ -1417,7 +1419,7 @@ sub bad_ghost {
     fs::write(
         &file3,
         r#"
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0
 sub ghost_update {
@@ -1452,7 +1454,7 @@ fn check_defined_builtin() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 0
 sub check_undefined {
@@ -1461,7 +1463,7 @@ sub check_undefined {
     return defined($y);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 1
 sub check_defined_after_assign {
@@ -1471,7 +1473,7 @@ sub check_defined_after_assign {
     return defined($y);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 1
 sub check_param_defined {
@@ -1499,7 +1501,7 @@ sub check_param_defined {
     fs::write(
         &file2,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result >= 0
 sub check_defined_branch {
@@ -1538,7 +1540,7 @@ fn check_exists_builtin() {
     fs::write(
         &file,
         r#"
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result == 1
 sub check_exists_after_assign {
@@ -1548,7 +1550,7 @@ sub check_exists_after_assign {
     return $r;
 }
 
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result >= 0
 sub check_exists_param_hash {
@@ -1563,7 +1565,7 @@ sub check_exists_param_hash {
     return $r;
 }
 
-# sig: (Hash<Str, Int>, Str, Str) -> Int
+# sig: (Hash<Str, I64>, Str, Str) -> I64
 # pre: length($k1) >= 1 && length($k2) >= 1
 # post: $result == 1
 sub check_exists_multiple_keys {
@@ -1597,7 +1599,7 @@ fn check_scalar_references() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result == 10
 sub ref_write {
@@ -1607,7 +1609,7 @@ sub ref_write {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result == $x * 2
 sub ref_read {
@@ -1617,7 +1619,7 @@ sub ref_read {
     return $y;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n > 0
 # post: $result == $n + 5
 sub ref_chain {
@@ -1650,7 +1652,7 @@ fn check_arrow_dereference() {
     fs::write(
         &file,
         r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 42
 sub arrow_array_write {
@@ -1661,7 +1663,7 @@ sub arrow_array_write {
     return $data[0];
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 2
 sub arrow_array_read {
@@ -1672,7 +1674,7 @@ sub arrow_array_read {
     return int($val / 10);
 }
 
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: $key eq "name"
 # post: $result == 1
 sub arrow_hash_write {
@@ -1707,7 +1709,7 @@ fn check_round118_integration_showcase() {
         r#"
 # extern: sanitize_input (Str) -> Str post: length($result) >= 0 && length($result) <= 20
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 15
 sub sum_array_foreach {
@@ -1721,7 +1723,7 @@ sub sum_array_foreach {
     return $sum;
 }
 
-# sig: (Hash<Str, Int>, Int) -> Int
+# sig: (Hash<Str, I64>, I64) -> I64
 # pre: $x > 0 && $x < 100
 # post: $result == 1
 sub hash_ref_exists_defined {
@@ -1734,7 +1736,7 @@ sub hash_ref_exists_defined {
     return $found;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result == $n * 3
 sub ghost_loop_invariant {
@@ -1750,7 +1752,7 @@ sub ghost_loop_invariant {
     return $sum;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($input) >= 1 && length($input) <= 10
 # post: $result >= 0 && $result <= 1
 sub validated_regex_check {
@@ -1763,7 +1765,7 @@ sub validated_regex_check {
     return $has_prefix;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == $x + 1
 sub ref_defined_assert {
@@ -1776,7 +1778,7 @@ sub ref_defined_assert {
     return $y;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $idx >= 0 && $idx <= 2
 # post: $result >= 10 && $result <= 30
 sub array_ref_lookup {

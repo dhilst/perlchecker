@@ -3,7 +3,7 @@
 # Previously Z3's str.indexof returned -1 when pos > length(s),
 # which was unsound. Now fixed: the encoding guards empty needles.
 
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 1 && $pos >= 0
 # post: $result >= 0 && $result <= length($s)
 sub index_empty_needle {

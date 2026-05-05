@@ -10,7 +10,7 @@
 # position 32.  Fixed by iterating 2*MAX_STR_LEN times.
 
 # --- Basic: length of concat equals sum of lengths ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 0 && length($b) >= 0
 # post: $result == length($a) + length($b)
 sub len_concat_sum {
@@ -19,7 +19,7 @@ sub len_concat_sum {
 }
 
 # --- length(substr(concat, ...)) is bounded ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($b) >= 1
 # post: $result >= 0 && $result <= length($a) + length($b)
 sub len_substr_of_concat {
@@ -32,7 +32,7 @@ sub len_substr_of_concat {
 # --- length after replace on concat (the bug case) ---
 # Replace all "x" with "yy" in a 64-char string of x's.
 # Perl: length == 128.  Before fix, checker only replaced 32 of 64.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: $a eq "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" && $b eq "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 # post: $result == 128
 sub len_replace_on_concat {
@@ -44,7 +44,7 @@ sub len_replace_on_concat {
 
 # --- length after replace on concat (deletion case) ---
 # Replace all "x" with "" in a 64-char string of x's => length 0.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: $a eq "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" && $b eq "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 # post: $result == 0
 sub len_replace_delete_on_concat {
@@ -55,7 +55,7 @@ sub len_replace_delete_on_concat {
 }
 
 # --- length of triple concat ---
-# sig: (Str, Str, Str) -> Int
+# sig: (Str, Str, Str) -> I64
 # pre: length($a) >= 0 && length($b) >= 0 && length($c) >= 0
 # post: $result == length($a) + length($b) + length($c)
 sub len_triple_concat {
@@ -64,7 +64,7 @@ sub len_triple_concat {
 }
 
 # --- length after reverse of concat ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 0 && length($b) >= 0
 # post: $result == length($a) + length($b)
 sub len_reverse_concat {

@@ -9,7 +9,7 @@
 # correct reversed-direction result. Now fixed.
 
 # --- left-shift with negative amount equals right-shift ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 1000 && $n >= 1 && $n <= 5
 # post: $result == ($x >> $n)
 sub shl_neg_equals_shr {
@@ -19,7 +19,7 @@ sub shl_neg_equals_shr {
 }
 
 # --- right-shift with negative amount equals left-shift ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 100 && $n >= 1 && $n <= 3
 # post: $result == ($x << $n)
 sub shr_neg_equals_shl {

@@ -8,7 +8,7 @@
 # --- Function 1: All arithmetic operators (+, -, *, /, %, **) ---
 # Uses every arithmetic operator in branching logic. Preconditions
 # ensure division is safe and values remain small.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 4 && $y >= 1 && $y <= 4
 # post: $result >= 1 && $result <= 280
 sub arith_all_ops {
@@ -33,7 +33,7 @@ sub arith_all_ops {
 # --- Function 2: All comparison operators (==, !=, <, >, <=, >=, <=>) ---
 # Multi-way classification using every numeric comparison operator.
 # Each branch uses a different comparison to select a return value.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0 && $result <= 30
 sub compare_all_ops {
@@ -60,7 +60,7 @@ sub compare_all_ops {
 # --- Function 3: All bitwise operators (&, |, ^, ~, <<, >>) ---
 # Exercises every bitwise operator with conditional logic.
 # Works on small bounded non-negative integers for tractability.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 7 && $y >= 0 && $y <= 7
 # post: $result >= 0
 sub bitwise_all_ops {
@@ -85,7 +85,7 @@ sub bitwise_all_ops {
 # --- Function 4: All logical operators (&&, ||, !, and, or, not) ---
 # Complex conditions mixing all logical operators in branching.
 # Tests the verifier's ability to reason about logical combinations.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10 && $z >= 0 && $z <= 10
 # post: $result >= 0 && $result <= 30
 sub logical_all_ops {

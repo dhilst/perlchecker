@@ -250,7 +250,7 @@ pub fn execute_cfg(
 
         // For array parameters, add companion length variables
         match ty {
-            Type::ArrayInt | Type::ArrayStr => {
+            Type::ArrayI64 | Type::ArrayStr => {
                 let len_var = format!("{}__len", cfg_param.source);
                 annotation_env.insert(len_var.clone(), SymValue::Int(IntExpr::Var(len_var)));
             }
@@ -265,7 +265,7 @@ pub fn execute_cfg(
     )?;
     let mut initial_path = precondition;
     for (cfg_param, ty) in cfg.params.iter().zip(function.arg_types.iter()) {
-        if matches!(ty, Type::ArrayInt | Type::ArrayStr) {
+        if matches!(ty, Type::ArrayI64 | Type::ArrayStr) {
             let len_var = format!("{}__len", cfg_param.source);
             let non_neg = BoolExpr::IntCmp(
                 CmpOp::Ge,
@@ -887,16 +887,16 @@ fn execute_extern_call(
 
 fn symbolic_value(name: &str, ty: Type) -> SymValue {
     match ty {
-        Type::Int => SymValue::Int(IntExpr::Var(name.to_string())),
+        Type::I64 => SymValue::Int(IntExpr::Var(name.to_string())),
         Type::Str => SymValue::Str(StrExpr::Var(name.to_string())),
-        Type::ArrayInt => SymValue::ArrayInt(ArrayIntExpr::Var(name.to_string())),
+        Type::ArrayI64 => SymValue::ArrayInt(ArrayIntExpr::Var(name.to_string())),
         Type::ArrayStr => SymValue::ArrayStr(ArrayStrExpr::Var(name.to_string())),
-        Type::HashInt => SymValue::HashInt(HashIntExpr::Var(name.to_string())),
+        Type::HashI64 => SymValue::HashInt(HashIntExpr::Var(name.to_string())),
         Type::HashStr => SymValue::HashStr(HashStrExpr::Var(name.to_string())),
         // References are desugared before symbolic execution; these should never appear.
-        Type::RefInt | Type::RefStr
-        | Type::RefArrayInt | Type::RefArrayStr
-        | Type::RefHashInt | Type::RefHashStr => SymValue::Int(IntExpr::Const(0)),
+        Type::RefI64 | Type::RefStr
+        | Type::RefArrayI64 | Type::RefArrayStr
+        | Type::RefHashI64 | Type::RefHashStr => SymValue::Int(IntExpr::Const(0)),
     }
 }
 
@@ -1326,51 +1326,48 @@ fn extract_array_str_base_name(array: &SymValue) -> String {
     }
 }
 
-/// Compute the effective length of an Int array, accounting for stores that extend it.
-/// For a base `Var("arr")`, the length is `arr__len`.
-/// For `Store(base, index, _)`, the length is `max(effective_length(base), index + 1)`.
-fn effective_array_int_length(array: &ArrayIntExpr) -> IntExpr {
+/// Compute the maximum valid index of an Int array, accounting for stores.
+/// For base `Var("arr")`, max index is `arr__len - 1`.
+/// For `Store(base, index, _)`, max index is `max(base_max_idx, index)`.
+/// This avoids computing `index + 1` which overflows in BV(64) at i64::MAX.
+fn effective_array_int_max_index(array: &ArrayIntExpr) -> IntExpr {
     match array {
-        ArrayIntExpr::Var(name) => IntExpr::Var(format!("{name}__len")),
+        ArrayIntExpr::Var(name) => IntExpr::Sub(
+            Box::new(IntExpr::Var(format!("{name}__len"))),
+            Box::new(IntExpr::Const(1)),
+        ),
         ArrayIntExpr::Store(base, index, _) => {
-            let base_len = effective_array_int_length(base);
-            let index_plus_one = IntExpr::Add(
-                Box::new((**index).clone()),
-                Box::new(IntExpr::Const(1)),
-            );
-            // max(base_len, index + 1) = ite(index + 1 > base_len, index + 1, base_len)
+            let base_max = effective_array_int_max_index(base);
             IntExpr::Ite(
                 Box::new(BoolExpr::IntCmp(
                     CmpOp::Gt,
-                    Box::new(index_plus_one.clone()),
-                    Box::new(base_len.clone()),
+                    Box::new((**index).clone()),
+                    Box::new(base_max.clone()),
                 )),
-                Box::new(index_plus_one),
-                Box::new(base_len),
+                Box::new((**index).clone()),
+                Box::new(base_max),
             )
         }
     }
 }
 
-/// Compute the effective length of a Str array, accounting for stores that extend it.
-fn effective_array_str_length(array: &ArrayStrExpr) -> IntExpr {
+/// Compute the maximum valid index of a Str array, accounting for stores.
+fn effective_array_str_max_index(array: &ArrayStrExpr) -> IntExpr {
     match array {
-        ArrayStrExpr::Var(name) => IntExpr::Var(format!("{name}__len")),
+        ArrayStrExpr::Var(name) => IntExpr::Sub(
+            Box::new(IntExpr::Var(format!("{name}__len"))),
+            Box::new(IntExpr::Const(1)),
+        ),
         ArrayStrExpr::Store(base, index, _) => {
-            let base_len = effective_array_str_length(base);
-            let index_plus_one = IntExpr::Add(
-                Box::new((**index).clone()),
-                Box::new(IntExpr::Const(1)),
-            );
-            // max(base_len, index + 1) = ite(index + 1 > base_len, index + 1, base_len)
+            let base_max = effective_array_str_max_index(base);
             IntExpr::Ite(
                 Box::new(BoolExpr::IntCmp(
                     CmpOp::Gt,
-                    Box::new(index_plus_one.clone()),
-                    Box::new(base_len.clone()),
+                    Box::new((**index).clone()),
+                    Box::new(base_max.clone()),
                 )),
-                Box::new(index_plus_one),
-                Box::new(base_len),
+                Box::new((**index).clone()),
+                Box::new(base_max),
             )
         }
     }
@@ -1426,17 +1423,19 @@ fn eval_builtin(
                     SymValue::Int(IntExpr::Var(format!("{name}__len")))
                 }
                 SymValue::ArrayInt(arr @ ArrayIntExpr::Store(_, _, _)) => {
-                    // For Store variants, use effective length which accounts for
-                    // stores that extend the array beyond its current length.
-                    SymValue::Int(effective_array_int_length(arr))
+                    SymValue::Int(IntExpr::Add(
+                        Box::new(effective_array_int_max_index(arr)),
+                        Box::new(IntExpr::Const(1)),
+                    ))
                 }
                 SymValue::ArrayStr(ArrayStrExpr::Var(name)) => {
                     SymValue::Int(IntExpr::Var(format!("{name}__len")))
                 }
                 SymValue::ArrayStr(arr @ ArrayStrExpr::Store(_, _, _)) => {
-                    // For Store variants, use effective length which accounts for
-                    // stores that extend the array beyond its current length.
-                    SymValue::Int(effective_array_str_length(arr))
+                    SymValue::Int(IntExpr::Add(
+                        Box::new(effective_array_str_max_index(arr)),
+                        Box::new(IntExpr::Const(1)),
+                    ))
                 }
                 _ => {
                     return Err(SymExecError::TypeMismatch {
@@ -1656,9 +1655,7 @@ fn eval_access(
                 let base = extract_array_int_base_name(&collection);
                 let raw_index = expect_int(index, function)?;
                 let normalized = normalize_array_index(&base, raw_index);
-                // Perl returns undef (0 in numeric context) for out-of-bounds reads.
-                // Use effective_length which accounts for stores extending the array.
-                let len = effective_array_int_length(array);
+                let max_idx = effective_array_int_max_index(array);
                 let in_bounds = BoolExpr::And(
                     Box::new(BoolExpr::IntCmp(
                         CmpOp::Ge,
@@ -1666,9 +1663,9 @@ fn eval_access(
                         Box::new(IntExpr::Const(0)),
                     )),
                     Box::new(BoolExpr::IntCmp(
-                        CmpOp::Lt,
+                        CmpOp::Le,
                         Box::new(normalized.clone()),
-                        Box::new(len),
+                        Box::new(max_idx),
                     )),
                 );
                 SymValue::Int(IntExpr::Ite(
@@ -1684,9 +1681,7 @@ fn eval_access(
                 let base = extract_array_str_base_name(&collection);
                 let raw_index = expect_int(index, function)?;
                 let normalized = normalize_array_index(&base, raw_index);
-                // Perl returns undef ("" in string context) for out-of-bounds reads.
-                // Use effective_length which accounts for stores extending the array.
-                let len = effective_array_str_length(array);
+                let max_idx = effective_array_str_max_index(array);
                 let in_bounds = BoolExpr::And(
                     Box::new(BoolExpr::IntCmp(
                         CmpOp::Ge,
@@ -1694,9 +1689,9 @@ fn eval_access(
                         Box::new(IntExpr::Const(0)),
                     )),
                     Box::new(BoolExpr::IntCmp(
-                        CmpOp::Lt,
+                        CmpOp::Le,
                         Box::new(normalized.clone()),
-                        Box::new(len),
+                        Box::new(max_idx),
                     )),
                 );
                 SymValue::Str(StrExpr::Ite(
@@ -1890,7 +1885,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result > $x".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return $x;\n".to_string(),
@@ -1938,7 +1933,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int, Int) -> Int".to_string(),
+                "# sig: (I64, I64) -> I64".to_string(),
                 "# post: $result == 1".to_string(),
             ],
             body: "\n    my ($x, $y) = @_;\n    if ($y == 0) {\n        return int($x / $y);\n    }\n    return 1;\n".to_string(),
@@ -1954,7 +1949,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Array<Int>, Int, Int) -> Int".to_string(),
+                "# sig: (Array<I64>, I64, I64) -> I64".to_string(),
                 "# pre: $i >= 0".to_string(),
                 "# post: $result == $v".to_string(),
             ],
@@ -1988,7 +1983,7 @@ mod tests {
             ExtractedFunction {
                 name: "inc".to_string(),
                 annotations: vec![
-                    "# sig: (Int) -> Int".to_string(),
+                    "# sig: (I64) -> I64".to_string(),
                     "# post: $result == $x + 1".to_string(),
                 ],
                 body: "\n    my ($x) = @_;\n    return $x + 1;\n".to_string(),
@@ -1997,7 +1992,7 @@ mod tests {
             ExtractedFunction {
                 name: "use_inc".to_string(),
                 annotations: vec![
-                    "# sig: (Int) -> Int".to_string(),
+                    "# sig: (I64) -> I64".to_string(),
                     "# post: $result == $x + 1".to_string(),
                 ],
                 body: "\n    my ($x) = @_;\n    return inc($x);\n".to_string(),
@@ -2016,7 +2011,7 @@ mod tests {
         let functions = vec![ExtractedFunction {
             name: "loop".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result >= $x".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return loop($x);\n".to_string(),
@@ -2032,7 +2027,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "countdown".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# pre: $x >= 0 && $x <= 5".to_string(),
                 "# post: $result == 0".to_string(),
             ],
@@ -2049,7 +2044,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "spin".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result == 0".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    while ($x >= 0) {\n        $x = $x + 1;\n    }\n    return 0;\n".to_string(),
@@ -2071,7 +2066,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "too_many_paths".to_string(),
             annotations: vec![
-                "# sig: (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> Int"
+                "# sig: (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64"
                     .to_string(),
                 "# post: $result >= 0".to_string(),
             ],
@@ -2088,7 +2083,8 @@ mod tests {
         let function = ExtractedFunction {
             name: "foo".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
+                "# pre: $x >= -1000000 && $x <= 1000000".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    if ($x > 0) {\n        return $x;\n    }\n    return 0 - $x;\n".to_string(),
@@ -2115,7 +2111,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "guarded_positive".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# pre: $x >= 1 && $x <= 100".to_string(),
                 "# post: $result >= 1".to_string(),
             ],
@@ -2132,7 +2128,7 @@ mod tests {
         let function = ExtractedFunction {
             name: "die_is_reachable".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# pre: $x >= 0 && $x <= 10".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
@@ -2149,7 +2145,7 @@ mod tests {
         let functions = vec![ExtractedFunction {
             name: "use_ext".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return ext_abs($x);\n".to_string(),
@@ -2157,7 +2153,7 @@ mod tests {
         }];
 
         let extern_lines = vec![
-            "# extern: ext_abs (Int) -> Int post: $result >= 0".to_string(),
+            "# extern: ext_abs (I64) -> I64 post: $result >= 0".to_string(),
         ];
 
         let results = super::verify_extracted_functions_with_externs(
@@ -2175,7 +2171,7 @@ mod tests {
         let functions = vec![ExtractedFunction {
             name: "use_missing".to_string(),
             annotations: vec![
-                "# sig: (Int) -> Int".to_string(),
+                "# sig: (I64) -> I64".to_string(),
                 "# post: $result >= 0".to_string(),
             ],
             body: "\n    my ($x) = @_;\n    return missing($x);\n".to_string(),
@@ -2202,7 +2198,7 @@ mod tests {
             ExtractedFunction {
                 name: "inc".to_string(),
                 annotations: vec![
-                    "# sig: (Int) -> Int".to_string(),
+                    "# sig: (I64) -> I64".to_string(),
                     "# post: $result == $x + 1".to_string(),
                 ],
                 body: "\n    my ($x) = @_;\n    return $x + 1;\n".to_string(),
@@ -2211,7 +2207,7 @@ mod tests {
             ExtractedFunction {
                 name: "use_inc".to_string(),
                 annotations: vec![
-                    "# sig: (Int) -> Int".to_string(),
+                    "# sig: (I64) -> I64".to_string(),
                     "# post: $result == $x + 1".to_string(),
                 ],
                 body: "\n    my ($x) = @_;\n    return inc($x);\n".to_string(),
@@ -2221,7 +2217,7 @@ mod tests {
 
         // Extern declares inc returns x + 100 (wrong), but local inc returns x + 1 (correct)
         let extern_lines = vec![
-            "# extern: inc (Int) -> Int post: $result == $a + 100".to_string(),
+            "# extern: inc (I64) -> I64 post: $result == $a + 100".to_string(),
         ];
 
         let results = super::verify_extracted_functions_with_externs(

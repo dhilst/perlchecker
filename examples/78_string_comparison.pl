@@ -9,7 +9,7 @@
 # --- Function 1: Classify string position relative to three boundaries ---
 # Given a string and three boundary strings, returns which region it falls in.
 # Creates 4 distinct paths based on lt/ge comparisons.
-# sig: (Str, Str, Str, Str) -> Int
+# sig: (Str, Str, Str, Str) -> I64
 # pre: $lo lt $mid && $mid lt $hi
 # post: $result >= 1 && $result <= 4
 sub classify_region {
@@ -28,7 +28,7 @@ sub classify_region {
 # --- Function 2: Nested equality and ordering checks ---
 # Combines eq/ne with lt/gt in nested conditionals. Classifies a pair
 # of strings by their equality and relative ordering.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # post: $result >= 1 && $result <= 3
 sub compare_pair {
     my ($a, $b) = @_;
@@ -45,7 +45,7 @@ sub compare_pair {
 # Given three strings, determines which of the 6 possible orderings
 # they could have (or equal cases), returning a category code.
 # Uses multiple comparisons creating many branch paths.
-# sig: (Str, Str, Str) -> Int
+# sig: (Str, Str, Str) -> I64
 # post: $result >= 1 && $result <= 6
 sub triple_order {
     my ($x, $y, $z) = @_;
@@ -72,7 +72,7 @@ sub triple_order {
 # Checks if string is in range [lo, hi] using le/ge, and further
 # classifies boundary vs interior positions. The combination of
 # ge/le/eq creates multiple path splits.
-# sig: (Str, Str, Str) -> Int
+# sig: (Str, Str, Str) -> I64
 # pre: $lo lt $hi
 # post: $result >= 0 && $result <= 3
 sub range_classify {
@@ -94,7 +94,7 @@ sub range_classify {
 # Uses ne checks against multiple reference strings to count
 # how many references a string differs from. Creates exponential
 # path explosion through independent ne branches.
-# sig: (Str, Str, Str, Str) -> Int
+# sig: (Str, Str, Str, Str) -> I64
 # post: $result >= 0 && $result <= 3
 sub count_differences {
     my ($s, $r1, $r2, $r3) = @_;

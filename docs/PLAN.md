@@ -1,13 +1,13 @@
 # Incremental v1 Plan for `perlchecker`
 
 ## Summary
-Build a new Rust binary crate named `perlchecker` with a single initial command, `perlchecker check <file.pl>`, and grow it in small verified stages from extraction to full symbolic checking. v1 supports only annotated Perl subs with `Int` parameters/return, assignments, `if`, `return`, arithmetic `+ - *`, comparisons, and boolean operators. Verification means partial correctness only: for every explored terminating path satisfying `# pre:`, prove the returned value satisfies `# post:`.
+Build a new Rust binary crate named `perlchecker` with a single initial command, `perlchecker check <file.pl>`, and grow it in small verified stages from extraction to full symbolic checking. v1 supports only annotated Perl subs with `I64` parameters/return, assignments, `if`, `return`, arithmetic `+ - *`, comparisons, and boolean operators. Verification means partial correctness only: for every explored terminating path satisfying `# pre:`, prove the returned value satisfies `# post:`.
 
 ## Key Changes
 - Bootstrap a new Cargo binary crate with `src/cli`, `extractor`, `parser`, `ast`, `ir`, `symexec`, `smt`, and `annotations`; add `clap`, `thiserror`, `tracing`, `tracing-subscriber`, `pest`, `pest_derive`, `proptest`, and a Rust Z3 binding.
 - Treat Rust as an external prerequisite for implementation in this environment; the plan should assume `rustup`/`cargo` are installed before coding. Use the system `z3` already present at `/usr/bin/z3` rather than planning vendored SMT binaries.
 - Lock the annotation contract to one contiguous block immediately above `sub NAME { ... }` with exactly:
-  - required `# sig: (Int, Int, ...) -> Int`
+  - required `# sig: (I64, I64, ...) -> I64`
   - optional single `# pre: ...`
   - required single `# post: ...`
   - reject `# pos:` and other aliases in v1
@@ -19,7 +19,7 @@ Build a new Rust binary crate named `perlchecker` with a single initial command,
   - return `ExtractedFunction { name, annotations, body, start_line }`
 - Define annotation parsing as a separate stage that produces:
   - `FunctionSpec { name, arg_types, ret_type, pre, post }`
-  - `Type` with only `Int` in v1
+  - `Type` with only `I64` in v1
   - a shared expression AST for `pre`/`post` so annotation and code expressions use the same operator semantics
 - Parse extracted function bodies with `pest` into:
   - `FunctionAst { name, params, body }`
@@ -28,7 +28,7 @@ Build a new Rust binary crate named `perlchecker` with a single initial command,
 - Add a semantic analysis stage before IR:
   - require `my ($x, $y, ...) = @_;` as the first executable statement
   - ensure parameter count matches `# sig`
-  - reject undeclared locals, unsupported constructs, and any non-`Int` usage
+  - reject undeclared locals, unsupported constructs, and any non-`I64` usage
   - require every explored branch to end in `return` for the parser/typechecker to accept the function shape, but keep verification semantics as partial correctness only
 - Lower AST to a small internal IR in two steps:
   - SSA conversion with versioned variable names and phi-free block parameters or explicit merge assignments
@@ -39,7 +39,7 @@ Build a new Rust binary crate named `perlchecker` with a single initial command,
   - fork on branch conditions, accumulate constraints, and prune unsat paths eagerly through SMT checks
   - at each feasible return, check `path_condition ∧ pre ∧ ¬post[result := returned_expr]`
 - SMT integration:
-  - encode `Int` and boolean expressions directly into Z3
+  - encode `I64` and boolean expressions directly into Z3
   - produce either `Verified` or `Counterexample { function, assignments }`
   - map models back only to user-visible parameters in v1
 - CLI rollout by milestone:
@@ -61,7 +61,7 @@ Build a new Rust binary crate named `perlchecker` with a single initial command,
   - `ExtractedFunction { name: String, annotations: Vec<String>, body: String, start_line: usize }`
   - `FunctionSpec { name: String, arg_types: Vec<Type>, ret_type: Type, pre: Expr, post: Expr }`
   - `FunctionAst { name: String, params: Vec<String>, body: Vec<Stmt> }`
-  - `Type::Int`
+  - `Type::I64`
   - `VerificationResult::{Verified, Counterexample}`
 - Diagnostics:
   - structured error enums per stage with `thiserror`

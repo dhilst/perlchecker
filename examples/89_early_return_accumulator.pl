@@ -10,7 +10,7 @@
 # Returns 0 early for zero input. Otherwise, accumulates $x
 # in a loop of 3 iterations. The postcondition bounds the result
 # for both the early-return path (0) and the loop path (3*x).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
 # post: $result >= 0 && $result <= 15
 sub guard_then_accum {
@@ -28,7 +28,7 @@ sub guard_then_accum {
 # Two early returns handle boundary cases ($n <= 1 returns 1,
 # $n >= 8 returns 24). The middle range [2,7] enters a loop
 # that sums 1..3. All paths produce results in [1, 24].
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 10
 # post: $result >= 1 && $result <= 24
 sub multi_guard_loop {
@@ -48,7 +48,7 @@ sub multi_guard_loop {
 # with a branch that adds either $a or $b depending on comparison
 # with loop var. Creates 2^3 = 8 paths in the loop plus 2 early
 # return paths = 10 total paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 4 && $b >= 0 && $b <= 4
 # post: $result >= 0 && $result <= 12
 sub dual_guard_cond_loop {
@@ -72,7 +72,7 @@ sub dual_guard_cond_loop {
 # After guards, a stride-2 loop accumulates from the input.
 # The verifier must prove the bound covers both guard constants
 # and the loop-computed sum.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0 && $result <= 20
 sub cascade_guard_stride_loop {
@@ -93,7 +93,7 @@ sub cascade_guard_stride_loop {
 # up to 4 iterations but breaks early if accumulator exceeds
 # a threshold. Both the early return, the last-exit, and the
 # full-loop completion paths must satisfy the postcondition.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $val >= 0 && $val <= 5 && $limit >= 1 && $limit <= 20
 # post: $result >= -1 && $result <= 20
 sub guard_loop_early_exit {

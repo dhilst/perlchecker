@@ -132,12 +132,26 @@ pub fn parse_function_ast_with_limits(
     comment_annotations.sort_by_key(|(line, _)| *line);
 
     // Interleave comment annotations into the statement list based on line numbers.
+    // Only insert annotations at this level if they are NOT inside a nested block
+    // (those are handled by parse_block when parsing the inner block).
     let stmts = if comment_annotations.is_empty() {
         stmt_pairs
             .into_iter()
             .flat_map(|pair| parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations))
             .collect()
     } else {
+        let stmt_spans: Vec<(usize, usize)> = stmt_pairs
+            .iter()
+            .map(|p| {
+                let start = p.as_span().start_pos().line_col().0;
+                let end = p.as_span().end_pos().line_col().0;
+                (start, end)
+            })
+            .collect();
+        let is_inside_stmt = |line: usize| -> bool {
+            stmt_spans.iter().any(|&(start, end)| line > start && line <= end)
+        };
+
         let mut stmts = Vec::new();
         let mut ann_idx = 0;
         for pair in stmt_pairs {
@@ -145,13 +159,17 @@ pub fn parse_function_ast_with_limits(
             while ann_idx < comment_annotations.len()
                 && comment_annotations[ann_idx].0 < stmt_line
             {
-                stmts.push(comment_annotations[ann_idx].1.clone());
+                if !is_inside_stmt(comment_annotations[ann_idx].0) {
+                    stmts.push(comment_annotations[ann_idx].1.clone());
+                }
                 ann_idx += 1;
             }
             stmts.extend(parse_stmt_with_asserts(pair, max_loop_unroll, &assert_annotations));
         }
         while ann_idx < comment_annotations.len() {
-            stmts.push(comment_annotations[ann_idx].1.clone());
+            if !is_inside_stmt(comment_annotations[ann_idx].0) {
+                stmts.push(comment_annotations[ann_idx].1.clone());
+            }
             ann_idx += 1;
         }
         stmts
@@ -974,6 +992,18 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations:
             .collect();
     }
 
+    let stmt_spans: Vec<(usize, usize)> = stmt_pairs
+        .iter()
+        .map(|p| {
+            let start = p.as_span().start_pos().line_col().0;
+            let end = p.as_span().end_pos().line_col().0;
+            (start, end)
+        })
+        .collect();
+    let is_inside_stmt = |line: usize| -> bool {
+        stmt_spans.iter().any(|&(start, end)| line > start && line <= end)
+    };
+
     let mut stmts = Vec::new();
     let mut assert_idx = 0;
     for pair in stmt_pairs {
@@ -981,13 +1011,17 @@ fn parse_block(pair: Pair<'_, Rule>, max_loop_unroll: usize, assert_annotations:
         while assert_idx < assert_annotations.len()
             && assert_annotations[assert_idx].0 < stmt_line
         {
-            stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+            if !is_inside_stmt(assert_annotations[assert_idx].0) {
+                stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+            }
             assert_idx += 1;
         }
         stmts.extend(parse_stmt_with_asserts(pair, max_loop_unroll, assert_annotations));
     }
     while assert_idx < assert_annotations.len() {
-        stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+        if !is_inside_stmt(assert_annotations[assert_idx].0) {
+            stmts.push(Stmt::Assert(assert_annotations[assert_idx].1.clone()));
+        }
         assert_idx += 1;
     }
     stmts

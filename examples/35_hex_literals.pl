@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0 && $result <= 240
 sub mask_high_nibble {
@@ -7,7 +7,7 @@ sub mask_high_nibble {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 0xFF
 # post: $result >= 0 && $result <= 15
 sub low_nibble_hex {
@@ -16,7 +16,7 @@ sub low_nibble_hex {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0xAB
 # post: $result == 0xAB
 sub hex_identity {

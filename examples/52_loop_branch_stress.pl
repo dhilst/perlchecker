@@ -8,7 +8,7 @@
 
 # --- For-loop with if/else in each iteration: 2^4 = 16 paths ---
 # Each of 4 iterations has an if/else, doubling the path count
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $n >= 1 && $n <= 4
 # post: $result >= 0 && $result <= 40
 sub loop_branch_multiply {
@@ -27,7 +27,7 @@ sub loop_branch_multiply {
 
 # --- Loop with next if: skipping iterations prunes paths ---
 # 4 iterations, next skips even indices, only odd indices accumulate
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 4
 # post: $result >= 0 && $result <= 4
 sub loop_next_skip {
@@ -43,7 +43,7 @@ sub loop_next_skip {
 
 # --- Loop with last if: early exit cuts remaining paths ---
 # Accumulates until threshold hit, then breaks
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 5 && $limit >= 1 && $limit <= 10
 # post: $result >= 0 && $result <= 25
 sub loop_last_threshold {
@@ -59,7 +59,7 @@ sub loop_last_threshold {
 
 # --- Loop + ternary + conditional assignment: combined stress ---
 # Each iteration picks via ternary and adds conditionally
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 5 && $b >= 0 && $b <= 5
 # post: $result >= 0 && $result <= 25
 sub loop_ternary_combo {
@@ -79,7 +79,7 @@ sub loop_ternary_combo {
 
 # --- Nested conditions inside loop with last/next combo ---
 # Each iteration: if/elsif/else with next and last creating complex CFG
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 3
 # post: $result >= 0 && $result <= 35
 sub loop_nested_control {

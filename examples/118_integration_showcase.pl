@@ -7,7 +7,7 @@
 
 # --- Function 1: foreach + array literal + assert (R101, R102, R111) ---
 # Iterates over an array literal, summing elements with mid-loop assertions.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 15
 sub sum_array_foreach {
@@ -23,7 +23,7 @@ sub sum_array_foreach {
 
 # --- Function 2: hash ref + exists + defined + assert (R115, R114, R117, R111) ---
 # Writes through a hash reference, then checks key existence and definedness.
-# sig: (Hash<Str, Int>, Int) -> Int
+# sig: (Hash<Str, I64>, I64) -> I64
 # pre: $x > 0 && $x < 100
 # post: $result == 1
 sub hash_ref_exists_defined {
@@ -38,7 +38,7 @@ sub hash_ref_exists_defined {
 
 # --- Function 3: ghost variable + loop invariant (R113, R109) ---
 # Uses a ghost variable as a factor in a loop invariant for verification.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result == $n * 3
 sub ghost_loop_invariant {
@@ -57,7 +57,7 @@ sub ghost_loop_invariant {
 # --- Function 4: extern + regex + string ops (R112, R103) ---
 # Calls an external function, then checks the result with regex matching.
 # extern: sanitize_input (Str) -> Str post: length($result) >= 0 && length($result) <= 20
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($input) >= 1 && length($input) <= 10
 # post: $result >= 0 && $result <= 1
 sub validated_regex_check {
@@ -72,7 +72,7 @@ sub validated_regex_check {
 
 # --- Function 5: scalar ref + defined + assert (R116, R114, R111) ---
 # Reads through a scalar reference, checks definedness of the result.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == $x + 1
 sub ref_defined_assert {
@@ -88,7 +88,7 @@ sub ref_defined_assert {
 # --- Function 6: array literal + arrow ref + foreach (R102, R117, R101) ---
 # Creates an array literal, accesses it via arrow dereference, and
 # uses foreach to iterate and accumulate a bounded sum.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $idx >= 0 && $idx <= 2
 # post: $result >= 10 && $result <= 30
 sub array_ref_lookup {

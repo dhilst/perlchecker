@@ -10,7 +10,7 @@
 # Uses 15+ features: for-loop, while, ternary, if/elsif/else,
 # unless, die, last, next, +=, min, max, abs, array access, **,
 # comparison operators, compound assignment.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $n >= 1 && $n <= 3
 # post: $result >= 1 && $result <= 50
 sub the_gauntlet {
@@ -48,7 +48,7 @@ sub the_gauntlet {
 # 5 sequential if/else blocks = 32 paths. Each block adds a
 # bounded amount to the accumulator based on input parameters.
 # The postcondition bounds the total across all 32 paths.
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 3 && $b >= 0 && $b <= 3 && $c >= 0 && $c <= 3 && $d >= 0 && $d <= 3 && $e >= 0 && $e <= 3
 # post: $result >= 5 && $result <= 20
 sub path_explorer {
@@ -85,7 +85,7 @@ sub path_explorer {
 # --- Function 3: String Wizard ---
 # Chains 6+ string operations: contains, starts_with, ends_with,
 # length, substr, concat with branching on each result.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 6 && length($s) <= 12
 # post: $result >= 1 && $result <= 18
 sub string_wizard {
@@ -128,7 +128,7 @@ sub string_wizard {
 # --- Function 4: Bit Manipulator ---
 # Exercises all bitwise ops (&, |, ^, ~, <<, >>) with conditional
 # logic. Works on bounded non-negative integers for tractability.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 7 && $y >= 1 && $y <= 7
 # post: $result >= 0 && $result <= 30
 sub bit_manipulator {
@@ -155,7 +155,7 @@ sub bit_manipulator {
 # --- Function 5: State Machine ---
 # 3-state FSM with 2 transition steps. State 0->1->2 with input-
 # dependent transitions. Proves final state is bounded.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $input1 >= 0 && $input1 <= 3 && $input2 >= 0 && $input2 <= 3
 # post: $result >= 0 && $result <= 2
 sub state_machine {
@@ -185,7 +185,7 @@ sub state_machine {
 # --- Function 6: Array Tracker ---
 # push/pop + loop + scalar + conditional. Tracks array length
 # through operations and proves bounds on the result.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 5 && $b >= 1 && $b <= 5 && $c >= 1 && $c <= 5
 # post: $result >= 3 && $result <= 15
 sub array_tracker {
@@ -211,7 +211,7 @@ sub array_tracker {
 # Conditional hash writes + reads + branching on values.
 # Stores into multiple keys conditionally and reads back to decide
 # which value to return. SMT must track store/select chains.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 1 && $result <= 20
 sub hash_oracle {
@@ -238,7 +238,7 @@ sub hash_oracle {
 # Multiple return-if guards with die-unless for validation.
 # Early return-if exits prune paths before the main computation.
 # The precondition ensures die guards are unreachable (proving safety).
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 2 && $result <= 20
 sub guard_fortress {
@@ -255,7 +255,7 @@ sub guard_fortress {
 # --- Function 9: Swap Dance ---
 # Conditional list swaps proving ordering. After the swap pass,
 # the smaller value is always first. Returns the minimum.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 1 && $a <= 8 && $b >= 1 && $b <= 8 && $c >= 1 && $c <= 8
 # post: $result >= 1 && $result <= 8
 sub swap_dance {
@@ -276,7 +276,7 @@ sub swap_dance {
 # --- Function 10: Boundary Sentinel ---
 # Boundary value checks with 3-way branching. Tests exact boundary
 # conditions (0, thresholds) creating precise path splits.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -5 && $x <= 5 && $y >= -5 && $y <= 5
 # post: $result >= 0 && $result <= 30
 sub boundary_sentinel {

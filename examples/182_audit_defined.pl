@@ -9,7 +9,7 @@
 
 # Test 1: defined() on a parameter hash is NOT always true
 # (counterexample: key may not exist)
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result >= 0
 sub defined_guards_hash_read {
@@ -25,7 +25,7 @@ sub defined_guards_hash_read {
 }
 
 # Test 2: After assignment, defined() returns 1
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result == 1
 sub defined_after_assign {
@@ -35,7 +35,7 @@ sub defined_after_assign {
 }
 
 # Test 3: defined() and exists() agree on a freshly assigned key
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result == 1
 sub defined_matches_exists {
@@ -51,7 +51,7 @@ sub defined_matches_exists {
 
 # Test 4: Unassigned key — defined() must not be provably 1
 # (This would be UNSOUND before the fix)
-# sig: (Hash<Str, Int>, Str, Str) -> Int
+# sig: (Hash<Str, I64>, Str, Str) -> I64
 # pre: length($k1) >= 1 && length($k2) >= 1
 # post: $result >= 0
 sub defined_unassigned_key {

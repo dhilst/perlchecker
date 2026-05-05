@@ -1,4 +1,4 @@
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 3 && length($p) >= 1 && length($p) <= 3
 # post: $result >= 0 && $result <= 1
 sub check_prefix {
@@ -7,7 +7,7 @@ sub check_prefix {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1
 # post: $result == 1
 sub string_starts_with_self {
@@ -16,7 +16,7 @@ sub string_starts_with_self {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1
 # post: $result == 1
 sub string_ends_with_self {

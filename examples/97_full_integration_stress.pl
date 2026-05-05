@@ -9,7 +9,7 @@
 # --- Function 1: Kitchen sink numeric ---
 # Uses: for-loop, ternary, if/elsif/else, unless, die guard,
 # last, compound assign (+=), min(), max(), abs(), array access
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $len >= 1 && $len <= 3
 # post: $result >= 0 && $result <= 30
 sub kitchen_sink_numeric {
@@ -42,7 +42,7 @@ sub kitchen_sink_numeric {
 # --- Function 2: String feature integration ---
 # Uses: contains, starts_with, length, substr, concat (.=),
 # if/elsif/else, return if, ternary, unless
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 10
 # post: $result >= 0 && $result <= 20
 sub string_integration {
@@ -76,7 +76,7 @@ sub string_integration {
 # --- Function 3: Numeric bitwise integration ---
 # Uses: **, <<, >>, &, |, ternary, for-loop, next if,
 # die unless, spaceship (<=>), if/else, compound assign (+=)
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 3 && $n >= 1 && $n <= 3
 # post: $result >= 1 && $result <= 100
 sub numeric_bitwise_integration {

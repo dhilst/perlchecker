@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == 5
 sub return_binary {
@@ -7,7 +7,7 @@ sub return_binary {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $mode >= 0
 # post: $result == 493
 sub octal_permission {
@@ -16,7 +16,7 @@ sub octal_permission {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 0xFF
 # post: $result == ($x & 0b11110000)
 sub mask_with_binary {

@@ -1,4 +1,4 @@
-# sig: (Str, Int) -> Str
+# sig: (Str, I64) -> Str
 # pre: length($s) >= $n && $n >= 0
 # post: length($result) == length($s) - $n
 sub suffix {

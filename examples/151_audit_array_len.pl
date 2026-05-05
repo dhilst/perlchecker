@@ -5,7 +5,7 @@
 # across multiple operations.
 
 # --- push then pop cancels out on length ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
 # post: $result == scalar(@arr)
 sub push_pop_length_identity {
@@ -16,7 +16,7 @@ sub push_pop_length_identity {
 }
 
 # --- pop returns the value that was pushed ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 5
 # post: $result == $v
 sub push_pop_value {
@@ -27,7 +27,7 @@ sub push_pop_value {
 }
 
 # --- two pushes then scalar is original + 2 ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 5
 # post: $result == scalar(@arr) + 2
 sub two_pushes_length {
@@ -38,7 +38,7 @@ sub two_pushes_length {
 }
 
 # --- two pushes then two pops: second pop returns first pushed ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 5
 # post: $result == $a
 sub two_push_two_pop_first {
@@ -51,7 +51,7 @@ sub two_push_two_pop_first {
 }
 
 # --- two pushes then two pops: first pop returns second pushed ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 5
 # post: $result == $b
 sub two_push_two_pop_second {
@@ -63,7 +63,7 @@ sub two_push_two_pop_second {
 }
 
 # --- pop from array then check length ---
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 1 && scalar(@arr) <= 5
 # post: $result == scalar(@arr) - 1
 sub pop_decrements_length {
@@ -76,7 +76,7 @@ sub pop_decrements_length {
 # After pop, $arr[scalar(@arr)] is undef in Perl (0 in numeric context).
 # The fix invalidates the popped slot with an unconstrained variable,
 # so the checker correctly rejects this claim.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) >= 0 && scalar(@arr) <= 5 && $x != 0
 # post: $result == $x
 sub pop_ghost_read_counterexample {

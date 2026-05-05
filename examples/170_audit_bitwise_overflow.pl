@@ -13,7 +13,7 @@
 # to be in [-(2^63), 2^64), discarding paths with unrepresentable values.
 
 # Test 1: Normal bitwise AND on in-range values still verifies
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0 && $result <= 255
 sub and_in_range {
@@ -22,7 +22,7 @@ sub and_in_range {
 }
 
 # Test 2: Normal bitwise OR on in-range values still verifies
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 15 && $b >= 0 && $b <= 240
 # post: $result >= 0 && $result <= 255
 sub or_in_range {
@@ -31,7 +31,7 @@ sub or_in_range {
 }
 
 # Test 3: Normal bitwise XOR on in-range values still verifies
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == 0
 sub xor_self {
@@ -40,7 +40,7 @@ sub xor_self {
 }
 
 # Test 4: BitNot result (up to 2^64-1) used in AND still works
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == 255 - $x
 sub bitnot_then_and {
@@ -50,7 +50,7 @@ sub bitnot_then_and {
 
 # Test 5: Negative values in bitwise AND still work correctly
 # In Perl: (-1) & 255 == 255 because -1 as unsigned 64-bit is all 1s
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= -1
 # post: $result >= 0 && $result <= 255
 sub neg_and_byte {

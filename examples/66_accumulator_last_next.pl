@@ -8,7 +8,7 @@
 # --- Function 1: Sum with skip and cap ---
 # Accumulates a running sum, skipping values at even indices (next),
 # and stopping early when the sum exceeds a cap (last).
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $step >= 1 && $step <= 3 && $cap >= 5 && $cap <= 15
 # post: $result >= 1 && $result <= 15
 sub sum_skip_cap {
@@ -27,7 +27,7 @@ sub sum_skip_cap {
 # --- Function 2: Find first value above threshold ---
 # Iterates indices, skipping negative-step indices with next,
 # exits with last on first match. Returns the matching index + 1.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $thresh >= 1 && $thresh <= 4 && $offset >= 0 && $offset <= 2
 # post: $result >= 1 && $result <= 5
 sub find_first_above {
@@ -47,7 +47,7 @@ sub find_first_above {
 # --- Function 3: Count odd values skipping small ones ---
 # Counts how many values pass a filter, using next to skip
 # even values and last to stop after finding enough.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $base >= 0 && $base <= 2 && $max_count >= 1 && $max_count <= 3
 # post: $result >= 0 && $result <= 3
 sub count_odd_limited {
@@ -66,7 +66,7 @@ sub count_odd_limited {
 # --- Function 4: Running minimum with skip and early exit ---
 # Finds the minimum of computed values, skipping some indices
 # with next, and exiting early with last when min is already 0.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $start >= 2 && $start <= 8
 # post: $result >= 0 && $result <= 8
 sub running_min_skip_exit {
@@ -87,7 +87,7 @@ sub running_min_skip_exit {
 # Complex interleaving: next skips when accumulator is odd,
 # last exits when accumulator exceeds limit. Tests both flags
 # interacting on the same variable.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $inc >= 1 && $inc <= 2 && $limit >= 3 && $limit <= 8
 # post: $result >= 0 && $result <= 8
 sub alternating_skip_break {

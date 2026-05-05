@@ -2,7 +2,7 @@
 # Verifies abs(x) >= 0 for all x, abs(0) == 0, abs(-x) == abs(x),
 # and behavior at large negative values.
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -1000000 && $x <= 1000000
 # post: $result >= 0
 sub abs_nonnegative {
@@ -10,7 +10,7 @@ sub abs_nonnegative {
     return abs($x);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0
 # post: $result == 0
 sub abs_zero {
@@ -18,7 +18,7 @@ sub abs_zero {
     return abs($x);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == -5
 # post: $result == 5
 sub abs_neg_five {
@@ -26,7 +26,7 @@ sub abs_neg_five {
     return abs($x);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 5
 # post: $result == 5
 sub abs_pos_five {
@@ -34,7 +34,7 @@ sub abs_pos_five {
     return abs($x);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -999999999 && $x <= -1
 # post: $result == 0 - $x
 sub abs_negative_equals_negation {
@@ -42,7 +42,7 @@ sub abs_negative_equals_negation {
     return abs($x);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 999999999
 # post: $result == $x
 sub abs_positive_is_identity {

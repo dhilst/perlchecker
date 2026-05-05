@@ -11,7 +11,7 @@
 # shift of any non-negative shift amount.  Previously the checker
 # would find a spurious counterexample because arithmetic shift of
 # a negative number stays negative.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -1000 && $x <= 1000
 # post: $result >= 0
 sub logical_shr_nonneg {
@@ -20,7 +20,7 @@ sub logical_shr_nonneg {
 }
 
 # Positive inputs: logical and arithmetic right shift agree.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 8 && $x <= 1000
 # post: $result >= 4
 sub positive_shr_verified {

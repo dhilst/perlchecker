@@ -1,4 +1,4 @@
-# sig: (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64
 # post: $result >= 0
 sub path_limit_exceeded {
     my ($a, $b, $c, $d, $e, $f, $g, $h, $i, $j, $k) = @_;

@@ -6,7 +6,7 @@
 
 # A function with a loop that exceeds the unroll bound.
 # This should produce UNKNOWN with guidance, not a hard error.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result >= 0
 sub needs_invariant {
@@ -21,7 +21,7 @@ sub needs_invariant {
 }
 
 # Same function but WITH an invariant -- should verify.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result >= 0 && $result == $n
 sub has_invariant {

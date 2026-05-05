@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 100
 # post: $result >= 1
 sub guarded_positive {
@@ -9,7 +9,7 @@ sub guarded_positive {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub die_is_reachable {

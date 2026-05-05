@@ -10,7 +10,7 @@
 # and use max(user_bound, MAX_STR_LEN) per variable.
 
 # --- Case 1: die unreachable when precondition keeps string short ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result == length($s)
 sub die_short_string_unreachable {
@@ -20,7 +20,7 @@ sub die_short_string_unreachable {
 }
 
 # --- Case 2: warn is a no-op (execution continues) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == $x + 1
 sub warn_no_effect {
@@ -30,7 +30,7 @@ sub warn_no_effect {
 }
 
 # --- Case 3: die unless guard with precondition ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == $x * 2
 sub die_unless_guard {
@@ -42,7 +42,7 @@ sub die_unless_guard {
 # --- Case 4: die guard for long strings, precondition excludes die path ---
 # (Before the fix, this would have falsely verified even with a broad
 #  precondition because MAX_STR_LEN=32 made length>50 unsatisfiable)
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 50
 # post: $result == length($s)
 sub die_long_guard_safe {

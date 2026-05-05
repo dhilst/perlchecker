@@ -3,7 +3,7 @@
 # Z3: str.to_int("-5") == -1 (only non-negative digit strings are supported)
 # This is a soundness divergence in the StrToInt encoding.
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= -100 && $n <= -1
 # post: $result == $n
 sub neg_int_roundtrip {

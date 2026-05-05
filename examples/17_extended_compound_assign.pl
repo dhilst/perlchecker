@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 100 && $n >= 0 && $n <= 3
 # post: $result >= 1
 sub shift_assign {
@@ -8,7 +8,7 @@ sub shift_assign {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0 && $result <= 15
 sub mask_low_nibble {
@@ -18,7 +18,7 @@ sub mask_low_nibble {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 2 && $x <= 5
 # post: $result >= 4
 sub square_assign {

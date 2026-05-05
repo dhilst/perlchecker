@@ -10,7 +10,7 @@
 # For x in [1,4]: x**2 ranges [1,16], x<<1 ranges [2,8].
 # When x==1: 1 < 2, when x==2: 4 == 4, when x>=3: x**2 > x<<1.
 # Three-way branching on that comparison produces bounded results.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 4
 # post: $result >= 1 && $result <= 16
 sub power_vs_shift_branch {
@@ -33,7 +33,7 @@ sub power_vs_shift_branch {
 # For n in [1,3], base in [1,3]:
 #   1<<n: 2,4,8.  base**2: 1,4,9.
 # Branches on which is larger, then returns the smaller plus 1.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 1 && $n <= 3 && $base >= 1 && $base <= 3
 # post: $result >= 2 && $result <= 9
 sub shift_pow2_vs_general_power {
@@ -55,7 +55,7 @@ sub shift_pow2_vs_general_power {
 # Computes a<<1 and b>>1, then uses spaceship to get -1/0/1.
 # For a in [1,4], b in [2,8]: a<<1 in [2,8], b>>1 in [1,4].
 # Adds the spaceship result to a base value derived from a+b.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 4 && $b >= 2 && $b <= 8
 # post: $result >= 2 && $result <= 13
 sub spaceship_on_shifts {
@@ -78,7 +78,7 @@ sub spaceship_on_shifts {
 # --- Function 4: Power in one branch, shift in another, bound both ---
 # Input x in [1,4]: if x <= 2, compute x**3 (1 or 8);
 # if x > 2, compute x<<2 (12 or 16). All results in [1,16].
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 4
 # post: $result >= 1 && $result <= 16
 sub power_or_shift_path {
@@ -97,7 +97,7 @@ sub power_or_shift_path {
 # then compares them with a cascading branch structure.
 # For x in [1,4]: x**2 in [1,16], (x<<1)>>1 == x in [1,4].
 # The ratio x**2 / x = x, but we express bounds via additive branches.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 4
 # post: $result >= 2 && $result <= 20
 sub nested_shift_power_compare {

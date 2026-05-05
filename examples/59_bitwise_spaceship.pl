@@ -11,7 +11,7 @@
 # Masks input to low 4 bits, then branches on result to produce
 # different offsets. The verifier must reason that (x & 0xF) is
 # always in [0,15] and track through 3 branch paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0 && $result <= 25
 sub mask_and_branch {
@@ -32,7 +32,7 @@ sub mask_and_branch {
 # Uses spaceship to classify relationship, then combines result
 # with bitwise OR of masked inputs. Cross-theory: bitvector for
 # OR/AND, integer for spaceship ITE desugaring.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0 && $result <= 31
 sub spaceship_bitor_path {
@@ -56,7 +56,7 @@ sub spaceship_bitor_path {
 # Iterates a bounded loop, left-shifting an accumulator each
 # iteration. Branches on a masked check to decide whether to add
 # or XOR. Exercises bitvector shift + XOR + conditional in loop.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $seed >= 1 && $seed <= 3
 # post: $result >= 0 && $result <= 100
 sub shift_accum_paths {
@@ -79,7 +79,7 @@ sub shift_accum_paths {
 # XORs two masked values, uses spaceship on the XOR result vs a
 # threshold to pick a return path. Combines bitvector XOR with
 # spaceship ITE in a multi-exit function.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 255 && $y >= 0 && $y <= 255
 # post: $result >= 0 && $result <= 30
 sub xor_spaceship_select {
@@ -103,7 +103,7 @@ sub xor_spaceship_select {
 # Pipelines: right-shift input, mask, compare with spaceship,
 # then uses abs to ensure non-negative. Exercises 4 operations
 # from different theories in a single data flow with branches.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 255 && $y >= 0 && $y <= 255
 # post: $result >= 0 && $result <= 15
 sub pipeline_multi_theory {

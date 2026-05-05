@@ -10,7 +10,7 @@
 # =============================================================
 
 # --- min returns the smaller of two values ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result <= $x && $result <= $y
 sub test_min_le {
     my ($x, $y) = @_;
@@ -18,7 +18,7 @@ sub test_min_le {
 }
 
 # --- max returns the larger of two values ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result >= $x && $result >= $y
 sub test_max_ge {
     my ($x, $y) = @_;
@@ -26,7 +26,7 @@ sub test_max_ge {
 }
 
 # --- min is one of its arguments ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result == $x || $result == $y
 sub test_min_is_arg {
     my ($x, $y) = @_;
@@ -34,7 +34,7 @@ sub test_min_is_arg {
 }
 
 # --- max is one of its arguments ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result == $x || $result == $y
 sub test_max_is_arg {
     my ($x, $y) = @_;
@@ -42,7 +42,7 @@ sub test_max_is_arg {
 }
 
 # --- clamping pattern: max(lo, min(hi, x)) ---
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $lo <= $hi
 # post: $result >= $lo && $result <= $hi
 sub clamp {
@@ -52,7 +52,7 @@ sub clamp {
 }
 
 # --- min and max together bound the range ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # post: $result >= 0
 sub min_max_nonneg {
     my ($x, $y) = @_;

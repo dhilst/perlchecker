@@ -1,4 +1,4 @@
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($b) >= 1
 # post: ($result == -1 || $result == 0 || $result == 1)
 sub str_compare {
@@ -7,7 +7,7 @@ sub str_compare {
     return $r;
 }
 
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($b) >= 1
 # post: $result >= 0
 sub cmp_abs {

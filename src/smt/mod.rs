@@ -7,7 +7,7 @@ use z3::{
     Params,
     Sort,
     Solver,
-    ast::{Ast as _, Array, BV, Bool, Int, Real, String as Z3String},
+    ast::{Ast, Array, BV, Bool, Int, Real, String as Z3String},
 };
 
 use crate::{
@@ -108,13 +108,13 @@ pub fn find_model_with_timeout(
             let mut assignments = BTreeMap::new();
             for variable in variables {
                 let value = match variable.ty {
-                    Type::Int => {
-                        let symbol = Int::new_const(variable.name.clone());
+                    Type::I64 => {
+                        let symbol = BV::new_const(variable.name.clone(), 64);
                         match model
                             .eval(&symbol, true)
-                            .and_then(|value| value.as_i64())
+                            .and_then(|value| value.as_u64())
                         {
-                            Some(value) => ModelValue::Int(value),
+                            Some(value) => ModelValue::Int(value as i64),
                             None => ModelValue::Unconstrained,
                         }
                     }
@@ -128,8 +128,8 @@ pub fn find_model_with_timeout(
                             None => ModelValue::Unconstrained,
                         }
                     }
-                    Type::ArrayInt => {
-                        let symbol = Array::new_const(variable.name.clone(), &Sort::int(), &Sort::int());
+                    Type::ArrayI64 => {
+                        let symbol = Array::new_const(variable.name.clone(), &Sort::bitvector(64), &Sort::bitvector(64));
                         match model.eval(&symbol, true) {
                             Some(value) => ModelValue::Collection(value.to_string()),
                             None => ModelValue::Unconstrained,
@@ -137,15 +137,15 @@ pub fn find_model_with_timeout(
                     }
                     Type::ArrayStr => {
                         let symbol =
-                            Array::new_const(variable.name.clone(), &Sort::int(), &Sort::string());
+                            Array::new_const(variable.name.clone(), &Sort::bitvector(64), &Sort::string());
                         match model.eval(&symbol, true) {
                             Some(value) => ModelValue::Collection(value.to_string()),
                             None => ModelValue::Unconstrained,
                         }
                     }
-                    Type::HashInt => {
+                    Type::HashI64 => {
                         let symbol =
-                            Array::new_const(variable.name.clone(), &Sort::string(), &Sort::int());
+                            Array::new_const(variable.name.clone(), &Sort::string(), &Sort::bitvector(64));
                         match model.eval(&symbol, true) {
                             Some(value) => ModelValue::Collection(value.to_string()),
                             None => ModelValue::Unconstrained,
@@ -163,9 +163,9 @@ pub fn find_model_with_timeout(
                         }
                     }
                     // References are desugared before SMT; these should never appear.
-                    Type::RefInt | Type::RefStr
-                    | Type::RefArrayInt | Type::RefArrayStr
-                    | Type::RefHashInt | Type::RefHashStr => {
+                    Type::RefI64 | Type::RefStr
+                    | Type::RefArrayI64 | Type::RefArrayStr
+                    | Type::RefHashI64 | Type::RefHashStr => {
                         ModelValue::Unconstrained
                     }
                 };
@@ -276,120 +276,92 @@ fn apply_solver_timeout(solver: &Solver, timeout_ms: u32) {
     solver.set_params(&params);
 }
 
-fn encode_int(expr: &IntExpr) -> Int {
+fn bv_const(value: i64) -> BV {
+    BV::from_i64(value, 64)
+}
+
+fn int_to_bv(i: &Int) -> BV {
+    BV::from_int(i, 64)
+}
+
+fn int_to_bv_via_axiom(i: &Int, nonneg: bool) -> BV {
+    let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let fresh = BV::new_const(format!("__i2bv_{n}"), 64);
+    let axiom = fresh.to_int(true).eq(i);
+    REVERSE_AXIOMS.with(|axioms| {
+        let mut ax = axioms.borrow_mut();
+        ax.push(axiom);
+        if nonneg {
+            ax.push(fresh.bvsge(&bv_const(0)));
+        }
+    });
+    fresh
+}
+
+fn encode_int(expr: &IntExpr) -> BV {
     match expr {
-        IntExpr::Const(value) => Int::from_i64(*value),
-        IntExpr::Var(name) => Int::new_const(name.clone()),
-        IntExpr::Add(left, right) => Int::add(&[&encode_int(left), &encode_int(right)]),
-        IntExpr::Sub(left, right) => Int::sub(&[&encode_int(left), &encode_int(right)]),
-        IntExpr::Mul(left, right) => Int::mul(&[&encode_int(left), &encode_int(right)]),
+        IntExpr::Const(value) => bv_const(*value),
+        IntExpr::Var(name) => BV::new_const(name.clone(), 64),
+        IntExpr::Add(left, right) => encode_int(left).bvadd(&encode_int(right)),
+        IntExpr::Sub(left, right) => encode_int(left).bvsub(&encode_int(right)),
+        IntExpr::Mul(left, right) => encode_int(left).bvmul(&encode_int(right)),
         IntExpr::Pow(left, right) => {
-            // Int::power returns Real. Convert back to Int using truncation
-            // toward zero (matching Perl's behavior), NOT floor.
-            // floor(-0.5) = -1, but Perl truncates -0.5 to 0.
-            //
-            // Guard: Perl defines $x ** 0 = 1 for all $x (including 0 ** 0).
-            // Z3 leaves 0^0 unspecified, so we handle exponent == 0 explicitly.
             let l = encode_int(left);
             let r = encode_int(right);
-            let exp_is_zero = r.eq(&Int::from_i64(0));
-            let real_result = l.power(&r);
+            let exp_is_zero = Ast::eq(&r, &bv_const(0));
+            let l_int = l.to_int(true);
+            let r_int = r.to_int(true);
+            let real_result = l_int.power(&r_int);
             let zero_real = Real::from_rational(0, 1);
             let is_nonneg = real_result.ge(&zero_real);
             let floor_val = real_result.to_int();
             let neg_floor = real_result.unary_minus().to_int();
-            let normal_result = is_nonneg.ite(&floor_val, &neg_floor.unary_minus());
-            exp_is_zero.ite(&Int::from_i64(1), &normal_result)
+            let normal_int = is_nonneg.ite(&floor_val, &neg_floor.unary_minus());
+            let normal_bv = int_to_bv(&normal_int);
+            exp_is_zero.ite(&bv_const(1), &normal_bv)
         }
-        IntExpr::Div(left, right) => {
-            encode_truncating_division(&encode_int(left), &encode_int(right))
-        }
+        IntExpr::Div(left, right) => encode_int(left).bvsdiv(&encode_int(right)),
         IntExpr::Mod(left, right) => {
-            encode_perl_modulo(&encode_int(left), &encode_int(right))
+            // Perl's % uses floor-modulo (result has sign of divisor).
+            // Z3's bvsmod implements exactly this semantics.
+            encode_int(left).bvsmod(&encode_int(right))
         }
-        IntExpr::BitAnd(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 64);
-            let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvand(&r_bv).to_int(false)
-        }
-        IntExpr::BitOr(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 64);
-            let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvor(&r_bv).to_int(false)
-        }
-        IntExpr::BitXor(left, right) => {
-            let l_bv = BV::from_int(&encode_int(left), 64);
-            let r_bv = BV::from_int(&encode_int(right), 64);
-            l_bv.bvxor(&r_bv).to_int(false)
-        }
+        IntExpr::BitAnd(left, right) => encode_int(left).bvand(&encode_int(right)),
+        IntExpr::BitOr(left, right) => encode_int(left).bvor(&encode_int(right)),
+        IntExpr::BitXor(left, right) => encode_int(left).bvxor(&encode_int(right)),
         IntExpr::Shl(left, right) => {
-            // Perl: x << -n  is equivalent to  x >> n
-            //
-            // Soundness: shift amounts >= 64 always yield 0 in Perl.
-            // Z3's bvshl already returns 0 for shifts in [64, 2^64-1],
-            // but shift amounts >= 2^64 would wrap via int2bv. We guard
-            // the final result: if abs(amount) >= 64, result is 0.
-            //
-            // Left-operand overflow (value >= 2^64) is handled via a
-            // safety constraint (see encode_int_safety) that blocks
-            // verification when int2bv would produce unsound wrapping.
             let l = encode_int(left);
             let r = encode_int(right);
-            let l_bv = BV::from_int(&l, 64);
-            let r_nonneg = r.ge(0);
-            let r_abs = r_nonneg.ite(&r, &r.unary_minus());
-            let r_bv = BV::from_int(&r_abs, 64);
-            let shl_result = l_bv.bvshl(&r_bv).to_int(false);
-            let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
+            let zero = bv_const(0);
+            let sixty_four = bv_const(64);
+            let r_nonneg = r.bvsge(&zero);
+            let r_abs = r_nonneg.ite(&r, &r.bvneg());
+            let r_too_large = r_abs.bvsge(&sixty_four);
+            let shl_result = l.bvshl(&r_abs);
+            let shr_result = l.bvlshr(&r_abs);
             let normal_result = r_nonneg.ite(&shl_result, &shr_result);
-            // Guard: shift amounts >= 64 always yield 0
-            let sixty_four = Int::from_i64(64);
-            let r_too_large = r_abs.ge(&sixty_four);
-            r_too_large.ite(&Int::from_i64(0), &normal_result)
+            r_too_large.ite(&zero, &normal_result)
         }
         IntExpr::Shr(left, right) => {
-            // Perl: x >> -n  is equivalent to  x << n
-            // Same shift-amount guarding as Shl (see comments above).
             let l = encode_int(left);
             let r = encode_int(right);
-            let l_bv = BV::from_int(&l, 64);
-            let r_nonneg = r.ge(0);
-            let r_abs = r_nonneg.ite(&r, &r.unary_minus());
-            let r_bv = BV::from_int(&r_abs, 64);
-            let shr_result = l_bv.bvlshr(&r_bv).to_int(false);
-            let shl_result = l_bv.bvshl(&r_bv).to_int(false);
+            let zero = bv_const(0);
+            let sixty_four = bv_const(64);
+            let r_nonneg = r.bvsge(&zero);
+            let r_abs = r_nonneg.ite(&r, &r.bvneg());
+            let r_too_large = r_abs.bvsge(&sixty_four);
+            let shr_result = l.bvlshr(&r_abs);
+            let shl_result = l.bvshl(&r_abs);
             let normal_result = r_nonneg.ite(&shr_result, &shl_result);
-            // Guard: shift amounts >= 64 always yield 0
-            let sixty_four = Int::from_i64(64);
-            let r_too_large = r_abs.ge(&sixty_four);
-            r_too_large.ite(&Int::from_i64(0), &normal_result)
+            r_too_large.ite(&zero, &normal_result)
         }
-        IntExpr::BitNot(value) => {
-            // Perl's ~ operator performs bitwise NOT on a 64-bit unsigned
-            // integer and returns the result as an unsigned value.
-            // The two's complement identity ~x == -x - 1 is correct for signed
-            // arithmetic but Perl interprets the result as unsigned 64-bit.
-            // For x >= 0: result = 2^64 - 1 - x.  For x < 0: result = -x - 1.
-            let encoded = encode_int(value);
-            let signed_result = encoded.unary_minus() - Int::from_i64(1);
-            let is_nonneg = signed_result.ge(&Int::from_i64(0));
-            let two_pow_64 = Int::add(&[&Int::from_u64(u64::MAX), &Int::from_i64(1)]);
-            let unsigned_result = Int::add(&[&signed_result, &two_pow_64]);
-            is_nonneg.ite(&signed_result, &unsigned_result)
-        }
+        IntExpr::BitNot(value) => encode_int(value).bvnot(),
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
-            let is_nonnegative = encoded.ge(&Int::from_i64(0));
-            is_nonnegative.ite(&encoded, &encoded.unary_minus())
+            let zero = bv_const(0);
+            encoded.bvsge(&zero).ite(&encoded, &encoded.bvneg())
         }
         IntExpr::Ord(value) => {
-            // Perl's ord($s) returns the code point of the FIRST character.
-            // Z3's str.to_code returns -1 for strings of length != 1.
-            // Fix: extract the first character with str.at($s, 0), then
-            // apply str.to_code to that single-character string.
-            //
-            // Additionally, Perl's ord("") returns 0, but str.at("", 0) = ""
-            // and str.to_code("") = -1. Guard: if length == 0, return 0.
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
             let is_empty = encoded.length().eq(Int::from_i64(0));
@@ -399,29 +371,16 @@ fn encode_int(expr: &IntExpr) -> Int {
             let code_point = unsafe {
                 Int::wrap(ctx, z3_sys::Z3_mk_string_to_code(ctx.get_z3_context(), first_char.get_z3_ast()).unwrap())
             };
-            is_empty.ite(&Int::from_i64(0), &code_point)
+            let result_int = is_empty.ite(&Int::from_i64(0), &code_point);
+            int_to_bv_via_axiom(&result_int, true)
         }
         IntExpr::StrToInt(value) => {
-            // Perl's int($s) extracts the leading integer from a string.
-            // Z3's str.to_int only handles non-negative digit strings and
-            // returns -1 for anything else — including strings like "-5"
-            // or non-numeric strings like "" and "abc".
-            //
-            // Fix: detect a leading '-' sign, apply str.to_int to the tail,
-            // and negate the result. This makes int("" . $n) a correct
-            // round-trip for negative integers.
-            //
-            // Additionally, Z3's str.to_int returns -1 for non-digit
-            // strings, but Perl's int() returns 0 for non-numeric input
-            // (e.g., int("") == 0, int("abc") == 0). We clamp the -1
-            // sentinel to 0 to match Perl semantics.
             let ctx = &Context::thread_local();
             let encoded = encode_str(value);
             let minus_sign = Z3String::from_str("-").expect("minus literal");
             let one = Int::from_i64(1);
             let zero = Int::from_i64(0);
             let neg_one = Int::from_i64(-1);
-            // Does the string start with '-'?
             let starts_with_minus = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_prefix(
                     ctx.get_z3_context(),
@@ -429,17 +388,20 @@ fn encode_int(expr: &IntExpr) -> Int {
                     encoded.get_z3_ast(),
                 ).unwrap())
             };
-            // Positive path: str.to_int on the whole string
-            // Z3 returns -1 for non-digit strings; Perl returns 0.
+            let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let fresh_name = format!("__strtoint_fallback_{n}");
+            let fallback = Int::new_const(fresh_name);
             let raw_pos_val = unsafe {
                 Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
                     ctx.get_z3_context(),
                     encoded.get_z3_ast(),
                 ).unwrap())
             };
-            let pos_val = raw_pos_val.eq(&neg_one).ite(&zero, &raw_pos_val);
-            // Negative path: strip the leading '-', str.to_int on the rest, negate
-            // Z3 returns -1 for non-digit tails (e.g., "-abc"); Perl returns 0.
+            let is_empty = encoded.length().eq(Int::from_i64(0));
+            let pos_val = raw_pos_val.eq(&neg_one).ite(
+                &is_empty.ite(&zero, &fallback),
+                &raw_pos_val,
+            );
             let tail = encoded.substr(one, encoded.length());
             let raw_tail_val = unsafe {
                 Int::wrap(ctx, z3_sys::Z3_mk_str_to_int(
@@ -447,8 +409,13 @@ fn encode_int(expr: &IntExpr) -> Int {
                     tail.get_z3_ast(),
                 ).unwrap())
             };
-            let neg_val = raw_tail_val.eq(&neg_one).ite(&zero, &raw_tail_val.unary_minus());
-            starts_with_minus.ite(&neg_val, &pos_val)
+            let tail_is_empty = tail.length().eq(Int::from_i64(0));
+            let neg_val = raw_tail_val.eq(&neg_one).ite(
+                &tail_is_empty.ite(&zero, &fallback),
+                &raw_tail_val.unary_minus(),
+            );
+            let result_int = starts_with_minus.ite(&neg_val, &pos_val);
+            int_to_bv_via_axiom(&result_int, false)
         }
         IntExpr::Contains(haystack, needle) => {
             let ctx = &Context::thread_local();
@@ -457,27 +424,25 @@ fn encode_int(expr: &IntExpr) -> Int {
             let contains_bool = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_contains(ctx.get_z3_context(), h.get_z3_ast(), n.get_z3_ast()).unwrap())
             };
-            contains_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+            contains_bool.ite(&bv_const(1), &bv_const(0))
         }
         IntExpr::StartsWith(string, prefix) => {
             let ctx = &Context::thread_local();
             let s = encode_str(string);
             let p = encode_str(prefix);
-            // Z3's str.prefixof takes (prefix, string)
             let prefix_bool = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_prefix(ctx.get_z3_context(), p.get_z3_ast(), s.get_z3_ast()).unwrap())
             };
-            prefix_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+            prefix_bool.ite(&bv_const(1), &bv_const(0))
         }
         IntExpr::EndsWith(string, suffix) => {
             let ctx = &Context::thread_local();
             let s = encode_str(string);
             let sfx = encode_str(suffix);
-            // Z3's str.suffixof takes (suffix, string)
             let suffix_bool = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), sfx.get_z3_ast(), s.get_z3_ast()).unwrap())
             };
-            suffix_bool.ite(&Int::from_i64(1), &Int::from_i64(0))
+            suffix_bool.ite(&bv_const(1), &bv_const(0))
         }
         IntExpr::Ite(cond, then_int, else_int) => {
             let cond_bool = encode_bool(cond);
@@ -485,9 +450,10 @@ fn encode_int(expr: &IntExpr) -> Int {
             let else_encoded = encode_int(else_int);
             cond_bool.ite(&then_encoded, &else_encoded)
         }
-        IntExpr::Length(value) => encode_str(value).length(),
+        IntExpr::Length(value) => int_to_bv_via_axiom(&encode_str(value).length(), true),
         IntExpr::Index(haystack, needle, start) => {
-            encode_index_of(&encode_str(haystack), &encode_str(needle), &encode_int(start))
+            let result_int = encode_index_of(&encode_str(haystack), &encode_str(needle), &encode_int(start).to_int(true));
+            int_to_bv_via_axiom(&result_int, false)
         }
         IntExpr::Chomp(value) => {
             let ctx = &Context::thread_local();
@@ -496,16 +462,16 @@ fn encode_int(expr: &IntExpr) -> Int {
             let has_newline = unsafe {
                 Bool::wrap(ctx, z3_sys::Z3_mk_seq_suffix(ctx.get_z3_context(), newline.get_z3_ast(), encoded.get_z3_ast()).unwrap())
             };
-            has_newline.ite(&Int::from_i64(1), &Int::from_i64(0))
+            has_newline.ite(&bv_const(1), &bv_const(0))
         }
         IntExpr::ArraySelect(array, index) => encode_array_int(array)
             .select(&encode_int(index))
-            .as_int()
-            .expect("array select should produce Int"),
+            .as_bv()
+            .expect("array select should produce BV"),
         IntExpr::HashSelect(hash, key) => encode_hash_int(hash)
             .select(&encode_str(key))
-            .as_int()
-            .expect("hash select should produce Int"),
+            .as_bv()
+            .expect("hash select should produce BV"),
     }
 }
 
@@ -517,13 +483,9 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         StrExpr::Var(name) => Z3String::new_const(name.clone()),
         StrExpr::Concat(left, right) => Z3String::concat(&[encode_str(left), encode_str(right)]),
         StrExpr::Substr(value, start, len) => {
-            // Perl's substr() normalizes negative start offsets:
-            // substr($s, -N, L) == substr($s, length($s) - N, L).
-            // Z3's str.substr returns "" for negative start, so we must
-            // normalize: effective_start = if start >= 0 then start else length(value) + start
             let encoded_value = encode_str(value);
-            let encoded_start = encode_int(start);
-            let encoded_len = encode_int(len);
+            let encoded_start = encode_int(start).to_int(true);
+            let encoded_len = encode_int(len).to_int(true);
             let zero = Int::from_i64(0);
             let effective_start = encoded_start.ge(&zero).ite(
                 &encoded_start,
@@ -532,16 +494,10 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             encoded_value.substr(effective_start, encoded_len)
         }
         StrExpr::Chr(value) => {
-            // Perl's chr() always returns a 1-character string.  For negative
-            // code points it returns U+FFFD (replacement character, code 65533).
-            // Z3's str.from_code returns "" for values < 0 or > 196607, which
-            // would make length(chr(x)) == 0 satisfiable — unsound.
-            //
-            // Fix: clamp out-of-range inputs to 65533 before calling from_code.
             let ctx = &Context::thread_local();
-            let encoded = encode_int(value);
-            let replacement = Int::from_i64(65533); // U+FFFD
-            let max_code = Int::from_i64(196607);   // Z3 seq max code point
+            let encoded = encode_int(value).to_int(true);
+            let replacement = Int::from_i64(65533);
+            let max_code = Int::from_i64(0x7FFFFFFF);
             let zero = Int::from_i64(0);
             let in_range = Bool::and(&[&encoded.ge(&zero), &encoded.le(&max_code)]);
             let clamped = in_range.ite(&encoded, &replacement);
@@ -551,7 +507,7 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         }
         StrExpr::FromInt(value) => {
             let ctx = &Context::thread_local();
-            let encoded = encode_int(value);
+            let encoded = encode_int(value).to_int(true);
             let zero = Int::from_i64(0);
             let is_nonneg = encoded.ge(&zero);
             let pos_str = unsafe {
@@ -563,20 +519,7 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             };
             let minus_sign = Z3String::from_str("-").expect("minus literal");
             let neg_str = Z3String::concat(&[minus_sign, neg_digits]);
-            let exact_str = is_nonneg.ite(&pos_str, &neg_str);
-            // Soundness: Perl stringifies integers exactly only within the
-            // range [-2^63, 2^64-1].  Outside this range, Perl converts to
-            // a float and uses scientific notation (e.g., "-1.8e+19").
-            // We model overflow as a fresh unconstrained string so that Z3
-            // cannot prove properties about overflowed stringifications.
-            let i64_min = Int::from_i64(i64::MIN);
-            // 2^64 - 1 = u64::MAX; express as i64::MAX + i64::MAX + 1
-            let u64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
-            let in_range = Bool::and(&[&encoded.ge(&i64_min), &encoded.le(&u64_max)]);
-            let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let fresh_name = format!("__fromint_overflow_{n}");
-            let overflow_str = Z3String::new_const(fresh_name);
-            in_range.ite(&exact_str, &overflow_str)
+            is_nonneg.ite(&pos_str, &neg_str)
         }
         StrExpr::Reverse(value) => {
             let n = REVERSE_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -588,37 +531,12 @@ fn encode_str(expr: &StrExpr) -> Z3String {
             fresh_var
         }
         StrExpr::Replace(string, from, to) => {
-            // Perl's replace is global (s///g): it replaces ALL non-overlapping
-            // occurrences in a single left-to-right pass.
-            //
-            // The naive approach of chaining str.replace MAX_STR_LEN times is
-            // unsound when the replacement string contains the search pattern,
-            // causing cascading re-replacements (e.g., replace("ab","a","aa")
-            // would produce a string of length > 32 instead of correct "aab").
-            //
-            // Fix: two-phase replacement using a sentinel placeholder string of
-            // length MAX_STR_LEN+1.  Since all input strings are bounded to
-            // MAX_STR_LEN, neither the original string nor `from` nor `to` can
-            // contain the placeholder.  Phase 1 replaces all occurrences of
-            // `from` with the placeholder (no cascade since placeholder does not
-            // contain `from`).  Phase 2 replaces all placeholders with `to` (no
-            // cascade since placeholder length > MAX_STR_LEN means `to` cannot
-            // contain it).
-            //
-            // Note: the input string to replace may be a concatenation of two
-            // bounded variables (up to 2*MAX_STR_LEN chars), so we iterate
-            // 2*MAX_STR_LEN times to cover all possible occurrences.
             let ctx = &Context::thread_local();
             let s = encode_str(string);
             let f = encode_str(from);
             let t = encode_str(to);
-            // Build a placeholder: a string of (MAX_STR_LEN + 1) private-use-area
-            // characters (U+F8FF).  This cannot appear in any bounded input
-            // string of length <= MAX_STR_LEN.
             let placeholder_chars: String = std::iter::repeat('\u{F8FF}').take((MAX_STR_LEN + 1) as usize).collect();
             let placeholder = Z3String::from_str(&placeholder_chars).expect("placeholder literal");
-            // Phase 1: replace from -> placeholder (chain 2*MAX_STR_LEN times
-            // to handle concatenated strings)
             let mut current = s;
             for _ in 0..2 * MAX_STR_LEN {
                 current = unsafe {
@@ -626,7 +544,6 @@ fn encode_str(expr: &StrExpr) -> Z3String {
                     Z3String::wrap(ctx, z3_sys::Z3_mk_seq_replace(ctx.get_z3_context(), args[0], args[1], args[2]).unwrap())
                 };
             }
-            // Phase 2: replace placeholder -> to (chain 2*MAX_STR_LEN times)
             for _ in 0..2 * MAX_STR_LEN {
                 current = unsafe {
                     let args = [current.get_z3_ast(), placeholder.get_z3_ast(), t.get_z3_ast()];
@@ -638,10 +555,7 @@ fn encode_str(expr: &StrExpr) -> Z3String {
         StrExpr::CharAt(string, index) => {
             let ctx = &Context::thread_local();
             let s = encode_str(string);
-            let i = encode_int(index);
-            // Perl negative-index semantics: char_at($s, -1) means last char.
-            // Z3's str.at returns "" for negative i, so we normalize:
-            //   effective_i = ite(i >= 0, i, length(s) + i)
+            let i = encode_int(index).to_int(true);
             let zero = Int::from_i64(0);
             let effective_i = i.ge(&zero).ite(&i, &Int::add(&[&s.length(), &i]));
             unsafe {
@@ -667,7 +581,7 @@ fn encode_str(expr: &StrExpr) -> Z3String {
 
 fn encode_array_int(expr: &ArrayIntExpr) -> Array {
     match expr {
-        ArrayIntExpr::Var(name) => Array::new_const(name.clone(), &Sort::int(), &Sort::int()),
+        ArrayIntExpr::Var(name) => Array::new_const(name.clone(), &Sort::bitvector(64), &Sort::bitvector(64)),
         ArrayIntExpr::Store(base, index, value) => {
             encode_array_int(base).store(&encode_int(index), &encode_int(value))
         }
@@ -676,7 +590,7 @@ fn encode_array_int(expr: &ArrayIntExpr) -> Array {
 
 fn encode_array_str(expr: &ArrayStrExpr) -> Array {
     match expr {
-        ArrayStrExpr::Var(name) => Array::new_const(name.clone(), &Sort::int(), &Sort::string()),
+        ArrayStrExpr::Var(name) => Array::new_const(name.clone(), &Sort::bitvector(64), &Sort::string()),
         ArrayStrExpr::Store(base, index, value) => {
             encode_array_str(base).store(&encode_int(index), &encode_str(value))
         }
@@ -685,7 +599,7 @@ fn encode_array_str(expr: &ArrayStrExpr) -> Array {
 
 fn encode_hash_int(expr: &HashIntExpr) -> Array {
     match expr {
-        HashIntExpr::Var(name) => Array::new_const(name.clone(), &Sort::string(), &Sort::int()),
+        HashIntExpr::Var(name) => Array::new_const(name.clone(), &Sort::string(), &Sort::bitvector(64)),
         HashIntExpr::Store(base, key, value) => {
             encode_hash_int(base).store(&encode_str(key), &encode_int(value))
         }
@@ -736,43 +650,6 @@ fn encode_index_of(haystack: &Z3String, needle: &Z3String, start: &Int) -> Int {
     needle_is_empty.ite(&empty_needle_result, &z3_result)
 }
 
-fn encode_truncating_division(left: &Int, right: &Int) -> Int {
-    let left_nonnegative = left.ge(0);
-    let right_nonnegative = right.ge(0);
-    let left_abs = left_nonnegative.ite(left, &left.unary_minus());
-    let right_abs = right_nonnegative.ite(right, &right.unary_minus());
-    let magnitude = left_abs.div(&right_abs);
-    left_nonnegative
-        .iff(&right_nonnegative)
-        .ite(&magnitude, &magnitude.unary_minus())
-}
-
-/// Encode Perl's `%` operator (floor-modulo).
-///
-/// Perl's modulo follows floor division: the result has the same sign as
-/// the divisor. This differs from both Z3's `rem` (which uses Euclidean
-/// semantics) and C's `%` (which follows truncated division).
-///
-/// Implementation: compute truncated remainder, then adjust when the
-/// remainder and divisor have different signs.
-///   trunc_rem = a - b * trunc_div(a, b)
-///   perl_mod  = if (trunc_rem != 0 && sign(trunc_rem) != sign(b))
-///               then trunc_rem + b
-///               else trunc_rem
-fn encode_perl_modulo(left: &Int, right: &Int) -> Int {
-    let trunc_div = encode_truncating_division(left, right);
-    let trunc_rem = Int::sub(&[left, &Int::mul(&[right, &trunc_div])]);
-    let zero = Int::from_i64(0);
-    let rem_nonzero = trunc_rem.eq(&zero).not();
-    // Signs differ when exactly one is negative
-    let rem_nonneg = trunc_rem.ge(0);
-    let right_nonneg = right.ge(0);
-    let signs_differ = rem_nonneg.iff(&right_nonneg).not();
-    let needs_adjust = Bool::and(&[&rem_nonzero, &signs_differ]);
-    let adjusted = Int::add(&[&trunc_rem, right]);
-    needs_adjust.ite(&adjusted, &trunc_rem)
-}
-
 fn encode_bool(expr: &BoolExpr) -> Bool {
     match expr {
         BoolExpr::Const(value) => Bool::from_bool(*value),
@@ -783,12 +660,12 @@ fn encode_bool(expr: &BoolExpr) -> Bool {
             let left = encode_int(left);
             let right = encode_int(right);
             match op {
-                crate::symexec::CmpOp::Lt => left.lt(&right),
-                crate::symexec::CmpOp::Le => left.le(&right),
-                crate::symexec::CmpOp::Gt => left.gt(&right),
-                crate::symexec::CmpOp::Ge => left.ge(&right),
-                crate::symexec::CmpOp::Eq => left.eq(&right),
-                crate::symexec::CmpOp::Ne => left.eq(&right).not(),
+                crate::symexec::CmpOp::Lt => left.bvslt(&right),
+                crate::symexec::CmpOp::Le => left.bvsle(&right),
+                crate::symexec::CmpOp::Gt => left.bvsgt(&right),
+                crate::symexec::CmpOp::Ge => left.bvsge(&right),
+                crate::symexec::CmpOp::Eq => Ast::eq(&left, &right),
+                crate::symexec::CmpOp::Ne => Ast::eq(&left, &right).not(),
             }
         }
         BoolExpr::StrEq(left, right) => encode_str(left).eq(encode_str(right)),
@@ -857,55 +734,96 @@ fn encode_bool_safety(expr: &BoolExpr) -> Bool {
 fn encode_int_safety(expr: &IntExpr) -> Bool {
     match expr {
         IntExpr::Const(_) | IntExpr::Var(_) => Bool::from_bool(true),
-        IntExpr::Add(left, right)
-        | IntExpr::Sub(left, right)
-        | IntExpr::Mul(left, right) => {
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+        IntExpr::Add(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &l.bvadd_no_overflow(&r, true),
+                &l.bvadd_no_underflow(&r),
+            ])
+        }
+        IntExpr::Sub(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &l.bvsub_no_overflow(&r),
+                &l.bvsub_no_underflow(&r, true),
+            ])
+        }
+        IntExpr::Mul(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &l.bvmul_no_overflow(&r, true),
+                &l.bvmul_no_underflow(&r),
+            ])
         }
         IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {
-            // Soundness: Z3's int2bv wraps mod 2^64, but Perl saturates
-            // at UINT64_MAX when converting floats to unsigned integers
-            // for bitwise ops. Values >= 2^64 would wrap incorrectly.
-            // Guard: both operands must be < 2^64 and >= -(2^63) to
-            // ensure int2bv produces the correct two's complement pattern.
+            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+        }
+        IntExpr::Shl(left, right) => {
             let l = encode_int(left);
-            let r = encode_int(right);
-            let uint64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
-            let two_pow_64 = Int::add(&[&uint64_max, &Int::from_i64(1)]);
-            let i64_min = Int::from_i64(i64::MIN);
-            let l_in_range = Bool::and(&[&l.ge(&i64_min), &l.lt(&two_pow_64)]);
-            let r_in_range = Bool::and(&[&r.ge(&i64_min), &r.lt(&two_pow_64)]);
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &l_in_range, &r_in_range])
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &l.bvsge(&bv_const(0)),
+            ])
+        }
+        IntExpr::Shr(left, right) => {
+            let l = encode_int(left);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &l.bvsge(&bv_const(0)),
+            ])
         }
         IntExpr::Pow(left, right) => {
-            // Soundness: Perl's ** with a negative exponent produces a float
-            // (e.g. 2**-1 = 0.5), which breaks our integer-only model.
-            // Discard paths where the exponent is negative.
-            let r = encode_int(right);
-            let exp_nonneg = r.ge(0);
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &exp_nonneg])
-        }
-        IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
-            // Soundness: Z3's int2bv wraps mod 2^64, but Perl's NV-to-UV
-            // conversion saturates at UINT64_MAX for values >= 2^64.
-            // Assert the left operand is in [-(2^63), 2^64) to prevent
-            // unsound wrapping via int2bv.
             let l = encode_int(left);
-            let uint64_max = Int::add(&[&Int::from_i64(i64::MAX), &Int::from_i64(i64::MAX), &Int::from_i64(1)]);
-            let two_pow_64 = Int::add(&[&uint64_max, &Int::from_i64(1)]);
-            let i64_min = Int::from_i64(i64::MIN);
-            let l_in_range = Bool::and(&[&l.ge(&i64_min), &l.lt(&two_pow_64)]);
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right), &l_in_range])
+            let r = encode_int(right);
+            let exp_nonneg = r.bvsge(&bv_const(0));
+            let l_int = l.to_int(true);
+            let r_int = r.to_int(true);
+            let real_result = l_int.power(&r_int);
+            let min_val = Real::from_rational(i64::MIN, 1);
+            let max_val = Real::from_rational(i64::MAX, 1);
+            let fits = Bool::and(&[&real_result.ge(&min_val), &real_result.le(&max_val)]);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &exp_nonneg,
+                &fits,
+            ])
         }
-        IntExpr::Div(left, right) | IntExpr::Mod(left, right) => Bool::and(&[
+        IntExpr::Div(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            let r_nonzero = Ast::eq(&r, &bv_const(0)).not();
+            let no_overflow = l.bvsdiv_no_overflow(&r);
+            Bool::and(&[
+                &encode_int_safety(left),
+                &encode_int_safety(right),
+                &r_nonzero,
+                &no_overflow,
+            ])
+        }
+        IntExpr::Mod(left, right) => Bool::and(&[
             &encode_int_safety(left),
             &encode_int_safety(right),
-            &encode_int(right).eq(Int::from_i64(0)).not(),
+            &Ast::eq(&encode_int(right), &bv_const(0)).not(),
         ]),
         IntExpr::BitNot(value) => encode_int_safety(value),
-        IntExpr::Abs(value) => encode_int_safety(value),
+        IntExpr::Abs(value) => {
+            let encoded = encode_int(value);
+            Bool::and(&[&encode_int_safety(value), &encoded.bvneg_no_overflow()])
+        }
         IntExpr::StrToInt(value) => encode_str_safety(value),
         IntExpr::Ord(value) => encode_str_safety(value),
         IntExpr::Contains(haystack, needle) => {
@@ -955,11 +873,30 @@ fn encode_str_safety(expr: &StrExpr) -> Bool {
         StrExpr::Chr(value) => encode_int_safety(value),
         StrExpr::FromInt(value) => encode_int_safety(value),
         StrExpr::Reverse(value) => encode_str_safety(value),
-        StrExpr::Replace(string, from, to) => Bool::and(&[
-            &encode_str_safety(string),
-            &encode_str_safety(from),
-            &encode_str_safety(to),
-        ]),
+        StrExpr::Replace(string, from, to) => {
+            // Soundness: Perl's replace($s, "", $r) inserts $r between
+            // every character and at both ends (e.g., replace("abc","","x")
+            // produces "xaxbxcx"). Z3's str.replace(s, "", r) does NOT
+            // model this per-position insertion -- it replaces the empty
+            // match once or produces implementation-defined results.
+            //
+            // Our chained-replace encoding (phase 1: from->placeholder,
+            // phase 2: placeholder->to) also breaks down for empty `from`
+            // because every position matches the empty string.
+            //
+            // Conservative fix: add a safety constraint that the search
+            // pattern must have length >= 1.  If the pattern is potentially
+            // empty, the path is pruned and the checker won't make false
+            // claims about the replacement result.
+            let from_encoded = encode_str(from);
+            let from_nonempty = from_encoded.length().ge(Int::from_i64(1));
+            Bool::and(&[
+                &encode_str_safety(string),
+                &encode_str_safety(from),
+                &encode_str_safety(to),
+                &from_nonempty,
+            ])
+        }
         StrExpr::CharAt(string, index) => Bool::and(&[
             &encode_str_safety(string),
             &encode_int_safety(index),
@@ -1233,7 +1170,7 @@ mod tests {
     use super::{MAX_STR_LEN, ModelVar, find_model, is_satisfiable};
     use crate::{
         ast::Type,
-        symexec::{BoolExpr, CmpOp, IntExpr, ModelValue, StrExpr},
+        symexec::{ArrayIntExpr, BoolExpr, CmpOp, IntExpr, ModelValue, StrExpr},
     };
 
     #[test]
@@ -1292,6 +1229,24 @@ mod tests {
     }
 
     #[test]
+    fn array_store_select_identity() {
+        // store(arr, i, v)[i] == v should always hold (theory of arrays)
+        let stored = ArrayIntExpr::Store(
+            Box::new(ArrayIntExpr::Var("arr".to_string())),
+            Box::new(IntExpr::Var("i".to_string())),
+            Box::new(IntExpr::Var("v".to_string())),
+        );
+        let selected = IntExpr::ArraySelect(Box::new(stored), Box::new(IntExpr::Var("i".to_string())));
+        // NOT(selected == v) should be UNSAT
+        let negation = BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(selected),
+            Box::new(IntExpr::Var("v".to_string())),
+        );
+        assert!(!is_satisfiable("foo", &negation).unwrap(), "array store-then-select should be identity");
+    }
+
+    #[test]
     fn prunes_division_by_zero_via_safety_constraints() {
         let condition = BoolExpr::IntCmp(
             CmpOp::Eq,
@@ -1321,7 +1276,7 @@ mod tests {
 
     #[test]
     fn perl_modulo_matches_all_sign_combinations() {
-        // Verify encode_perl_modulo matches Perl's % for all sign combinations
+        // Verify bvsmod matches Perl's % for all sign combinations
         let cases: &[(i64, i64, i64)] = &[
             // (a, b, expected_perl_mod)
             (7, 3, 1),
@@ -1349,11 +1304,135 @@ mod tests {
             );
             assert!(
                 is_satisfiable("foo", &condition).unwrap(),
-                "encode_perl_modulo({}, {}) should equal {} (Perl's %)",
+                "bvsmod({}, {}) should equal {} (Perl's %)",
                 a,
                 b,
                 perl_expected
             );
         }
+    }
+
+    #[test]
+    fn strtoint_pure_digits_correct() {
+        // int("42") == 42 should be satisfiable
+        let condition = BoolExpr::IntCmp(
+            CmpOp::Eq,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("42".to_string())))),
+            Box::new(IntExpr::Const(42)),
+        );
+        assert!(is_satisfiable("foo", &condition).unwrap());
+    }
+
+    #[test]
+    fn strtoint_negative_correct() {
+        // int("-7") == -7 should be satisfiable
+        let condition = BoolExpr::IntCmp(
+            CmpOp::Eq,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("-7".to_string())))),
+            Box::new(IntExpr::Const(-7)),
+        );
+        assert!(is_satisfiable("foo", &condition).unwrap());
+    }
+
+    #[test]
+    fn strtoint_empty_returns_zero() {
+        // int("") == 0 should be satisfiable
+        let condition = BoolExpr::IntCmp(
+            CmpOp::Eq,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &condition).unwrap());
+    }
+
+    #[test]
+    fn strtoint_bare_minus_returns_zero() {
+        // int("-") == 0 should be satisfiable
+        let condition = BoolExpr::IntCmp(
+            CmpOp::Eq,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("-".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &condition).unwrap());
+    }
+
+    #[test]
+    fn strtoint_whitespace_not_falsely_zero() {
+        // int("  42") == 0 should NOT be provably true.
+        // The encoding uses an unconstrained fallback for non-pure-digit strings,
+        // so int("  42") != 0 is satisfiable (the fallback could be non-zero).
+        let not_zero = BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("  42".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &not_zero).unwrap(),
+            "int(\"  42\") != 0 should be satisfiable (old bug: encoding falsely forced 0)");
+    }
+
+    #[test]
+    fn strtoint_trailing_chars_not_falsely_zero() {
+        // int("42abc") != 0 should be satisfiable
+        let not_zero = BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("42abc".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &not_zero).unwrap(),
+            "int(\"42abc\") != 0 should be satisfiable (old bug: encoding falsely forced 0)");
+    }
+
+    #[test]
+    fn strtoint_decimal_not_falsely_zero() {
+        // int("3.14") != 0 should be satisfiable
+        let not_zero = BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const("3.14".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &not_zero).unwrap(),
+            "int(\"3.14\") != 0 should be satisfiable (old bug: encoding falsely forced 0)");
+    }
+
+    #[test]
+    fn strtoint_neg_whitespace_not_falsely_zero() {
+        // int(" -42") != 0 should be satisfiable
+        let not_zero = BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(IntExpr::StrToInt(Box::new(StrExpr::Const(" -42".to_string())))),
+            Box::new(IntExpr::Const(0)),
+        );
+        assert!(is_satisfiable("foo", &not_zero).unwrap(),
+            "int(\" -42\") != 0 should be satisfiable (old bug: encoding falsely forced 0)");
+    }
+
+    #[test]
+    fn replace_empty_pattern_pruned() {
+        // replace("abc", "", "x") should be pruned by safety constraints
+        // because the pattern is empty.
+        let condition = BoolExpr::StrEq(
+            Box::new(StrExpr::Replace(
+                Box::new(StrExpr::Const("abc".to_string())),
+                Box::new(StrExpr::Const("".to_string())),
+                Box::new(StrExpr::Const("x".to_string())),
+            )),
+            Box::new(StrExpr::Const("abc".to_string())),
+        );
+        assert!(!is_satisfiable("foo", &condition).unwrap(),
+            "replace with empty pattern should be pruned by safety constraints");
+    }
+
+    #[test]
+    fn replace_nonempty_pattern_works() {
+        // replace("abc", "b", "x") == "axc" should be satisfiable
+        let condition = BoolExpr::StrEq(
+            Box::new(StrExpr::Replace(
+                Box::new(StrExpr::Const("abc".to_string())),
+                Box::new(StrExpr::Const("b".to_string())),
+                Box::new(StrExpr::Const("x".to_string())),
+            )),
+            Box::new(StrExpr::Const("axc".to_string())),
+        );
+        assert!(is_satisfiable("foo", &condition).unwrap());
     }
 }

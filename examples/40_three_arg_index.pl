@@ -1,4 +1,4 @@
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 4 && length($sub) == 1
 # post: $result >= -1
 sub index_from_start {
@@ -7,7 +7,7 @@ sub index_from_start {
     return $r;
 }
 
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 3 && length($sub) == 1
 # post: $result >= -1 && $result <= length($s) - 1
 sub bounded_index {

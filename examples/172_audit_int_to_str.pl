@@ -10,7 +10,7 @@
 # e.g. "-6" instead of "18446744073709551610" for ~5. Fixed by switching
 # BitNot to unsigned arithmetic (add 2^64 when signed result is negative).
 
-# sig: (Int) -> Str
+# sig: (I64) -> Str
 # pre: $n == -5
 # post: $result eq "x-5"
 sub neg_concat {
@@ -18,7 +18,7 @@ sub neg_concat {
     return "x" . $n;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 9
 # post: $result == 1
 sub single_digit_str_len {
@@ -27,7 +27,7 @@ sub single_digit_str_len {
     return length($s);
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= -99 && $n <= -10
 # post: $result == 3
 sub neg_two_digit_str_len {
@@ -38,7 +38,7 @@ sub neg_two_digit_str_len {
 
 # The key fix: ~$n for non-negative $n produces an unsigned result.
 # "" . (~5) has length 20 (the string "18446744073709551610"), NOT 2 (not "-6").
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n == 5
 # post: $result == 20
 sub bitnot_str_len_unsigned {
@@ -48,7 +48,7 @@ sub bitnot_str_len_unsigned {
 }
 
 # Roundtrip: int("" . $n) == $n for small positive integers
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 9
 # post: $result == $n
 sub int_str_roundtrip_pos {

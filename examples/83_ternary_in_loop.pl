@@ -9,7 +9,7 @@
 # --- Function 1: Ternary accumulator in for-loop ---
 # Each iteration adds either 1 or 2 to accumulator based on
 # a ternary condition on the loop variable. 3 iterations = 8 paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 3 && $result <= 6
 sub ternary_accum_loop {
@@ -25,7 +25,7 @@ sub ternary_accum_loop {
 # --- Function 2: Ternary modifying loop condition variable ---
 # The ternary result modifies a variable used in the next iteration's
 # ternary condition, creating dependent path chains.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 5
 # post: $result >= 2 && $result <= 8
 sub ternary_condition_modifier {
@@ -45,7 +45,7 @@ sub ternary_condition_modifier {
 # --- Function 3: Nested ternary in for-loop with array access ---
 # Uses a nested ternary inside the loop to select between three
 # possible values based on array element comparisons.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $n >= 1 && $n <= 3 && $arr[0] >= 0 && $arr[0] <= 5 && $arr[1] >= 0 && $arr[1] <= 5 && $arr[2] >= 0 && $arr[2] <= 5
 # post: $result >= 0 && $result <= 15
 sub nested_ternary_array_loop {
@@ -61,7 +61,7 @@ sub nested_ternary_array_loop {
 # --- Function 4: Multiple ternaries per iteration ---
 # Two ternaries per iteration create 4 sub-paths each iteration.
 # 2 iterations with 2 ternaries each = 4^2 = 16 paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 0 && $result <= 14
 sub multi_ternary_per_iter {
@@ -81,7 +81,7 @@ sub multi_ternary_per_iter {
 # --- Function 5: Ternary with early exit and path convergence ---
 # Uses ternary in loop with last-if to prune paths early,
 # testing that the verifier handles path pruning correctly.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 6
 # post: $result >= 0 && $result <= 12
 sub ternary_early_exit {

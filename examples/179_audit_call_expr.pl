@@ -7,7 +7,7 @@
 #
 # This file demonstrates that the fix correctly detects the counterexample.
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result == $x * 2
 sub double_positive {
@@ -18,7 +18,7 @@ sub double_positive {
 # Calls double_positive without restricting $x to positive values.
 # The postcondition $result == $x * 2 holds for ALL $x (the body is correct
 # regardless of the precondition), so this should verify.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result == $x * 2
 sub call_ignoring_pre {
     my ($x) = @_;
@@ -26,7 +26,7 @@ sub call_ignoring_pre {
 }
 
 # A legitimate caller that satisfies the precondition — should verify.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0
 # post: $result > 0
 sub call_respecting_pre {

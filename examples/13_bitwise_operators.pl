@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0 && $result <= 255
 sub mask_byte {
@@ -7,7 +7,7 @@ sub mask_byte {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 15
 # post: $result == 0
 sub xor_self {
@@ -16,7 +16,7 @@ sub xor_self {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 255 && $b >= 0 && $b <= 255
 # post: $result >= 0 && $result <= 255
 sub or_bytes {

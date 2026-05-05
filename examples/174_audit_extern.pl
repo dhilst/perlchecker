@@ -6,9 +6,9 @@
 #
 # This example demonstrates the fix: the caller's pre guarantees sqrt_int's pre.
 #
-# extern: sqrt_int (Int) -> Int pre: $a > 0 post: $result >= 0 && $result * $result <= $a
+# extern: sqrt_int (I64) -> I64 pre: $a > 0 post: $result >= 0 && $result * $result <= $a
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0 && $x <= 100
 # post: $result >= 0
 sub use_sqrt_safe {

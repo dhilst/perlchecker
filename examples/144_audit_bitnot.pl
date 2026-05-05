@@ -3,7 +3,7 @@
 # For x >= 0: ~x == 2^64 - 1 - x (a large positive number).
 # For x < 0 (two's complement): ~x == -x - 1 (a small non-negative value).
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 0
 sub bitnot_nonneg_unsigned {
@@ -11,7 +11,7 @@ sub bitnot_nonneg_unsigned {
     return ~$x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= -1
 # post: $result == -$x - 1
 sub bitnot_neg {
@@ -19,7 +19,7 @@ sub bitnot_neg {
     return ~$x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 0
 # post: $result > 0
 sub bitnot_zero {
@@ -27,7 +27,7 @@ sub bitnot_zero {
     return ~$x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x == 5
 # post: $result > 0
 sub bitnot_five {
@@ -35,7 +35,7 @@ sub bitnot_five {
     return ~$x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == 255 - $x
 sub bitnot_masked_byte {

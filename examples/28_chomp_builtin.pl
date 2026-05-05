@@ -2,7 +2,7 @@
 # In Perl, chomp($s) modifies $s in-place removing trailing newline,
 # and returns the number of characters removed.
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 2 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub chomp_returns_count {
@@ -11,7 +11,7 @@ sub chomp_returns_count {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub chomp_bounded {

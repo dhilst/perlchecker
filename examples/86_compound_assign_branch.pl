@@ -10,7 +10,7 @@
 # An accumulator starts at a known value, then passes through two
 # sequential if/else blocks. Each block either adds or subtracts
 # depending on conditions, creating 4 distinct final values.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 10 && $y >= 1 && $y <= 10
 # post: $result >= -8 && $result <= 30
 sub compound_add_sub_branches {
@@ -33,7 +33,7 @@ sub compound_add_sub_branches {
 # Uses += -= *= in elsif chains. The final value depends on which
 # single branch was taken. Tests that the verifier correctly merges
 # the disjoint paths at the join point.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 0 && $n <= 20 && $base >= 1 && $base <= 5
 # post: $result >= 0 && $result <= 105
 sub compound_elsif_chain {
@@ -55,7 +55,7 @@ sub compound_elsif_chain {
 # Multiple compound assign statements separated by conditionals that
 # may modify the variable. The verifier must track how each += or -=
 # accumulates along the path.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 5 && $b >= 0 && $b <= 5 && $c >= 0 && $c <= 5
 # post: $result >= 1 && $result <= 26
 sub sequential_compound_conditional {
@@ -78,7 +78,7 @@ sub sequential_compound_conditional {
 # Each loop iteration uses += or -= depending on a condition that
 # changes with the loop variable. The compound ops accumulate across
 # 3 unrolled iterations with 2 paths each = 8 total paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= -6 && $result <= 30
 sub compound_in_loop_branch {
@@ -99,7 +99,7 @@ sub compound_in_loop_branch {
 # Two accumulators are modified with different compound ops depending
 # on nested conditions. The final result combines both, requiring the
 # verifier to track two parallel accumulation chains across 4 paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 8 && $y >= 1 && $y <= 8
 # post: $result >= 2 && $result <= 32
 sub dual_compound_nested {

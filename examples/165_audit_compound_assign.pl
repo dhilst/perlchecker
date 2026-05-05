@@ -16,7 +16,7 @@ sub concat_assign_check {
 }
 
 # --- <<= with negative RHS (direction reversal) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x < 256
 # post: $result == int($x / 4)
 sub shl_neg_rhs {
@@ -26,7 +26,7 @@ sub shl_neg_rhs {
 }
 
 # --- >>= with negative RHS (direction reversal) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result == $x * 4
 sub shr_neg_rhs {
@@ -36,7 +36,7 @@ sub shr_neg_rhs {
 }
 
 # --- %= with negative divisor (floor-mod semantics) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x > 0 && $x < 100
 # post: $result <= 0 && $result > -3
 sub mod_neg_divisor {
@@ -46,7 +46,7 @@ sub mod_neg_divisor {
 }
 
 # --- **= with positive exponent (still works) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result == $x * $x
 sub square_assign {
@@ -56,7 +56,7 @@ sub square_assign {
 }
 
 # --- compound += basic check ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $b >= 0
 # post: $result == $a + $b
 sub add_assign_check {

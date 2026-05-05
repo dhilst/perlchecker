@@ -10,7 +10,7 @@
 # Writes to "val" key in 4 different paths (nested if/else), then
 # reads it back and returns. The verifier must track that the final
 # value of $h{"val"} depends on which of the 4 paths was taken.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 20 && $y >= 0 && $y <= 20
 # post: $result >= 1 && $result <= 40
 sub hash_nested_overwrite {
@@ -36,7 +36,7 @@ sub hash_nested_overwrite {
 # First stores a default, then conditionally overwrites with a
 # second value. The verifier must reason that the second write
 # supersedes the first only on certain paths.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0 && $result <= 20
 sub hash_last_write_wins {
@@ -61,7 +61,7 @@ sub hash_last_write_wins {
 # Stores into three hash keys conditionally, then reads all three
 # and selects which to return based on their relative values.
 # The verifier must track 3 parallel store/select chains.
-# sig: (Hash<Str, Int>, Int, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64, I64) -> I64
 # pre: $p >= 1 && $p <= 10 && $q >= 1 && $q <= 10 && $r >= 1 && $r <= 10
 # post: $result >= 1 && $result <= 20
 sub hash_three_key_compare {
@@ -97,7 +97,7 @@ sub hash_three_key_compare {
 # Each loop iteration conditionally updates the hash key "acc"
 # based on whether the current accumulator is above a threshold.
 # The verifier must track the hash state across 3 unrolled iterations.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $init >= 1 && $init <= 5 && $step >= 1 && $step <= 3
 # post: $result >= 4 && $result <= 14
 sub hash_loop_conditional_update {
@@ -118,7 +118,7 @@ sub hash_loop_conditional_update {
 # Writes to two keys, then based on a third condition decides which
 # key to read and return. The verifier must maintain both store
 # chains and select the right one at the return point.
-# sig: (Hash<Str, Int>, Int, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10 && $sel >= 0 && $sel <= 1
 # post: $result >= 0 && $result <= 20
 sub hash_select_by_condition {

@@ -1,4 +1,4 @@
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 3 && length($old) == 1
 # post: $result >= 3
 sub replace_preserves_min_length {
@@ -9,7 +9,7 @@ sub replace_preserves_min_length {
     return $len;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && contains($s, "ab") == 1
 # post: $result >= 5
 sub replace_ab_with_xy {

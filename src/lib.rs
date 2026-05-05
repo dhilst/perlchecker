@@ -52,7 +52,7 @@ pub struct LanguageSubset {
 }
 
 pub const V1_LANGUAGE_SUBSET: LanguageSubset = LanguageSubset {
-    supported_types: &["Int", "Str"],
+    supported_types: &["I64", "Str"],
     supported_control_flow: &["if", "return", "assignment"],
     supported_expressions: &[
         "+", "-", "*", "/", ".", "<", "<=", ">", ">=", "==", "!=", "eq", "ne", "&&", "||", "!",
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn phase_zero_locks_the_v1_subset() {
-        assert_eq!(V1_LANGUAGE_SUBSET.supported_types, ["Int", "Str"]);
+        assert_eq!(V1_LANGUAGE_SUBSET.supported_types, ["I64", "Str"]);
         assert!(V1_LANGUAGE_SUBSET.supported_control_flow.contains(&"if"));
         assert!(V1_LANGUAGE_SUBSET.supported_expressions.contains(&"length"));
         assert!(V1_LANGUAGE_SUBSET.forbidden_features.contains(&"regex"));

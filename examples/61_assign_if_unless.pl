@@ -10,7 +10,7 @@
 # --- Basic assign-if modifier creates two paths ---
 # When the condition is true, $r gets the new value; otherwise
 # it keeps its initial value. Both paths must satisfy the post.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 0 && $result <= 100
 sub assign_if_basic {
@@ -23,7 +23,7 @@ sub assign_if_basic {
 # --- Basic assign-unless modifier creates two paths ---
 # Unless the flag is set, we override the value. If flag is set
 # (i.e. condition is true), the assignment does NOT execute.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $val >= 0 && $val <= 50 && ($flag == 0 || $flag == 1)
 # post: $result >= 0 && $result <= 50
 sub assign_unless_basic {
@@ -37,7 +37,7 @@ sub assign_unless_basic {
 # Two assign-if modifiers in sequence create 2x2 = 4 paths.
 # The verifier must reason through all combinations to prove
 # the postcondition holds universally.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10
 # post: $result >= 1 && $result <= 20
 sub sequential_assign_if {
@@ -52,7 +52,7 @@ sub sequential_assign_if {
 # Three conditional assignments produce 2^3 = 8 execution paths.
 # Each path either applies or skips each modifier. Postcondition
 # must hold across all eight paths.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 20
 # post: $result >= 0 && $result <= 30
 sub triple_conditional_assign {
@@ -68,7 +68,7 @@ sub triple_conditional_assign {
 # Combines for-loop, last-if, and assign-if modifiers.
 # The loop accumulates but conditionally resets, testing
 # interaction of loop unrolling with modifier-generated branches.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $start >= 0 && $start <= 5
 # post: $result >= 0 && $result <= 15
 sub loop_with_conditional_assign {

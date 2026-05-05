@@ -1,4 +1,4 @@
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) == 3 && $arr[0] == 10 && $arr[1] == 20 && $arr[2] == 30
 # post: $result == 30
 sub last_elem {
@@ -6,7 +6,7 @@ sub last_elem {
     return $arr[-1];
 }
 
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) == 3 && $arr[0] == 10 && $arr[1] == 20 && $arr[2] == 30
 # post: $result == 20
 sub second_to_last {
@@ -14,7 +14,7 @@ sub second_to_last {
     return $arr[-2];
 }
 
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) == 4 && $arr[0] == 1 && $arr[1] == 2 && $arr[2] == 3 && $arr[3] == 4
 # post: $result == 5
 sub neg_write_then_read {

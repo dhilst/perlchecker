@@ -1,5 +1,5 @@
 # Audit: nested foreach — inner loop must not clobber outer index
-# sig: (Array<Int>, Array<Int>) -> Int
+# sig: (Array<I64>, Array<I64>) -> I64
 # pre: scalar(@a) == 2 && scalar(@b) == 2
 # post: $result == $a[0] + $a[1] + $a[0] + $a[1]
 sub nested_foreach_sum {

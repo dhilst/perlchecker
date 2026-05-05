@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) == 2
 # post: $result == 6
 sub repeat_three_len {
@@ -8,7 +8,7 @@ sub repeat_three_len {
     return $len;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 3
 # post: $result == length($s) * 2
 sub repeat_two_len {

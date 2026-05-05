@@ -7,7 +7,7 @@
 # calling str.from_code, so chr() always returns a 1-char string.
 
 # After fix: chr($x) for negative $x has length 1, matching Perl.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= -1
 # post: $result == 1
 sub chr_neg_len {
@@ -16,7 +16,7 @@ sub chr_neg_len {
 }
 
 # Control test: For valid code points, chr() returns length 1 in both Perl and Z3.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 32 && $x <= 126
 # post: $result == 1
 sub chr_valid_len {

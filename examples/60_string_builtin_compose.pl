@@ -11,7 +11,7 @@
 # Checks if input contains a substring; if yes, concat a suffix,
 # otherwise take a prefix via substr. Both paths produce a string
 # whose length is bounded by the precondition.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 4 && length($s) <= 10
 # post: $result >= 4 && $result <= 13
 sub length_contains_branch {
@@ -32,7 +32,7 @@ sub length_contains_branch {
 # Tests prefix/suffix and branches to apply different replace
 # operations. Each path returns the length of the transformed
 # string. Z3 must track string length through replace semantics.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 8
 # post: $result >= 5 && $result <= 10
 sub prefix_suffix_replace {
@@ -56,7 +56,7 @@ sub prefix_suffix_replace {
 # Extracts a prefix substring, then checks if that substring
 # contains a character. Branches on the contains result. Exercises
 # nested string operation composition.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 6 && length($s) <= 10
 # post: $result >= 0 && $result <= 6
 sub substr_then_contains {
@@ -78,7 +78,7 @@ sub substr_then_contains {
 # Builds two concatenated strings and branches on their length
 # comparison. Each branch does further string ops. Creates 3
 # paths with different string operation chains.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 2 && length($a) <= 4 && length($b) >= 2 && length($b) <= 4
 # post: $result >= 2 && $result <= 8
 sub concat_length_multi {
@@ -101,7 +101,7 @@ sub concat_length_multi {
 # Applies a replace, then checks if the result starts_with or
 # contains something. Multi-step reasoning about how replace
 # affects subsequent string predicates.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 4 && length($s) <= 8 && starts_with($s, "ab") == 1
 # post: $result >= 1 && $result <= 3
 sub replace_then_check {

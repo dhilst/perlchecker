@@ -168,7 +168,7 @@ sub plain {
     return 0;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= $x
 sub foo {
     my ($x) = @_;
@@ -179,7 +179,7 @@ sub foo {
     return 0;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (Int, Int) -> I64
 # post: $result >= $x
 sub bar {
     my ($x, $y) = @_;
@@ -195,7 +195,7 @@ sub bar {
                 ExtractedFunction {
                     name: "foo".to_string(),
                     annotations: vec![
-                        "# sig: (Int) -> Int".to_string(),
+                        "# sig: (I64) -> I64".to_string(),
                         "# post: $result >= $x".to_string(),
                     ],
                     body: "\n    my ($x) = @_;\n    if ($x > 0) {\n        return $x;\n    }\n\n    return 0;\n".to_string(),
@@ -204,7 +204,7 @@ sub bar {
                 ExtractedFunction {
                     name: "bar".to_string(),
                     annotations: vec![
-                        "# sig: (Int, Int) -> Int".to_string(),
+                        "# sig: (Int, Int) -> I64".to_string(),
                         "# post: $result >= $x".to_string(),
                     ],
                     body: "\n    my ($x, $y) = @_;\n    return $x + $y;\n".to_string(),
@@ -217,7 +217,7 @@ sub bar {
     #[test]
     fn rejects_annotation_block_without_immediate_sub() {
         let source = r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result > 0
 
 sub foo {
@@ -239,7 +239,7 @@ sub foo {
     #[test]
     fn rejects_unmatched_braces() {
         let source = r#"
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= $x
 sub foo {
     if ($x > 0) {
@@ -264,7 +264,7 @@ sub foo {
             let source = (0..count)
                 .map(|index| {
                     format!(
-                        "# sig: (Int) -> Int\n# post: $result >= $x\nsub f{index} {{\n    my ($x) = @_;\n    return $x;\n}}\n"
+                        "# sig: (I64) -> I64\n# post: $result >= $x\nsub f{index} {{\n    my ($x) = @_;\n    return $x;\n}}\n"
                     )
                 })
                 .collect::<String>();

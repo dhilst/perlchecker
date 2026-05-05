@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # post: $result >= 0
 sub branch_with_comparisons {
     my ($x) = @_;

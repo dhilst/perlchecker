@@ -10,7 +10,7 @@
 # State starts at 0. In step 1, transitions to 1 or 2 based on input a.
 # In step 2, transitions based on current state + input b.
 # Final state is always in [0, 2].
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1
 # post: $result >= 0 && $result <= 2
 sub two_step_fsm {
@@ -41,7 +41,7 @@ sub two_step_fsm {
 # State transitions through 3 steps, accumulating an output value
 # based on which state we're in at each step. The output is bounded
 # by the number of steps times max per-step contribution.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 1 && $y >= 0 && $y <= 1 && $z >= 0 && $z <= 1
 # post: $result >= 3 && $result <= 9
 sub fsm_accumulator {
@@ -111,7 +111,7 @@ sub fsm_accumulator {
 # Simulates a 4-state machine (states 0-3) for 2 steps.
 # Uses elsif chains for state dispatch. Transitions depend on
 # the input at each step. Proves final state is in [0, 3].
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $inp1 >= 0 && $inp1 <= 1 && $inp2 >= 0 && $inp2 <= 1
 # post: $result >= 0 && $result <= 3
 sub four_state_dispatch {
@@ -174,7 +174,7 @@ sub four_state_dispatch {
 # Two state variables evolve together: s1 and s2 each take values
 # 0 or 1. Transitions of one depend on the other, creating
 # cross-variable path dependencies. After 2 steps, return s1 + s2.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 1 && $b >= 0 && $b <= 1
 # post: $result >= 0 && $result <= 2
 sub dual_state_interaction {
@@ -223,7 +223,7 @@ sub dual_state_interaction {
 # A 3-state machine runs for 2 steps, then maps the final state
 # to an output value via elsif. The combination of state transitions
 # + final mapping creates many paths. Proves output is in [10, 30].
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $p >= 0 && $p <= 2 && $q >= 0 && $q <= 2
 # post: $result >= 10 && $result <= 30
 sub fsm_output_mapping {

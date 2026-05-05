@@ -4,7 +4,7 @@
 
 # This file tests that legitimate ghost usage still works after the fix.
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result == $x + $y
 sub sum_with_fresh_ghost {

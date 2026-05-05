@@ -14,7 +14,7 @@
 # =============================================================
 
 # --- Count elements less than a pivot in a bounded array ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: $len >= 0 && $len <= 5 && $pivot >= 0
 # post: $result >= 0 && $result <= $len
 sub count_less_than {
@@ -30,7 +30,7 @@ sub count_less_than {
 }
 
 # --- Check if all elements are in [lo, hi] ---
-# sig: (Array<Int>, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64) -> I64
 # pre: $len >= 0 && $len <= 5 && $lo <= $hi
 # post: $result == 0 || $result == 1
 sub all_in_range {
@@ -48,7 +48,7 @@ sub all_in_range {
 }
 
 # --- Sum of array elements (bounded length) ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $len >= 0 && $len <= 5
 # post: $result >= 0 || $result < 0
 sub array_sum {
@@ -64,7 +64,7 @@ sub array_sum {
 # --- BOUNDARY PUSH: scalar(@arr) for array length ---
 # This function should sum all elements without needing
 # an explicit length parameter. Currently FAILS to parse.
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # post: $result >= 0 || $result < 0
 sub auto_sum {
     my ($arr) = @_;

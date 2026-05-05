@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result >= 0 && $result <= 255
 sub complement_byte {
@@ -7,7 +7,7 @@ sub complement_byte {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 255
 # post: $result == 255 - $x
 sub complement_byte_exact {

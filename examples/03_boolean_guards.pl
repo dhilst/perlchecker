@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: !($x == 0) || $y >= 0
 # post: ($x <= $y && $result == $y - $x) || ($x > $y && $result == $x - $y)
 sub boolean_guards {

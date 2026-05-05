@@ -5,7 +5,7 @@
 # the length. This enables building arrays element by element.
 
 # --- push stores at the current length index ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0
 # post: $result == $val
 sub push_and_read {
@@ -15,7 +15,7 @@ sub push_and_read {
 }
 
 # --- two consecutive pushes ---
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0
 # post: $result == $b
 sub push_twice_read_second {
@@ -27,7 +27,7 @@ sub push_twice_read_second {
 }
 
 # --- push updates scalar length ---
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == $n && $n >= 0 && $n <= 10
 # post: $result == $n + 1
 sub push_increments_length {

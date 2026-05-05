@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result == $n * 5
 sub multiply_by_five {
@@ -13,7 +13,7 @@ sub multiply_by_five {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 1 && $n <= 50
 # post: $result >= $n
 sub multiply_with_invariant {

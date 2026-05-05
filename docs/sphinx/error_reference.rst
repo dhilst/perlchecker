@@ -48,8 +48,8 @@ These occur when parsing the ``# sig:``, ``# pre:``, ``# post:`` lines.
    * - ``duplicate directive: post``
      - The annotation block has more than one ``# post:`` line.
    * - ``unsupported type: Foo``
-     - The type ``Foo`` is not recognized. Supported types: ``Int``, ``Str``,
-       ``Array<Int>``, ``Array<Str>``, ``Hash<Str, Int>``, ``Hash<Str, Str>``.
+     - The type ``Foo`` is not recognized. Supported types: ``I64``, ``Str``,
+       ``Array<I64>``, ``Array<Str>``, ``Hash<Str, I64>``, ``Hash<Str, Str>``.
    * - ``parameter count mismatch: sig declares N but body has M``
      - The number of types in the ``# sig:`` line does not match the number
        of parameters in ``my (...) = @_;``.
@@ -96,7 +96,7 @@ These occur during static type analysis of the function body.
    * - ``type mismatch``
      - An operator received the wrong type. For example, using ``+`` on
        strings or ``eq`` on integers.
-   * - ``array index must be Int``
+   * - ``array index must be I64``
      - An array access ``$arr[$i]`` used a non-integer index.
    * - ``unsafe substring start``
      - The ``substr`` start position could be negative or out of bounds.

@@ -9,7 +9,7 @@
 # =============================================================
 
 # --- Absolute value using ternary ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result >= 0
 sub abs_val {
@@ -19,7 +19,7 @@ sub abs_val {
 }
 
 # --- Min of two integers using ternary ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $y >= 0
 # post: $result <= $x && $result <= $y
 sub min_of {
@@ -29,7 +29,7 @@ sub min_of {
 }
 
 # --- Clamp to range using nested ternary ---
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $lo <= $hi
 # post: $result >= $lo && $result <= $hi
 sub clamp {

@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 100
 # post: $result >= 1
 sub guarded_with_die_if {
@@ -8,7 +8,7 @@ sub guarded_with_die_if {
     return $x;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 0
 sub positive_guard {

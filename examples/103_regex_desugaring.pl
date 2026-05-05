@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub starts_with_hello {
@@ -9,7 +9,7 @@ sub starts_with_hello {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub contains_test {
@@ -20,7 +20,7 @@ sub contains_test {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result >= 0 && $result <= 1
 sub not_ending_with_x {

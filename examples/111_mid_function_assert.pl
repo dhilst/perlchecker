@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 0
 sub sum_with_assert {
@@ -9,7 +9,7 @@ sub sum_with_assert {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 100
 # post: $result >= 0
 sub double_with_assert {
@@ -19,7 +19,7 @@ sub double_with_assert {
     return $result;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 1 && $b <= 10
 # post: $result >= 0
 sub guarded_division {
@@ -29,7 +29,7 @@ sub guarded_division {
     return $result;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
 # post: $result >= 0
 sub loop_with_assert {

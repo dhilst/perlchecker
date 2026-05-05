@@ -11,7 +11,7 @@
 # Precondition guarantees $x in [10,90], so all die statements are
 # unreachable. The die messages document the invariant. After pruning,
 # the tight postcondition on $x * 2 is provable.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 10 && $x <= 90
 # post: $result >= 20 && $result <= 180
 sub multi_guard_narrow {
@@ -25,7 +25,7 @@ sub multi_guard_narrow {
 # --- Die-unless with nested branches: 4 paths after pruning ---
 # Precondition gives $a in [1,50] and $b in [1,50], making die-unless
 # unreachable. Nested if/else then creates 4 paths, all bounded.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 50 && $b >= 1 && $b <= 50
 # post: $result >= 2 && $result <= 100
 sub die_unless_with_branches {
@@ -53,7 +53,7 @@ sub die_unless_with_branches {
 # Precondition restricts $x in [5,15], $y in [10,20], $z in [1,5].
 # Six die statements document and assert these bounds. After all
 # guards, $x + $y + $z is provably in [16, 40].
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $x >= 5 && $x <= 15 && $y >= 10 && $y <= 20 && $z >= 1 && $z <= 5
 # post: $result >= 16 && $result <= 40
 sub cascading_die_tight_bound {
@@ -72,7 +72,7 @@ sub cascading_die_tight_bound {
 # Precondition ensures $n in [1,10], making die unreachable.
 # After die prunes the impossible path, ternary creates 2 paths
 # both provably bounded by the narrowed range.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 1 && $n <= 10 && $m >= 1 && $m <= 10
 # post: $result >= 2 && $result <= 100
 sub die_in_block_with_ternary {
@@ -90,7 +90,7 @@ sub die_in_block_with_ternary {
 # Die guards document these invariants. A bounded loop accumulates
 # values; the postcondition is tight because die establishes the
 # range for symbolic reasoning about the loop body.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $start >= 1 && $start <= 5 && $factor >= 1 && $factor <= 3
 # post: $result >= 4 && $result <= 60
 sub die_guard_with_loop {

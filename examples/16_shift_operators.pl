@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 100
 # post: $result >= 2
 sub shift_left_one {
@@ -7,7 +7,7 @@ sub shift_left_one {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 4 && $x <= 100
 # post: $result >= 1
 sub shift_right_two {
@@ -16,7 +16,7 @@ sub shift_right_two {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 4
 # post: $result >= 1
 sub power_of_two {

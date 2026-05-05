@@ -10,7 +10,7 @@
 # --- 4-level nested ternary classification ---
 # Classifies input into one of 5 ranges using a 4-deep ternary chain.
 # Creates 5 distinct paths through a single expression.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 1 && $result <= 5
 sub classify_range {
@@ -22,7 +22,7 @@ sub classify_range {
 # --- Two interacting ternary chains with arithmetic ---
 # Two 3-deep ternary assignments whose results are combined,
 # creating 4 * 4 = 16 path combinations through arithmetic.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 30 && $b >= 0 && $b <= 30
 # post: $result >= 2 && $result <= 80
 sub ternary_pair_combine {
@@ -36,7 +36,7 @@ sub ternary_pair_combine {
 # --- Ternary in loop bound controlling iteration count ---
 # A ternary determines how many times the loop runs, then inside
 # the loop another ternary picks the increment. Paths = bound_paths * (iter_paths ^ iters).
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $mode >= 0 && $mode <= 2 && $val >= 1 && $val <= 5
 # post: $result >= 0 && $result <= 25
 sub ternary_loop_bound {
@@ -54,7 +54,7 @@ sub ternary_loop_bound {
 # --- 5-deep ternary scoring with compound postcondition ---
 # A single 5-level ternary assigns a score. The postcondition
 # verifies membership in the exact set of possible values.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 50
 # post: $result >= 0 && $result <= 50
 sub deep_score {
@@ -66,7 +66,7 @@ sub deep_score {
 # --- Cascading ternary assignments where each depends on prior ---
 # Three sequential ternary assignments where each uses the result
 # of the previous one, creating a chain of dependent ITE trees.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 20
 # post: $result >= 1 && $result <= 6
 sub cascading_ternaries {

@@ -6,7 +6,7 @@
 # =============================================================
 
 # --- Basic string ordering: returns 0 or 1 ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
 # post: $result >= 0 && $result <= 1
 sub is_less_than {
@@ -18,7 +18,7 @@ sub is_less_than {
 }
 
 # --- Constant string ordering: "a" is always less than "b" ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub a_lt_b {
@@ -30,7 +30,7 @@ sub a_lt_b {
 }
 
 # --- Ordering consistency: if a lt b then b gt a ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
 # post: $result >= 0 && $result <= 1
 sub ordering_consistency {
@@ -45,7 +45,7 @@ sub ordering_consistency {
 }
 
 # --- le/ge reflexivity: any string is le and ge itself ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub le_reflexive {

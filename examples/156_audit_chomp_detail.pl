@@ -4,7 +4,7 @@
 # 2. Side-effect correctly removes trailing \n
 # 3. Multiple trailing newlines: only ONE is removed
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "hello\n"
 # post: $result == 1
 sub chomp_returns_one_when_newline {
@@ -13,7 +13,7 @@ sub chomp_returns_one_when_newline {
     return $r;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $s eq "hello"
 # post: $result == 0
 sub chomp_returns_zero_when_no_newline {
@@ -50,7 +50,7 @@ sub chomp_no_newline_no_change {
 }
 
 # Symbolic test: chomp return value matches whether string changed
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result >= 0 && $result <= 1
 sub chomp_return_bounded_symbolic {
@@ -60,7 +60,7 @@ sub chomp_return_bounded_symbolic {
 }
 
 # Symbolic: after chomp, length decreased by exactly the return value
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 0
 sub chomp_length_consistency {

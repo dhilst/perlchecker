@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= 0
 sub conditional_assign {
@@ -8,7 +8,7 @@ sub conditional_assign {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result <= 50
 sub cap_unless {

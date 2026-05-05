@@ -10,7 +10,7 @@
 # Returns different values depending on whether $x is exactly 0,
 # negative, or positive. The == 0 check creates a hard branch
 # point that the solver must reason about precisely.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -5 && $x <= 5
 # post: (!($x == 0) || $result == 100) && (!($x > 0) || $result == $x + 10) && (!($x < 0) || $result == 0 - $x + 20)
 sub boundary_zero {
@@ -28,7 +28,7 @@ sub boundary_zero {
 # Tests < 0, == 0, > 0 with different computations. Each path
 # produces a result in a specific range, and the overall result
 # is always >= 1.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -4 && $x <= 4
 # post: $result >= 1 && $result <= 20
 sub three_way_boundary {
@@ -47,7 +47,7 @@ sub three_way_boundary {
 # Checks 0, then 1, then -1 in sequence, each adjusting the
 # accumulator differently. Creates 4 distinct paths:
 # (x==0), (x==1), (x==-1), (other).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -3 && $x <= 3
 # post: (!($x == 0) || $result == 50) && (!($x == 1) || $result == 30) && (!($x == -1) || $result == 40) && $result >= 5 && $result <= 50
 sub multi_boundary_seq {
@@ -69,7 +69,7 @@ sub multi_boundary_seq {
 # Loop runs up to 5 iterations, but breaks when the counter equals
 # the boundary value $b. The accumulator tracks how many iterations
 # ran before hitting the boundary.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $b >= 0 && $b <= 4
 # post: $result == $b
 sub boundary_loop_break {
@@ -87,7 +87,7 @@ sub boundary_loop_break {
 # Two parameters each checked against boundary 0, creating a
 # 2x3 grid of paths: (a==0 vs a>0 vs a<0) x (b==0 vs b!=0).
 # Each combination produces a result in a tight provable range.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -3 && $a <= 3 && $b >= -3 && $b <= 3
 # post: $result >= 0 && $result <= 15
 sub compound_boundary {

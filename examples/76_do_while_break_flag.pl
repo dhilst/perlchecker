@@ -10,7 +10,7 @@
 # The loop can exit via last (when acc exceeds threshold) OR via
 # the while condition (when i reaches n). Both exits lead to
 # different final states that must satisfy the postcondition.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $n >= 2 && $n <= 4 && $threshold >= 3 && $threshold <= 8
 # post: $result >= 2 && $result <= 10
 sub dowhile_dual_exit {
@@ -29,7 +29,7 @@ sub dowhile_dual_exit {
 # Loop condition depends on two variables (i < limit && acc < cap).
 # Inside, last fires on a third condition. Three possible exit
 # triggers stress the path tracker: last, i >= limit, acc >= cap.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $limit >= 2 && $limit <= 4 && $cap >= 4 && $cap <= 10
 # post: $result >= 2 && $result <= 10
 sub dowhile_multi_cond_last {
@@ -52,7 +52,7 @@ sub dowhile_multi_cond_last {
 # Iter 3: inc=1, total=6; Iter 4: inc=2, total=8.
 # Break when total >= x. With x in [3,5], breaks at total in [3,5].
 # With x>5 won't break early, loop ends after 5 iters with total=8.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 3 && $x <= 5
 # post: $result >= 3 && $result <= 8
 sub dowhile_cond_assign_last {
@@ -72,7 +72,7 @@ sub dowhile_cond_assign_last {
 # Uses do-until (negated condition) where next skips the
 # accumulation for even iterations, creating paths where some
 # iterations contribute and others don't.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 3 && $n <= 5
 # post: $result >= 1 && $result <= 3
 sub dountil_next_skip {
@@ -97,7 +97,7 @@ sub dountil_next_skip {
 #   But could also: a=2, b=1, threshold=2. iter1: sum=2, 2>2? no. iter2: sum=4, 4>2 yes. result=4.
 #   Max: a=4, b=2, threshold=8. iter1:4, iter2:8, iter3:12>8, break. result=12.
 #   If loop runs all 5: a=4,b=2 → 12 on iter3.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 2 && $a <= 4 && $b >= 1 && $b <= 2
 # post: $result >= 4 && $result <= 12
 sub dowhile_flag_break {

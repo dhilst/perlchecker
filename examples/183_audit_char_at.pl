@@ -41,7 +41,7 @@ sub char_at_inbounds {
 }
 
 # Length of char_at result is 1 for valid in-bounds access.
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 5 && $i >= 0 && $i < length($s)
 # post: $result == 1
 sub char_at_length_one {

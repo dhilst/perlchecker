@@ -13,7 +13,7 @@
 # With n in [2,4], loop runs n times. Only odd i values contribute.
 # i=0: skip. i=1: acc+=2. i=2: skip. i=3: acc+=2.
 # n=2: acc=2. n=3: acc=2. n=4: acc=4.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 2 && $n <= 4
 # post: $result >= 2 && $result <= 4
 sub do_until_skip_even {
@@ -34,7 +34,7 @@ sub do_until_skip_even {
 # i < thresh. For thresh in [1,3]:
 #   thresh=1: sums i=1,2,3 -> 6. thresh=2: sums i=2,3 -> 5.
 #   thresh=3: sums i=3 -> 3.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $thresh >= 1 && $thresh <= 3
 # post: $result >= 3 && $result <= 6
 sub do_until_conditional_accum {
@@ -59,7 +59,7 @@ sub do_until_conditional_accum {
 #   base=0: vals 0,1,2,3 -> skip 0,3 -> count 2.
 #   base=1: vals 1,2,3,4 -> skip 3 -> count 3.
 #   base=2: vals 2,3,4,5 -> skip 3 -> count 3.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $base >= 0 && $base <= 2
 # post: $result >= 2 && $result <= 3
 sub do_until_next_if_count {
@@ -83,7 +83,7 @@ sub do_until_next_if_count {
 #   step=1 (odd): no skip, acc = 1+1+1 = 3.
 #   step=2 (even): skip i=1, acc = 2+0+2 = 4.
 #   step=3 (odd): no skip, acc = 3+3+3 = 9.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $step >= 1 && $step <= 3
 # post: $result >= 3 && $result <= 9
 sub do_until_weighted_skip {
@@ -109,7 +109,7 @@ sub do_until_weighted_skip {
 # x=1: i=0:1+1=2<=2 +1, i=1:1+1=2<=2 +1, i=2:1+2=3>2 +2, i=3:1+3=4<=4 +2 => 6
 # x=2: i=0:2+0=2<=2 +1, i=1:2+1=3>2 +2, i=2:2+2=4<=4 +2, i=3:2+3=5>4 skip => 5
 # x=3: i=0:3+0=3>2 +2, i=1:3+1=4<=4 +2, i=2:3+2=5>4 skip, i=3:3+3=6>4 skip => 4
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 3
 # post: $result >= 4 && $result <= 6
 sub do_until_nested_next {

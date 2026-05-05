@@ -22,7 +22,7 @@ sub repeat_neg_large {
     return $s x -100;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) == 2
 # post: $result == 6
 sub repeat_three_len {

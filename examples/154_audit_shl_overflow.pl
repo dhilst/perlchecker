@@ -13,7 +13,7 @@
 #    than accept a potentially wrong proof).
 
 # --- Case 1: shift by 64 always yields 0 (sound before and after fix) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == 0
 sub shl_by_64 {
@@ -23,7 +23,7 @@ sub shl_by_64 {
 }
 
 # --- Case 2: large variable shift amount yields 0 ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 64 && $n <= 200
 # post: $result == 0
 sub shl_large_var_amount {
@@ -33,7 +33,7 @@ sub shl_large_var_amount {
 }
 
 # --- Case 3: basic shift correctness (regression guard) ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 10
 # post: $result == $x * 2
 sub shl_one_is_times_two {
@@ -43,7 +43,7 @@ sub shl_one_is_times_two {
 }
 
 # --- Case 4: shift by 63 for small values ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 1
 # post: $result > 0
 sub shl_63_positive {

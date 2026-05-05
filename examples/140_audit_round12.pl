@@ -11,7 +11,7 @@
 # --- Function 1: index on concatenated string finds match beyond position 32 ---
 # The concatenation $a . $b produces a 34-char string.  "x" is guaranteed
 # to appear in $b (at position 33), so index must NOT return -1.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) == 32 && length($b) == 2 && ends_with($b, "x") == 1 && contains($a, "x") == 0 && starts_with($b, "x") == 0
 # post: $result >= 0
 sub index_finds_past_32 {
@@ -21,7 +21,7 @@ sub index_finds_past_32 {
 }
 
 # --- Function 2: basic index still works correctly ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && starts_with($s, "hello") == 1
 # post: $result == 2
 sub index_basic {
@@ -30,7 +30,7 @@ sub index_basic {
 }
 
 # --- Function 3: index with negative start behaves like start=0 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 3 && starts_with($s, "abc") == 1
 # post: $result == 0
 sub index_negative_start {

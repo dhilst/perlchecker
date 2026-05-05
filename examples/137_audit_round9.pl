@@ -7,7 +7,7 @@
 # through the encoding. Fixed by clamping the -1 sentinel to 0.
 
 # --- int("") should be 0, not -1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($x) == 0
 # post: $result == 0
 sub int_empty_string {
@@ -16,7 +16,7 @@ sub int_empty_string {
 }
 
 # --- int of a non-numeric string should be 0 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $x eq "abc"
 # post: $result == 0
 sub int_nonnumeric {
@@ -25,7 +25,7 @@ sub int_nonnumeric {
 }
 
 # --- int("-abc") should be 0, not 1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $x eq "-abc"
 # post: $result == 0
 sub int_neg_nonnumeric {
@@ -34,7 +34,7 @@ sub int_neg_nonnumeric {
 }
 
 # --- int("-") should be 0 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $x eq "-"
 # post: $result == 0
 sub int_bare_minus {
@@ -43,7 +43,7 @@ sub int_bare_minus {
 }
 
 # --- valid negative int conversion still works ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $x eq "-42"
 # post: $result == -42
 sub int_neg_valid {
@@ -52,7 +52,7 @@ sub int_neg_valid {
 }
 
 # --- valid positive int conversion still works ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: $x eq "99"
 # post: $result == 99
 sub int_pos_valid {

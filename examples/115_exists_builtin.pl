@@ -1,7 +1,7 @@
 # Round 115: exists() builtin for hash key existence checking
 
 # Test 1: After assigning to a hash key, exists returns 1
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result == 1
 sub check_exists_after_assign {
@@ -12,7 +12,7 @@ sub check_exists_after_assign {
 }
 
 # Test 2: exists on a parameter hash is unconstrained, use in conditional
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: length($k) >= 1
 # post: $result >= 0
 sub check_exists_param_hash {
@@ -28,7 +28,7 @@ sub check_exists_param_hash {
 }
 
 # Test 3: Multiple key assignments, exists checks specific key
-# sig: (Hash<Str, Int>, Str, Str) -> Int
+# sig: (Hash<Str, I64>, Str, Str) -> I64
 # pre: length($k1) >= 1 && length($k2) >= 1
 # post: $result == 1
 sub check_exists_multiple_keys {

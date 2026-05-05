@@ -10,7 +10,7 @@
 # =============================================================
 
 # --- last exits the loop, result is value at break point ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 5
 # post: $result == 3
 sub find_three {
@@ -28,7 +28,7 @@ sub find_three {
 }
 
 # --- last inside conditional prevents further iterations ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result >= 1
 sub sum_until_break {
@@ -46,7 +46,7 @@ sub sum_until_break {
 }
 
 # --- last with for loop ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 10
 # post: $result >= 0
 sub for_with_last {

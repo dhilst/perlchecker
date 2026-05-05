@@ -10,7 +10,7 @@
 # When x is positive, result is x*2 (positive). When x <= 0,
 # result is 0. The implication (!($x > 0) || $result > 0) holds
 # because on the x > 0 path, result = x*2 > 0.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -5 && $x <= 5
 # post: (!($x > 0) || $result > 0) && $result >= 0
 sub implication_positive {
@@ -25,7 +25,7 @@ sub implication_positive {
 # Two implications combined: if x > 0 then result >= x, AND
 # if x < 0 then result >= -x. This means result >= abs(x)
 # regardless of sign.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -5 && $x <= 5
 # post: (!($x > 0) || $result >= $x) && (!($x < 0) || $result >= 0 - $x) && $result >= 0
 sub implication_abs_bound {
@@ -43,7 +43,7 @@ sub implication_abs_bound {
 # Accumulates a sum in a loop. If n > 0, the loop runs at least
 # once adding at least 1 each iteration, so result >= n.
 # If n <= 0, no constraint on result (trivially satisfied).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 5
 # post: (!($n > 0) || $result >= $n) && $result >= 0
 sub implication_loop_sum {
@@ -60,7 +60,7 @@ sub implication_loop_sum {
 # --- Function 4: Biconditional-style — condition determines result exactly ---
 # Uses (condition || result == A) && (!condition || result == B) pattern.
 # When flag > 0: result must be 10. When flag <= 0: result must be 20.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $flag >= -3 && $flag <= 3
 # post: ($flag > 0 || $result == 20) && (!($flag > 0) || $result == 10)
 sub biconditional_branch {
@@ -77,7 +77,7 @@ sub biconditional_branch {
 # if x >= 1 && x <= 3 then result == x (identity in range)
 # if x < 1 then result == 1 (floored at 1)
 # This is a clamp(x, 1, 3) function.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -2 && $x <= 6
 # post: (!($x > 3) || $result == 3) && (!($x < 1) || $result == 1) && $result >= 1 && $result <= 3
 sub implication_clamp {

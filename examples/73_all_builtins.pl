@@ -10,7 +10,7 @@
 # Uses length, abs, min, max, contains, starts_with, substr, reverse
 # in sequence. Each builtin result feeds into the next condition,
 # interleaving string and integer theories.
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 4 && length($s) <= 10 && $n >= -5 && $n <= 5
 # post: $result >= 0 && $result <= 20
 sub mega_builtin_cascade {
@@ -43,7 +43,7 @@ sub mega_builtin_cascade {
 # Takes an integer code, converts to chr, checks properties of
 # the resulting character via string builtins, uses abs/min/max
 # on intermediate values.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $code >= 97 && $code <= 122
 # post: $result >= 1 && $result <= 26
 sub ord_chr_bridge {
@@ -66,7 +66,7 @@ sub ord_chr_bridge {
 # Combines reverse, length, substr, contains, starts_with in
 # branching logic. The verifier must reason that reverse preserves
 # length and that substr on a bounded-length string yields bounded length.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && length($s) <= 8
 # post: $result >= 1 && $result <= 8
 sub string_cross_theory {
@@ -98,7 +98,7 @@ sub string_cross_theory {
 # Uses all builtins in a complex chain with die statements pruning
 # impossible paths. The verifier must track that certain conditions
 # are impossible given the preconditions and earlier computations.
-# sig: (Str, Int, Int) -> Int
+# sig: (Str, I64, I64) -> I64
 # pre: length($s) >= 3 && length($s) <= 6 && $x >= 1 && $x <= 10 && $y >= 1 && $y <= 10
 # post: $result >= 1 && $result <= 20
 sub full_interleave_pruned {

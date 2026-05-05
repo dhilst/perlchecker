@@ -1,4 +1,4 @@
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result == 1
 sub reverse_preserves_length {
@@ -10,7 +10,7 @@ sub reverse_preserves_length {
     return 0;
 }
 
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 5
 # post: $result >= 0 && $result <= 1
 sub double_reverse_identity {

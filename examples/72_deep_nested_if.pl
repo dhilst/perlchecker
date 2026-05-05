@@ -11,7 +11,7 @@
 # Level 1: +10 or +1, Level 2: +8 or +2, Level 3: +6 or +3,
 # Level 4: +4 or +4, Level 5: +5 or +0
 # Min path: 1+2+3+4+0 = 10, Max path: 10+8+6+4+5 = 33
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20 && $c >= 0 && $c <= 20 && $d >= 0 && $d <= 20 && $e >= 0 && $e <= 20
 # post: $result >= 10 && $result <= 33
 sub five_level_if {
@@ -185,7 +185,7 @@ sub five_level_if {
 # Level 4 (unless $d>6): T(d<=6)->+5, F(d>6)->+2
 # Level 5 (if $e>3):    T->+4, F->+1
 # Min: 2+3+1+2+1 = 9, Max: 10+7+6+5+4 = 32
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 15 && $b >= 0 && $b <= 15 && $c >= 0 && $c <= 15 && $d >= 0 && $d <= 15 && $e >= 0 && $e <= 15
 # post: $result >= 9 && $result <= 32
 sub mixed_if_unless_deep {
@@ -225,7 +225,7 @@ sub mixed_if_unless_deep {
 # paths since each level has 2 branches fully expanded.
 # The accumulator gains: L1: 16/1, L2: 8/1, L3: 4/1, L4: 2/1, L5: 1/0
 # Min: 1+1+1+1+0 = 4, Max: 16+8+4+2+1 = 31
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 20 && $b >= 0 && $b <= 20 && $c >= 0 && $c <= 20 && $d >= 0 && $d <= 20 && $e >= 0 && $e <= 20
 # post: $result >= 4 && $result <= 31
 sub deep_nested_alternating {
@@ -400,7 +400,7 @@ sub deep_nested_alternating {
 # Reachable: r starts at 0, +10 (L1), +7 (L2), then L3: +6 or +1,
 # L4: +5 or +2, L5: +4 or +1.
 # Min reachable: 10+7+1+2+1 = 21, Max reachable: 10+7+6+5+4 = 32
-# sig: (Int, Int, Int, Int, Int) -> Int
+# sig: (I64, I64, I64, I64, I64) -> I64
 # pre: $a >= 10 && $a <= 15 && $b >= 0 && $b <= 5 && $c >= 0 && $c <= 15 && $d >= 0 && $d <= 15 && $e >= 0 && $e <= 15
 # post: $result >= 21 && $result <= 32
 sub nested_with_die_paths {

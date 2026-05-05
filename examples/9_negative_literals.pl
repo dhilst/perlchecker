@@ -5,7 +5,7 @@
 # arithmetic, conditionals, and postconditions.
 
 # --- Basic negation of a variable ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result == -$x
 sub flip_sign {
@@ -15,7 +15,7 @@ sub flip_sign {
 }
 
 # --- Negative literal in assignment ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -50 && $x <= 50
 # post: $result >= 0
 sub distance_from_origin {
@@ -26,7 +26,7 @@ sub distance_from_origin {
 }
 
 # --- Custom absolute value using negation ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: ($x >= 0 && $result == $x) || ($x < 0 && $result == -$x)
 sub my_abs {
@@ -36,7 +36,7 @@ sub my_abs {
 }
 
 # --- Negative bounds in precondition ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= -1
 # post: $result >= 1 && $result <= 100
 sub negate_negative {
@@ -46,7 +46,7 @@ sub negate_negative {
 }
 
 # --- Negative offset arithmetic ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0 && $x <= 50
 # post: $result == $x + -5
 sub subtract_five {
@@ -57,7 +57,7 @@ sub subtract_five {
 }
 
 # --- Clamping to a negative lower bound ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -200 && $x <= 200
 # post: $result >= -100 && $result <= 200
 sub clamp_lower {
@@ -68,7 +68,7 @@ sub clamp_lower {
 }
 
 # --- Double negation is identity ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -50 && $x <= 50
 # post: $result == $x
 sub double_negate {
@@ -79,7 +79,7 @@ sub double_negate {
 }
 
 # --- Sign function returning -1, 0, or 1 ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: ($x > 0 && $result == 1) || ($x == 0 && $result == 0) || ($x < 0 && $result == -1)
 sub sign {

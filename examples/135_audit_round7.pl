@@ -6,7 +6,7 @@
 # Perl's ord("") returns 0. Fix: guard with length == 0 check.
 
 # REGRESSION: checker must NOT verify this (Perl returns 0, not -1)
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) == 0
 # post: $result == -1
 sub ord_empty_wrong {
@@ -15,7 +15,7 @@ sub ord_empty_wrong {
 }
 
 # After fix: checker should verify this (Perl returns 0 for empty)
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) == 0
 # post: $result == 0
 sub ord_empty_correct {
@@ -24,7 +24,7 @@ sub ord_empty_correct {
 }
 
 # After fix: ord() always returns >= 0 for any string (including empty)
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # post: $result >= 0
 sub ord_always_nonneg {
     my ($s) = @_;

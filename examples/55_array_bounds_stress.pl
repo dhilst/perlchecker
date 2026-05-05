@@ -11,7 +11,7 @@
 # Iterates over array elements, adds only positive values to sum.
 # The verifier must track array reads at computed indices through
 # both the positive and non-positive branches per iteration.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: $len >= 1 && $len <= 4 && $arr[0] >= 0 && $arr[0] <= 5 && $arr[1] >= 0 && $arr[1] <= 5 && $arr[2] >= 0 && $arr[2] <= 5 && $arr[3] >= 0 && $arr[3] <= 5
 # post: $result >= 0 && $result <= 20
 sub sum_positive_elements {
@@ -30,7 +30,7 @@ sub sum_positive_elements {
 # --- Array search with early exit (last) ---
 # Searches for a target value in the array, returns 1 if found, 0 otherwise.
 # Combines array access at computed index with loop early exit.
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: $len >= 1 && $len <= 4 && $target >= 0 && $target <= 10
 # post: $result >= 0 && $result <= 1
 sub find_in_array {
@@ -49,7 +49,7 @@ sub find_in_array {
 # --- Push elements then pop and verify ---
 # Pushes multiple computed values into array, then pops the last,
 # verifying the verifier tracks array contents through push/pop.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) == 0 && $x >= 1 && $x <= 5
 # post: $result == $x + 2
 sub push_then_pop {
@@ -64,7 +64,7 @@ sub push_then_pop {
 # --- Scalar length drives branch logic ---
 # Uses scalar(@arr) in conditions to create multiple paths,
 # verifying the checker can reason about array length in branches.
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: scalar(@arr) == $len && $len >= 1 && $len <= 3 && $arr[0] >= 0 && $arr[0] <= 10 && $arr[1] >= 0 && $arr[1] <= 10 && $arr[2] >= 0 && $arr[2] <= 10
 # post: $result >= 0 && $result <= 30
 sub scalar_branching {
@@ -84,7 +84,7 @@ sub scalar_branching {
 # Finds the maximum value in an array, exits early if a value
 # exceeds a threshold. Combines array reads, comparisons,
 # conditional updates, and loop control.
-# sig: (Array<Int>, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64) -> I64
 # pre: $len >= 1 && $len <= 4 && $threshold >= 1 && $threshold <= 100 && $arr[0] >= 0 && $arr[0] <= 50 && $arr[1] >= 0 && $arr[1] <= 50 && $arr[2] >= 0 && $arr[2] <= 50 && $arr[3] >= 0 && $arr[3] <= 50
 # post: $result >= 0 && $result <= 50
 sub bounded_max_search {

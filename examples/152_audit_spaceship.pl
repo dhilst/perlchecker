@@ -7,7 +7,7 @@
 # and cmp string ordering correctness.
 
 # --- Spaceship with equal values must be exactly 0 ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -100 && $x <= 100
 # post: $result == 0
 sub spaceship_equal {
@@ -16,7 +16,7 @@ sub spaceship_equal {
 }
 
 # --- Spaceship antisymmetry: (a <=> b) == -(b <=> a) ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -50 && $a <= 50 && $b >= -50 && $b <= 50
 # post: $result == 0
 sub spaceship_antisymmetry {
@@ -27,7 +27,7 @@ sub spaceship_antisymmetry {
 }
 
 # --- Spaceship result is always in {-1, 0, 1} ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -1000 && $a <= 1000 && $b >= -1000 && $b <= 1000
 # post: ($result == -1 || $result == 0 || $result == 1)
 sub spaceship_range {
@@ -36,7 +36,7 @@ sub spaceship_range {
 }
 
 # --- Spaceship arithmetic: (a <=> b) + 1 in {0, 1, 2} ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -100 && $a <= 100 && $b >= -100 && $b <= 100
 # post: $result >= 0 && $result <= 2
 sub spaceship_plus_one {
@@ -46,7 +46,7 @@ sub spaceship_plus_one {
 }
 
 # --- Spaceship consistency: (a <=> b) < 0 iff a < b ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -100 && $a <= 100 && $b >= -100 && $b <= 100 && $a < $b
 # post: $result == -1
 sub spaceship_lt_implies_neg {
@@ -55,7 +55,7 @@ sub spaceship_lt_implies_neg {
 }
 
 # --- Spaceship consistency: (a <=> b) > 0 iff a > b ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -100 && $a <= 100 && $b >= -100 && $b <= 100 && $a > $b
 # post: $result == 1
 sub spaceship_gt_implies_pos {
@@ -64,7 +64,7 @@ sub spaceship_gt_implies_pos {
 }
 
 # --- String cmp with equal strings must be 0 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 10
 # post: $result == 0
 sub cmp_equal {
@@ -73,7 +73,7 @@ sub cmp_equal {
 }
 
 # --- String cmp antisymmetry: (a cmp b) == -(b cmp a) ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
 # post: $result == 0
 sub cmp_antisymmetry {
@@ -84,7 +84,7 @@ sub cmp_antisymmetry {
 }
 
 # --- String cmp result is always in {-1, 0, 1} ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($a) >= 1 && length($a) <= 5 && length($b) >= 1 && length($b) <= 5
 # post: ($result == -1 || $result == 0 || $result == 1)
 sub cmp_range {
@@ -93,7 +93,7 @@ sub cmp_range {
 }
 
 # --- Spaceship squared: result^2 is 0 or 1 ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= -100 && $a <= 100 && $b >= -100 && $b <= 100
 # post: ($result == 0 || $result == 1)
 sub spaceship_squared {

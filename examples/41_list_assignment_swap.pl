@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $b >= 0
 # post: $result == $a
 sub swap_returns_first {
@@ -8,7 +8,7 @@ sub swap_returns_first {
     return $y;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result == $a + $b
 sub list_assign_sum {

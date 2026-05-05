@@ -11,7 +11,7 @@
 # =============================================================
 
 # --- Use abs() builtin to get absolute value ---
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -1000 && $x <= 1000
 # post: $result >= 0 && $result <= 1000
 sub absolute {
@@ -21,7 +21,7 @@ sub absolute {
 }
 
 # --- Distance between two integers using abs ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= -100 && $x <= 100 && $y >= -100 && $y <= 100
 # post: $result >= 0
 sub distance {
@@ -31,7 +31,7 @@ sub distance {
 }
 
 # --- Absolute difference is symmetric ---
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $y >= 0
 # post: $result == 0
 sub abs_symmetry_check {

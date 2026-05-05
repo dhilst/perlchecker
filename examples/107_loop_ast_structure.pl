@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 5
 # post: $result >= 0
 sub sum_to_n {
@@ -12,7 +12,7 @@ sub sum_to_n {
     return $sum;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result >= 0
 sub for_loop_test {
@@ -25,7 +25,7 @@ sub for_loop_test {
     return $result;
 }
 
-# sig: (Array<Int>) -> Int
+# sig: (Array<I64>) -> I64
 # pre: scalar(@arr) >= 1 && scalar(@arr) <= 4
 # post: $result >= 0 && $result <= 4
 sub foreach_still_works {

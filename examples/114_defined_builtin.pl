@@ -1,7 +1,7 @@
 # Round 114: defined() builtin with companion definedness tracking
 
 # Test 1: Bare declaration leaves variable undefined
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 0
 sub check_undefined {
@@ -11,7 +11,7 @@ sub check_undefined {
 }
 
 # Test 2: Assignment makes variable defined
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 1
 sub check_defined_after_assign {
@@ -22,7 +22,7 @@ sub check_defined_after_assign {
 }
 
 # Test 3: Function parameters are always defined
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result == 1
 sub check_param_defined {
@@ -31,7 +31,7 @@ sub check_param_defined {
 }
 
 # Test 4: defined() in conditional logic
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 0
 # post: $result >= 0
 sub check_defined_branch {

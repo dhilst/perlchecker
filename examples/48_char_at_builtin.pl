@@ -1,4 +1,4 @@
-# sig: (Str, Int) -> Int
+# sig: (Str, I64) -> I64
 # pre: length($s) >= 5 && $i >= 0 && $i < length($s)
 # post: $result == 1
 sub char_at_length_one {
@@ -9,7 +9,7 @@ sub char_at_length_one {
 }
 
 # Complex path exploration: multiple branches based on character comparisons
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) == 3
 # post: $result >= 0 && $result <= 3
 sub count_a_chars {

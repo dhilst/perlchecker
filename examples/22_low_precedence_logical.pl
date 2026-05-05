@@ -1,4 +1,4 @@
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 10 && $y >= 0 && $y <= 10
 # post: $result >= 1
 sub both_positive_or_default {
@@ -10,7 +10,7 @@ sub both_positive_or_default {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result >= 0
 sub guard_or {
@@ -22,7 +22,7 @@ sub guard_or {
     return $r;
 }
 
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 5 && $y >= 0 && $y <= 5
 # post: $result >= 0
 sub low_or_example {

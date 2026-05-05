@@ -5,7 +5,7 @@
 # with non-empty needle false, boolean-to-Int mapping (0/1).
 
 # --- Edge case 1: contains with empty needle always returns 1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10
 # post: $result == 1
 sub contains_empty_needle {
@@ -15,7 +15,7 @@ sub contains_empty_needle {
 }
 
 # --- Edge case 2: starts_with with empty prefix always returns 1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10
 # post: $result == 1
 sub starts_with_empty_prefix {
@@ -25,7 +25,7 @@ sub starts_with_empty_prefix {
 }
 
 # --- Edge case 3: ends_with with empty suffix always returns 1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10
 # post: $result == 1
 sub ends_with_empty_suffix {
@@ -35,7 +35,7 @@ sub ends_with_empty_suffix {
 }
 
 # --- Edge case 4: contains result is always 0 or 1 ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10 && length($t) >= 0 && length($t) <= 5
 # post: $result >= 0 && $result <= 1
 sub contains_bounded {
@@ -45,7 +45,7 @@ sub contains_bounded {
 }
 
 # --- Edge case 5: starts_with result is always 0 or 1 ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10 && length($t) >= 0 && length($t) <= 5
 # post: $result >= 0 && $result <= 1
 sub starts_with_bounded {
@@ -55,7 +55,7 @@ sub starts_with_bounded {
 }
 
 # --- Edge case 6: ends_with result is always 0 or 1 ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10 && length($t) >= 0 && length($t) <= 5
 # post: $result >= 0 && $result <= 1
 sub ends_with_bounded {
@@ -65,7 +65,7 @@ sub ends_with_bounded {
 }
 
 # --- Edge case 7: contains($s, $s) is always 1 ---
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10
 # post: $result == 1
 sub contains_self {
@@ -75,7 +75,7 @@ sub contains_self {
 }
 
 # --- Edge case 8: starts_with implies contains ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10 && length($t) >= 0 && length($t) <= 5 && starts_with($s, $t) == 1
 # post: $result == 1
 sub starts_with_implies_contains {
@@ -85,7 +85,7 @@ sub starts_with_implies_contains {
 }
 
 # --- Edge case 9: ends_with implies contains ---
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 0 && length($s) <= 10 && length($t) >= 0 && length($t) <= 5 && ends_with($s, $t) == 1
 # post: $result == 1
 sub ends_with_implies_contains {

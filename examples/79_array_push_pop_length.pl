@@ -10,7 +10,7 @@
 # Pushes three computed values, pops two, then creates 4 paths by
 # branching on the popped values relative to thresholds. The verifier
 # must track what was stored at each index through push/pop.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10 && $c >= 0 && $c <= 10
 # post: $result >= 1 && $result <= 4
 sub push_pop_classify {
@@ -39,7 +39,7 @@ sub push_pop_classify {
 # Pushes a variable number of elements (based on input bounds), then
 # uses scalar(@arr) to determine which region the final length falls in.
 # Creates paths combining push count with length classification.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $x >= 1 && $x <= 5 && $y >= 1 && $y <= 5 && $z >= 1 && $z <= 5
 # post: $result >= 1 && $result <= 3
 sub push_triple_branch_length {
@@ -61,7 +61,7 @@ sub push_triple_branch_length {
 # Pushes 4 values, pops them all back, and classifies the result based
 # on sums and comparisons of the popped values. Creates 8 paths through
 # the 3 nested conditions on popped values.
-# sig: (Array<Int>, Int, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $w >= 0 && $w <= 5 && $x >= 0 && $x <= 5 && $y >= 0 && $y <= 5 && $z >= 0 && $z <= 5
 # post: $result >= 3 && $result <= 10
 sub push_four_pop_four_classify {
@@ -96,7 +96,7 @@ sub push_four_pop_four_classify {
 # Pushes elements, reads array at specific indices, pops one, then
 # creates paths branching on both the popped value and array element
 # values. Stresses the verifier's tracking of stored values.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $a >= 1 && $a <= 5 && $b >= 1 && $b <= 5 && $c >= 1 && $c <= 5
 # post: $result >= 2 && $result <= 12
 sub push_access_pop_paths {
@@ -127,7 +127,7 @@ sub push_access_pop_paths {
 # Pushes values based on input, pops them in sequence, using each
 # popped value to update a state variable through branches. Creates
 # many paths as each pop creates an independent branch point.
-# sig: (Array<Int>, Int, Int, Int, Int) -> Int
+# sig: (Array<I64>, I64, I64, I64, I64) -> I64
 # pre: scalar(@arr) == $n && $n == 0 && $p >= 0 && $p <= 10 && $q >= 0 && $q <= 10 && $r >= 0 && $r <= 10
 # post: $result >= 0 && $result <= 6
 sub pop_driven_state {

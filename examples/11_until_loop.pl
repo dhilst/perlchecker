@@ -1,4 +1,4 @@
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 1 && $x <= 5
 # post: $result == $x * 2
 sub double_until {
@@ -13,7 +13,7 @@ sub double_until {
     return $r;
 }
 
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $n >= 0 && $n <= 5
 # post: $result >= $n
 sub count_up {

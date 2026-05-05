@@ -10,7 +10,7 @@
 # Preconditions ensure $x and $y are both positive, so their sum
 # is always >= 2. Die guards restate this, helping the verifier
 # confirm tight bounds across 4 branching paths.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 1 && $x <= 50 && $y >= 1 && $y <= 50
 # post: $result >= 2 && $result <= 100
 sub arith_die_narrow {
@@ -39,7 +39,7 @@ sub arith_die_narrow {
 # Precondition ensures $den >= 2, so die for $den <= 0 and $den > 10
 # are both unreachable. The die statements document and confirm the
 # safe division range, helping the verifier bound the quotient.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $num >= 10 && $num <= 50 && $den >= 2 && $den <= 5
 # post: $result >= 2 && $result <= 25
 sub division_die_safe {
@@ -54,7 +54,7 @@ sub division_die_safe {
 # Given $a >= 5, $b >= 5, and $c in [0,10], the results of
 # max($a,$b) + $c are always >= 5 and <= 30. Die guards at each
 # branch confirm this, helping verify the tight postcondition.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $a >= 5 && $a <= 20 && $b >= 5 && $b <= 20 && $c >= 0 && $c <= 10
 # post: $result >= 5 && $result <= 30
 sub branch_die_bounds {
@@ -75,7 +75,7 @@ sub branch_die_bounds {
 # Starting from $start in [0,3] and adding $step in [1,2] for 3
 # iterations, the max is 3 + 2*3 = 9 and min is 0 + 1*3 = 3.
 # Die after the loop confirms the accumulator stayed bounded.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $start >= 0 && $start <= 3 && $step >= 1 && $step <= 2
 # post: $result >= 3 && $result <= 9
 sub loop_die_bounded {
@@ -94,7 +94,7 @@ sub loop_die_bounded {
 # With $x in [0,20], $y in [0,20], $z in [0,20], the computations
 # in each branch are bounded. Die guards at each leaf confirm the
 # result is in [1,40], which is always true given the preconditions.
-# sig: (Int, Int, Int) -> Int
+# sig: (I64, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 20 && $y >= 0 && $y <= 20 && $z >= 0 && $z <= 20
 # post: $result >= 0 && $result <= 40
 sub nested_die_confirm {

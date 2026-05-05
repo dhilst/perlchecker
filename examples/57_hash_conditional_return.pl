@@ -10,7 +10,7 @@
 # --- Conditional hash population with early return on sentinel ---
 # Stores different values based on input range, then returns early
 # if a sentinel key holds zero. 4 distinct exit paths.
-# sig: (Hash<Str, Int>, Int) -> Int
+# sig: (Hash<Str, I64>, I64) -> I64
 # pre: $x >= 0 && $x <= 100
 # post: $result >= 1 && $result <= 100
 sub hash_store_guard {
@@ -33,7 +33,7 @@ sub hash_store_guard {
 # Stores into two keys based on conditions, then reads both back
 # and combines them. The verifier must track two array stores and
 # prove the sum is bounded across all 4 path combinations.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $a >= 0 && $a <= 10 && $b >= 0 && $b <= 10
 # post: $result >= 0 && $result <= 20
 sub hash_dual_store {
@@ -56,7 +56,7 @@ sub hash_dual_store {
 # Stores a classification, then uses cascading return-if statements
 # based on the stored hash value. Creates 5 exit paths and requires
 # the verifier to track the hash store through each guard.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 100 && $bonus >= 0 && $bonus <= 10
 # post: $result >= 0 && $result <= 50
 sub hash_cascade_return {
@@ -83,7 +83,7 @@ sub hash_cascade_return {
 # Iterates a bounded loop, conditionally storing into the hash each
 # iteration based on the loop counter. After the loop, reads the
 # final hash state. Combines loop unrolling with hash tracking.
-# sig: (Hash<Str, Int>, Int) -> Int
+# sig: (Hash<Str, I64>, I64) -> I64
 # pre: $base >= 1 && $base <= 5
 # post: $result >= 1 && $result <= 20
 sub hash_loop_accum {
@@ -106,7 +106,7 @@ sub hash_loop_accum {
 # Combines ternary expressions for hash value computation with
 # multiple exit paths based on hash reads. Creates path explosion
 # from 2 ternary stores * 3 exit paths = 12 paths total.
-# sig: (Hash<Str, Int>, Int, Int) -> Int
+# sig: (Hash<Str, I64>, I64, I64) -> I64
 # pre: $x >= 0 && $x <= 20 && $y >= 0 && $y <= 20
 # post: $result >= 0 && $result <= 40
 sub hash_ternary_exits {

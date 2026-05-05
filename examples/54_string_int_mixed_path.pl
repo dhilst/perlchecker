@@ -10,7 +10,7 @@
 # --- Length-gated branching with arithmetic ---
 # Branch on string length, then compute integer results differently.
 # The verifier must track length constraints through both paths.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 20
 # post: $result >= 1 && $result <= 20
 sub length_category {
@@ -28,7 +28,7 @@ sub length_category {
 # Uses contains() as a boolean guard, computing different bounded
 # integer results in each branch. Cross-theory: string containment
 # determines which arithmetic path is taken.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 3 && length($sub) >= 1 && length($sub) <= 3
 # post: $result >= 0 && $result <= 1
 sub contains_to_flag {
@@ -47,7 +47,7 @@ sub contains_to_flag {
 # Uses ord() to convert a character to integer, performs arithmetic,
 # then verifies the result stays in bounds. Cross-theory: string
 # character extraction feeds integer computation.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $code >= 65 && $code <= 90
 # post: $result >= 97 && $result <= 122
 sub upper_to_lower_code {
@@ -61,7 +61,7 @@ sub upper_to_lower_code {
 # --- starts_with guard combined with length arithmetic ---
 # Uses starts_with() to branch, then uses length in arithmetic.
 # The verifier must combine string prefix knowledge with length bounds.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 5 && starts_with($s, "abc") == 1
 # post: $result >= 5
 sub prefix_aware_length {
@@ -79,7 +79,7 @@ sub prefix_aware_length {
 # Combines multiple string predicates with integer logic.
 # Creates 4 paths based on (length > 8) x (contains pattern).
 # All paths must produce a bounded result.
-# sig: (Str, Str) -> Int
+# sig: (Str, Str) -> I64
 # pre: length($s) >= 1 && length($s) <= 15 && length($pat) >= 1 && length($pat) <= 3
 # post: $result >= 0 && $result <= 30
 sub multi_string_int_paths {

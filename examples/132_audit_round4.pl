@@ -7,7 +7,7 @@
 
 # UNSOUND CASE: checker says verified, but Perl says false.
 # (-x)**-1 is a negative fraction (e.g., -0.5), floor = -1, but Perl float != -1.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 2 && $x <= 10
 # post: $result == -1
 sub neg_pow_unsound {
@@ -16,7 +16,7 @@ sub neg_pow_unsound {
 }
 
 # CORRECT CASE: positive exponents work fine (result is exact integer).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= -10 && $x <= 10
 # post: $result == $x * $x * $x
 sub cube_ok {
@@ -25,7 +25,7 @@ sub cube_ok {
 }
 
 # CORRECT CASE: positive base, negative exp — floor(1/x) = 0 = trunc(1/x).
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 2 && $x <= 100
 # post: $result == 0
 sub pos_pow_neg_exp_ok {

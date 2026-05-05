@@ -6,7 +6,7 @@
 # REGRESSION TEST: this must NOT be verified (it's false in Perl).
 # Before the fix, the checker wrongly verified it because Z3 believed
 # ord($x) >= 0 implies length($x) == 1.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($x) >= 1 && ord($x) >= 0
 # post: length($x) == 1
 sub ord_implies_len1 {
@@ -15,7 +15,7 @@ sub ord_implies_len1 {
 }
 
 # POSITIVE TEST: ord of a known single-char string is non-negative.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($x) == 1
 # post: $result >= 0
 sub ord_single_char_nonneg {
@@ -26,7 +26,7 @@ sub ord_single_char_nonneg {
 # POSITIVE TEST: ord returns same value regardless of string length
 # (operates on first char). For single-char strings, ord(substr($x,0,1))
 # equals ord($x).
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($x) == 1
 # post: $result == ord($x)
 sub ord_of_first_char {

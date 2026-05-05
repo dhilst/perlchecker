@@ -9,7 +9,7 @@
 # --- Function 1: Pure arithmetic + ternary (no loops) ---
 # Uses multiplication, addition, and ternary operator with nested
 # conditional expressions. No loops, no side effects.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 10 && $b >= 1 && $b <= 10
 # post: $result >= 2 && $result <= 110
 sub arith_ternary_only {
@@ -24,7 +24,7 @@ sub arith_ternary_only {
 # --- Function 2: For-loop + last + accumulator ---
 # Bounded loop with early exit via last. Accumulates values until
 # a threshold is reached. Tests loop unrolling + last interaction.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $step >= 1 && $step <= 5 && $limit >= 5 && $limit <= 20
 # post: $result >= 1 && $result <= 25
 sub loop_last_accumulate {
@@ -41,7 +41,7 @@ sub loop_last_accumulate {
 # --- Function 3: String ops + conditional branches ---
 # Uses length, contains, concat, and branches on string properties.
 # No loops, pure string reasoning with path divergence.
-# sig: (Str) -> Int
+# sig: (Str) -> I64
 # pre: length($s) >= 3 && length($s) <= 8
 # post: $result >= 3 && $result <= 11
 sub string_branch_ops {
@@ -61,7 +61,7 @@ sub string_branch_ops {
 # --- Function 4: Bitwise + shifts + comparison ---
 # Uses &, |, ^, <<, and comparisons to compute a masked/shifted
 # result. No loops, purely bitwise computation with branches.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $x >= 0 && $x <= 255 && $y >= 0 && $y <= 255
 # post: $result >= 0 && $result <= 255
 sub bitwise_shift_compare {
@@ -82,7 +82,7 @@ sub bitwise_shift_compare {
 # Reads array length in a loop, skipping even indices with next.
 # Accesses array elements at odd indices but returns the bounded
 # count of visited odd indices. Tests array + loop + next interaction.
-# sig: (Array<Int>, Int) -> Int
+# sig: (Array<I64>, I64) -> I64
 # pre: scalar(@arr) >= 4 && $n >= 2 && $n <= 4
 # post: $result >= 1 && $result <= 2
 sub array_loop_next {
@@ -100,7 +100,7 @@ sub array_loop_next {
 # --- Function 6: Hash + conditional + die guard ---
 # Reads a hash value, uses die as a guard, then branches on the
 # value. Tests hash access + die path pruning + conditional.
-# sig: (Hash<Str, Int>, Str) -> Int
+# sig: (Hash<Str, I64>, Str) -> I64
 # pre: $h{$k} >= 1 && $h{$k} <= 100
 # post: $result >= 1 && $result <= 100
 sub hash_conditional_guard {
@@ -119,7 +119,7 @@ sub hash_conditional_guard {
 # --- Function 7: Do-while + unless ---
 # Uses do-while loop with an unless conditional inside the body.
 # Tests do-while loop unrolling + unless branching.
-# sig: (Int) -> Int
+# sig: (I64) -> I64
 # pre: $x >= 10 && $x <= 30
 # post: $result >= 0 && $result < 10
 sub dowhile_unless_reduce {
@@ -136,7 +136,7 @@ sub dowhile_unless_reduce {
 # --- Function 8: Multiple return paths with die guards + inc/dec ---
 # Uses multiple die guards to prune paths, increment/decrement,
 # and early return via ternary. Tests die pruning + inc/dec + ternary.
-# sig: (Int, Int) -> Int
+# sig: (I64, I64) -> I64
 # pre: $a >= 1 && $a <= 20 && $b >= 1 && $b <= 20
 # post: $result >= 1 && $result <= 21
 sub multi_return_die_inc {
