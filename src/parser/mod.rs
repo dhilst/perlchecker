@@ -2444,11 +2444,20 @@ fn desugar_regex(var_expr: Expr, raw: &str, negated: bool) -> std::result::Resul
 
     let result = match (starts_with_caret, ends_with_dollar) {
         (true, true) => {
-            // ^pattern$ => string equality (already Bool)
+            // ^pattern$ => string equality OR equality with trailing newline
+            // (Perl's $ matches before an optional trailing \n)
             Expr::Binary {
-                left: Box::new(var_expr),
-                op: BinaryOp::StrEq,
-                right: Box::new(Expr::String(literal.to_string())),
+                left: Box::new(Expr::Binary {
+                    left: Box::new(var_expr.clone()),
+                    op: BinaryOp::StrEq,
+                    right: Box::new(Expr::String(literal.to_string())),
+                }),
+                op: BinaryOp::Or,
+                right: Box::new(Expr::Binary {
+                    left: Box::new(var_expr),
+                    op: BinaryOp::StrEq,
+                    right: Box::new(Expr::String(format!("{literal}\n"))),
+                }),
             }
         }
         (true, false) => {
@@ -2463,14 +2472,26 @@ fn desugar_regex(var_expr: Expr, raw: &str, negated: bool) -> std::result::Resul
             }
         }
         (false, true) => {
-            // pattern$ => ends_with (returns Int, wrap in == 1 for Bool)
+            // pattern$ => ends_with pattern OR ends_with pattern\n
+            // (Perl's $ matches before an optional trailing \n)
             Expr::Binary {
-                left: Box::new(Expr::Builtin {
-                    function: Builtin::EndsWith,
-                    args: vec![var_expr, Expr::String(literal.to_string())],
+                left: Box::new(Expr::Binary {
+                    left: Box::new(Expr::Builtin {
+                        function: Builtin::EndsWith,
+                        args: vec![var_expr.clone(), Expr::String(literal.to_string())],
+                    }),
+                    op: BinaryOp::Eq,
+                    right: Box::new(Expr::Int(1)),
                 }),
-                op: BinaryOp::Eq,
-                right: Box::new(Expr::Int(1)),
+                op: BinaryOp::Or,
+                right: Box::new(Expr::Binary {
+                    left: Box::new(Expr::Builtin {
+                        function: Builtin::EndsWith,
+                        args: vec![var_expr, Expr::String(format!("{literal}\n"))],
+                    }),
+                    op: BinaryOp::Eq,
+                    right: Box::new(Expr::Int(1)),
+                }),
             }
         }
         (false, false) => {
