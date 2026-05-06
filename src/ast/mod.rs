@@ -999,6 +999,7 @@ fn infer_expr_type(
         Expr::Int(_) => Ok(ExprType::I64),
         Expr::Bool(_) => Ok(ExprType::Bool),
         Expr::String(_) => Ok(ExprType::Str),
+        Expr::Variable(name) if name == "overflow" => Ok(ExprType::Bool),
         Expr::Variable(name) => env
             .get(name)
             .copied()

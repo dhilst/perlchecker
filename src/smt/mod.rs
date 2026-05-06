@@ -48,7 +48,7 @@ pub fn is_satisfiable_with_timeout(function: &str, condition: &BoolExpr, timeout
     apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
     reset_reverse_axioms();
-    solver.assert(&encode_safety_constraints(condition));
+    solver.assert(&encode_semantic_safety(condition));
     solver.assert(&encode_bool(condition));
     assert_reverse_axioms(&solver);
     let result = solver.check();
@@ -87,7 +87,7 @@ pub fn find_model_with_timeout(
     apply_solver_timeout(&solver, timeout_ms);
     assert_string_bounds(&solver, condition);
     reset_reverse_axioms();
-    solver.assert(&encode_safety_constraints(condition));
+    solver.assert(&encode_semantic_safety(condition));
     solver.assert(&encode_bool(condition));
     assert_reverse_axioms(&solver);
     let result = solver.check();
@@ -656,6 +656,15 @@ fn encode_bool(expr: &BoolExpr) -> Bool {
         BoolExpr::Not(expr) => encode_bool(expr).not(),
         BoolExpr::And(left, right) => Bool::and(&[&encode_bool(left), &encode_bool(right)]),
         BoolExpr::Or(left, right) => Bool::or(&[&encode_bool(left), &encode_bool(right)]),
+        BoolExpr::Overflow(exprs) => {
+            if exprs.is_empty() {
+                return Bool::from_bool(false);
+            }
+            let safety_parts: Vec<Bool> = exprs.iter().map(|e| encode_int_overflow_safety(e)).collect();
+            let refs: Vec<&Bool> = safety_parts.iter().collect();
+            let all_safe = Bool::and(&refs);
+            all_safe.not()
+        }
         BoolExpr::IntCmp(op, left, right) => {
             let left = encode_int(left);
             let right = encode_int(right);
@@ -711,77 +720,54 @@ fn encode_bool(expr: &BoolExpr) -> Bool {
     }
 }
 
-fn encode_safety_constraints(expr: &BoolExpr) -> Bool {
-    encode_bool_safety(expr)
-}
-
-fn encode_bool_safety(expr: &BoolExpr) -> Bool {
+fn encode_bool_semantic_safety(expr: &BoolExpr) -> Bool {
     match expr {
-        BoolExpr::Const(_) => Bool::from_bool(true),
-        BoolExpr::Not(expr) => encode_bool_safety(expr),
+        BoolExpr::Const(_) | BoolExpr::Overflow(_) => Bool::from_bool(true),
+        BoolExpr::Not(expr) => encode_bool_semantic_safety(expr),
         BoolExpr::And(left, right) | BoolExpr::Or(left, right) => {
-            Bool::and(&[&encode_bool_safety(left), &encode_bool_safety(right)])
+            Bool::and(&[&encode_bool_semantic_safety(left), &encode_bool_semantic_safety(right)])
         }
         BoolExpr::IntCmp(_, left, right) => {
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+            Bool::and(&[&encode_int_semantic_safety(left), &encode_int_semantic_safety(right)])
         }
         BoolExpr::StrEq(left, right) | BoolExpr::StrCmp(_, left, right) => {
-            Bool::and(&[&encode_str_safety(left), &encode_str_safety(right)])
+            Bool::and(&[&encode_str_semantic_safety(left), &encode_str_semantic_safety(right)])
         }
     }
 }
 
-fn encode_int_safety(expr: &IntExpr) -> Bool {
+fn encode_bool_overflow_safety(expr: &BoolExpr) -> Bool {
+    match expr {
+        BoolExpr::Const(_) | BoolExpr::Overflow(_) => Bool::from_bool(true),
+        BoolExpr::Not(expr) => encode_bool_overflow_safety(expr),
+        BoolExpr::And(left, right) | BoolExpr::Or(left, right) => {
+            Bool::and(&[&encode_bool_overflow_safety(left), &encode_bool_overflow_safety(right)])
+        }
+        BoolExpr::IntCmp(_, left, right) => {
+            Bool::and(&[&encode_int_overflow_safety(left), &encode_int_overflow_safety(right)])
+        }
+        BoolExpr::StrEq(left, right) | BoolExpr::StrCmp(_, left, right) => {
+            Bool::and(&[&encode_str_overflow_safety(left), &encode_str_overflow_safety(right)])
+        }
+    }
+}
+
+fn encode_int_semantic_safety(expr: &IntExpr) -> Bool {
     match expr {
         IntExpr::Const(_) | IntExpr::Var(_) => Bool::from_bool(true),
-        IntExpr::Add(left, right) => {
-            let l = encode_int(left);
-            let r = encode_int(right);
-            Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
-                &l.bvadd_no_overflow(&r, true),
-                &l.bvadd_no_underflow(&r),
-            ])
-        }
-        IntExpr::Sub(left, right) => {
-            let l = encode_int(left);
-            let r = encode_int(right);
-            Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
-                &l.bvsub_no_overflow(&r),
-                &l.bvsub_no_underflow(&r, true),
-            ])
-        }
-        IntExpr::Mul(left, right) => {
-            let l = encode_int(left);
-            let r = encode_int(right);
-            Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
-                &l.bvmul_no_overflow(&r, true),
-                &l.bvmul_no_underflow(&r),
-            ])
+        IntExpr::Add(left, right) | IntExpr::Sub(left, right) | IntExpr::Mul(left, right) => {
+            Bool::and(&[&encode_int_semantic_safety(left), &encode_int_semantic_safety(right)])
         }
         IntExpr::BitAnd(left, right)
         | IntExpr::BitOr(left, right)
         | IntExpr::BitXor(left, right) => {
-            Bool::and(&[&encode_int_safety(left), &encode_int_safety(right)])
+            Bool::and(&[&encode_int_semantic_safety(left), &encode_int_semantic_safety(right)])
         }
-        IntExpr::Shl(left, right) => {
+        IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
             let l = encode_int(left);
             Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
-                &l.bvsge(&bv_const(0)),
-            ])
-        }
-        IntExpr::Shr(left, right) => {
-            let l = encode_int(left);
-            Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
+                &encode_int_semantic_safety(left),
+                &encode_int_semantic_safety(right),
                 &l.bvsge(&bv_const(0)),
             ])
         }
@@ -796,172 +782,347 @@ fn encode_int_safety(expr: &IntExpr) -> Bool {
             let max_val = Real::from_rational(i64::MAX, 1);
             let fits = Bool::and(&[&real_result.ge(&min_val), &real_result.le(&max_val)]);
             Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
+                &encode_int_semantic_safety(left),
+                &encode_int_semantic_safety(right),
                 &exp_nonneg,
                 &fits,
             ])
         }
         IntExpr::Div(left, right) => {
-            let l = encode_int(left);
             let r = encode_int(right);
             let r_nonzero = Ast::eq(&r, &bv_const(0)).not();
+            Bool::and(&[
+                &encode_int_semantic_safety(left),
+                &encode_int_semantic_safety(right),
+                &r_nonzero,
+            ])
+        }
+        IntExpr::Mod(left, right) => Bool::and(&[
+            &encode_int_semantic_safety(left),
+            &encode_int_semantic_safety(right),
+            &Ast::eq(&encode_int(right), &bv_const(0)).not(),
+        ]),
+        IntExpr::BitNot(value) => encode_int_semantic_safety(value),
+        IntExpr::Abs(value) => encode_int_semantic_safety(value),
+        IntExpr::StrToInt(value) => encode_str_semantic_safety(value),
+        IntExpr::Ord(value) => encode_str_semantic_safety(value),
+        IntExpr::Contains(haystack, needle) => {
+            Bool::and(&[&encode_str_semantic_safety(haystack), &encode_str_semantic_safety(needle)])
+        }
+        IntExpr::StartsWith(string, prefix) => {
+            Bool::and(&[&encode_str_semantic_safety(string), &encode_str_semantic_safety(prefix)])
+        }
+        IntExpr::EndsWith(string, suffix) => {
+            Bool::and(&[&encode_str_semantic_safety(string), &encode_str_semantic_safety(suffix)])
+        }
+        IntExpr::Chomp(value) => encode_str_semantic_safety(value),
+        IntExpr::Ite(cond, then_int, else_int) => {
+            let cond_encoded = encode_bool(cond);
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_int_semantic_safety(then_int)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_int_semantic_safety(else_int)]);
+            Bool::and(&[&encode_bool_semantic_safety(cond), &then_safe, &else_safe])
+        }
+        IntExpr::Length(value) => encode_str_semantic_safety(value),
+        IntExpr::Index(haystack, needle, start) => {
+            Bool::and(&[
+                &encode_str_semantic_safety(haystack),
+                &encode_str_semantic_safety(needle),
+                &encode_int_semantic_safety(start),
+            ])
+        }
+        IntExpr::ArraySelect(array, index) => Bool::and(&[
+            &encode_array_int_semantic_safety(array),
+            &encode_int_semantic_safety(index),
+        ]),
+        IntExpr::HashSelect(hash, key) => Bool::and(&[
+            &encode_hash_int_semantic_safety(hash),
+            &encode_str_semantic_safety(key),
+        ]),
+    }
+}
+
+fn encode_int_overflow_safety(expr: &IntExpr) -> Bool {
+    match expr {
+        IntExpr::Const(_) | IntExpr::Var(_) => Bool::from_bool(true),
+        IntExpr::Add(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_overflow_safety(left),
+                &encode_int_overflow_safety(right),
+                &l.bvadd_no_overflow(&r, true),
+                &l.bvadd_no_underflow(&r),
+            ])
+        }
+        IntExpr::Sub(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_overflow_safety(left),
+                &encode_int_overflow_safety(right),
+                &l.bvsub_no_overflow(&r),
+                &l.bvsub_no_underflow(&r, true),
+            ])
+        }
+        IntExpr::Mul(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
+            Bool::and(&[
+                &encode_int_overflow_safety(left),
+                &encode_int_overflow_safety(right),
+                &l.bvmul_no_overflow(&r, true),
+                &l.bvmul_no_underflow(&r),
+            ])
+        }
+        IntExpr::Div(left, right) => {
+            let l = encode_int(left);
+            let r = encode_int(right);
             let no_overflow = l.bvsdiv_no_overflow(&r);
             Bool::and(&[
-                &encode_int_safety(left),
-                &encode_int_safety(right),
-                &r_nonzero,
+                &encode_int_overflow_safety(left),
+                &encode_int_overflow_safety(right),
                 &no_overflow,
             ])
         }
         IntExpr::Mod(left, right) => Bool::and(&[
-            &encode_int_safety(left),
-            &encode_int_safety(right),
-            &Ast::eq(&encode_int(right), &bv_const(0)).not(),
+            &encode_int_overflow_safety(left),
+            &encode_int_overflow_safety(right),
         ]),
-        IntExpr::BitNot(value) => encode_int_safety(value),
+        IntExpr::Pow(left, right) => {
+            Bool::and(&[
+                &encode_int_overflow_safety(left),
+                &encode_int_overflow_safety(right),
+            ])
+        }
+        IntExpr::BitAnd(left, right)
+        | IntExpr::BitOr(left, right)
+        | IntExpr::BitXor(left, right) => {
+            Bool::and(&[&encode_int_overflow_safety(left), &encode_int_overflow_safety(right)])
+        }
+        IntExpr::Shl(left, right) | IntExpr::Shr(left, right) => {
+            Bool::and(&[&encode_int_overflow_safety(left), &encode_int_overflow_safety(right)])
+        }
+        IntExpr::BitNot(value) => encode_int_overflow_safety(value),
         IntExpr::Abs(value) => {
             let encoded = encode_int(value);
-            Bool::and(&[&encode_int_safety(value), &encoded.bvneg_no_overflow()])
+            Bool::and(&[&encode_int_overflow_safety(value), &encoded.bvneg_no_overflow()])
         }
-        IntExpr::StrToInt(value) => encode_str_safety(value),
-        IntExpr::Ord(value) => encode_str_safety(value),
+        IntExpr::StrToInt(value) => encode_str_overflow_safety(value),
+        IntExpr::Ord(value) => encode_str_overflow_safety(value),
         IntExpr::Contains(haystack, needle) => {
-            Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle)])
+            Bool::and(&[&encode_str_overflow_safety(haystack), &encode_str_overflow_safety(needle)])
         }
         IntExpr::StartsWith(string, prefix) => {
-            Bool::and(&[&encode_str_safety(string), &encode_str_safety(prefix)])
+            Bool::and(&[&encode_str_overflow_safety(string), &encode_str_overflow_safety(prefix)])
         }
         IntExpr::EndsWith(string, suffix) => {
-            Bool::and(&[&encode_str_safety(string), &encode_str_safety(suffix)])
+            Bool::and(&[&encode_str_overflow_safety(string), &encode_str_overflow_safety(suffix)])
         }
-        IntExpr::Chomp(value) => encode_str_safety(value),
+        IntExpr::Chomp(value) => encode_str_overflow_safety(value),
         IntExpr::Ite(cond, then_int, else_int) => {
             let cond_encoded = encode_bool(cond);
-            // Safety of each branch is conditional on the condition:
-            // cond => safety(then), NOT cond => safety(else)
-            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_int_safety(then_int)]);
-            let else_safe = Bool::or(&[&cond_encoded, &encode_int_safety(else_int)]);
-            Bool::and(&[&encode_bool_safety(cond), &then_safe, &else_safe])
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_int_overflow_safety(then_int)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_int_overflow_safety(else_int)]);
+            Bool::and(&[&encode_bool_overflow_safety(cond), &then_safe, &else_safe])
         }
-        IntExpr::Length(value) => encode_str_safety(value),
+        IntExpr::Length(value) => encode_str_overflow_safety(value),
         IntExpr::Index(haystack, needle, start) => {
-            Bool::and(&[&encode_str_safety(haystack), &encode_str_safety(needle), &encode_int_safety(start)])
+            Bool::and(&[
+                &encode_str_overflow_safety(haystack),
+                &encode_str_overflow_safety(needle),
+                &encode_int_overflow_safety(start),
+            ])
         }
         IntExpr::ArraySelect(array, index) => Bool::and(&[
-            &encode_array_int_safety(array),
-            &encode_int_safety(index),
+            &encode_array_int_overflow_safety(array),
+            &encode_int_overflow_safety(index),
         ]),
         IntExpr::HashSelect(hash, key) => Bool::and(&[
-            &encode_hash_int_safety(hash),
-            &encode_str_safety(key),
+            &encode_hash_int_overflow_safety(hash),
+            &encode_str_overflow_safety(key),
         ]),
     }
 }
 
-fn encode_str_safety(expr: &StrExpr) -> Bool {
+fn encode_str_semantic_safety(expr: &StrExpr) -> Bool {
     match expr {
         StrExpr::Const(_) | StrExpr::Var(_) => Bool::from_bool(true),
         StrExpr::Concat(left, right) => {
-            Bool::and(&[&encode_str_safety(left), &encode_str_safety(right)])
+            Bool::and(&[&encode_str_semantic_safety(left), &encode_str_semantic_safety(right)])
         }
         StrExpr::Substr(value, start, len) => Bool::and(&[
-            &encode_str_safety(value),
-            &encode_int_safety(start),
-            &encode_int_safety(len),
+            &encode_str_semantic_safety(value),
+            &encode_int_semantic_safety(start),
+            &encode_int_semantic_safety(len),
         ]),
-        StrExpr::Chr(value) => encode_int_safety(value),
-        StrExpr::FromInt(value) => encode_int_safety(value),
-        StrExpr::Reverse(value) => encode_str_safety(value),
+        StrExpr::Chr(value) => encode_int_semantic_safety(value),
+        StrExpr::FromInt(value) => encode_int_semantic_safety(value),
+        StrExpr::Reverse(value) => encode_str_semantic_safety(value),
         StrExpr::Replace(string, from, to) => {
-            // Soundness: Perl's replace($s, "", $r) inserts $r between
-            // every character and at both ends (e.g., replace("abc","","x")
-            // produces "xaxbxcx"). Z3's str.replace(s, "", r) does NOT
-            // model this per-position insertion -- it replaces the empty
-            // match once or produces implementation-defined results.
-            //
-            // Our chained-replace encoding (phase 1: from->placeholder,
-            // phase 2: placeholder->to) also breaks down for empty `from`
-            // because every position matches the empty string.
-            //
-            // Conservative fix: add a safety constraint that the search
-            // pattern must have length >= 1.  If the pattern is potentially
-            // empty, the path is pruned and the checker won't make false
-            // claims about the replacement result.
             let from_encoded = encode_str(from);
             let from_nonempty = from_encoded.length().ge(Int::from_i64(1));
             Bool::and(&[
-                &encode_str_safety(string),
-                &encode_str_safety(from),
-                &encode_str_safety(to),
+                &encode_str_semantic_safety(string),
+                &encode_str_semantic_safety(from),
+                &encode_str_semantic_safety(to),
                 &from_nonempty,
             ])
         }
         StrExpr::CharAt(string, index) => Bool::and(&[
-            &encode_str_safety(string),
-            &encode_int_safety(index),
+            &encode_str_semantic_safety(string),
+            &encode_int_semantic_safety(index),
         ]),
         StrExpr::Ite(cond, then_str, else_str) => {
             let cond_encoded = encode_bool(cond);
-            // Safety of each branch is conditional on the condition:
-            // cond => safety(then), NOT cond => safety(else)
-            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_str_safety(then_str)]);
-            let else_safe = Bool::or(&[&cond_encoded, &encode_str_safety(else_str)]);
-            Bool::and(&[&encode_bool_safety(cond), &then_safe, &else_safe])
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_str_semantic_safety(then_str)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_str_semantic_safety(else_str)]);
+            Bool::and(&[&encode_bool_semantic_safety(cond), &then_safe, &else_safe])
         }
         StrExpr::ArraySelect(array, index) => Bool::and(&[
-            &encode_array_str_safety(array),
-            &encode_int_safety(index),
+            &encode_array_str_semantic_safety(array),
+            &encode_int_semantic_safety(index),
         ]),
         StrExpr::HashSelect(hash, key) => Bool::and(&[
-            &encode_hash_str_safety(hash),
-            &encode_str_safety(key),
+            &encode_hash_str_semantic_safety(hash),
+            &encode_str_semantic_safety(key),
         ]),
     }
 }
 
-fn encode_array_int_safety(expr: &ArrayIntExpr) -> Bool {
+fn encode_str_overflow_safety(expr: &StrExpr) -> Bool {
+    match expr {
+        StrExpr::Const(_) | StrExpr::Var(_) => Bool::from_bool(true),
+        StrExpr::Concat(left, right) => {
+            Bool::and(&[&encode_str_overflow_safety(left), &encode_str_overflow_safety(right)])
+        }
+        StrExpr::Substr(value, start, len) => Bool::and(&[
+            &encode_str_overflow_safety(value),
+            &encode_int_overflow_safety(start),
+            &encode_int_overflow_safety(len),
+        ]),
+        StrExpr::Chr(value) => encode_int_overflow_safety(value),
+        StrExpr::FromInt(value) => encode_int_overflow_safety(value),
+        StrExpr::Reverse(value) => encode_str_overflow_safety(value),
+        StrExpr::Replace(string, from, to) => Bool::and(&[
+            &encode_str_overflow_safety(string),
+            &encode_str_overflow_safety(from),
+            &encode_str_overflow_safety(to),
+        ]),
+        StrExpr::CharAt(string, index) => Bool::and(&[
+            &encode_str_overflow_safety(string),
+            &encode_int_overflow_safety(index),
+        ]),
+        StrExpr::Ite(cond, then_str, else_str) => {
+            let cond_encoded = encode_bool(cond);
+            let then_safe = Bool::or(&[&cond_encoded.not(), &encode_str_overflow_safety(then_str)]);
+            let else_safe = Bool::or(&[&cond_encoded, &encode_str_overflow_safety(else_str)]);
+            Bool::and(&[&encode_bool_overflow_safety(cond), &then_safe, &else_safe])
+        }
+        StrExpr::ArraySelect(array, index) => Bool::and(&[
+            &encode_array_str_overflow_safety(array),
+            &encode_int_overflow_safety(index),
+        ]),
+        StrExpr::HashSelect(hash, key) => Bool::and(&[
+            &encode_hash_str_overflow_safety(hash),
+            &encode_str_overflow_safety(key),
+        ]),
+    }
+}
+
+fn encode_array_int_semantic_safety(expr: &ArrayIntExpr) -> Bool {
     match expr {
         ArrayIntExpr::Var(_) => Bool::from_bool(true),
         ArrayIntExpr::Store(base, index, value) => Bool::and(&[
-            &encode_array_int_safety(base),
-            &encode_int_safety(index),
-            &encode_int_safety(value),
+            &encode_array_int_semantic_safety(base),
+            &encode_int_semantic_safety(index),
+            &encode_int_semantic_safety(value),
         ]),
     }
 }
 
-fn encode_array_str_safety(expr: &ArrayStrExpr) -> Bool {
+fn encode_array_int_overflow_safety(expr: &ArrayIntExpr) -> Bool {
+    match expr {
+        ArrayIntExpr::Var(_) => Bool::from_bool(true),
+        ArrayIntExpr::Store(base, index, value) => Bool::and(&[
+            &encode_array_int_overflow_safety(base),
+            &encode_int_overflow_safety(index),
+            &encode_int_overflow_safety(value),
+        ]),
+    }
+}
+
+fn encode_array_str_semantic_safety(expr: &ArrayStrExpr) -> Bool {
     match expr {
         ArrayStrExpr::Var(_) => Bool::from_bool(true),
         ArrayStrExpr::Store(base, index, value) => Bool::and(&[
-            &encode_array_str_safety(base),
-            &encode_int_safety(index),
-            &encode_str_safety(value),
+            &encode_array_str_semantic_safety(base),
+            &encode_int_semantic_safety(index),
+            &encode_str_semantic_safety(value),
         ]),
     }
 }
 
-fn encode_hash_int_safety(expr: &HashIntExpr) -> Bool {
+fn encode_array_str_overflow_safety(expr: &ArrayStrExpr) -> Bool {
+    match expr {
+        ArrayStrExpr::Var(_) => Bool::from_bool(true),
+        ArrayStrExpr::Store(base, index, value) => Bool::and(&[
+            &encode_array_str_overflow_safety(base),
+            &encode_int_overflow_safety(index),
+            &encode_str_overflow_safety(value),
+        ]),
+    }
+}
+
+fn encode_hash_int_semantic_safety(expr: &HashIntExpr) -> Bool {
     match expr {
         HashIntExpr::Var(_) => Bool::from_bool(true),
         HashIntExpr::Store(base, key, value) => Bool::and(&[
-            &encode_hash_int_safety(base),
-            &encode_str_safety(key),
-            &encode_int_safety(value),
+            &encode_hash_int_semantic_safety(base),
+            &encode_str_semantic_safety(key),
+            &encode_int_semantic_safety(value),
         ]),
     }
 }
 
-fn encode_hash_str_safety(expr: &HashStrExpr) -> Bool {
+fn encode_hash_int_overflow_safety(expr: &HashIntExpr) -> Bool {
+    match expr {
+        HashIntExpr::Var(_) => Bool::from_bool(true),
+        HashIntExpr::Store(base, key, value) => Bool::and(&[
+            &encode_hash_int_overflow_safety(base),
+            &encode_str_overflow_safety(key),
+            &encode_int_overflow_safety(value),
+        ]),
+    }
+}
+
+fn encode_hash_str_semantic_safety(expr: &HashStrExpr) -> Bool {
     match expr {
         HashStrExpr::Var(_) => Bool::from_bool(true),
         HashStrExpr::Store(base, key, value) => Bool::and(&[
-            &encode_hash_str_safety(base),
-            &encode_str_safety(key),
-            &encode_str_safety(value),
+            &encode_hash_str_semantic_safety(base),
+            &encode_str_semantic_safety(key),
+            &encode_str_semantic_safety(value),
         ]),
     }
+}
+
+fn encode_hash_str_overflow_safety(expr: &HashStrExpr) -> Bool {
+    match expr {
+        HashStrExpr::Var(_) => Bool::from_bool(true),
+        HashStrExpr::Store(base, key, value) => Bool::and(&[
+            &encode_hash_str_overflow_safety(base),
+            &encode_str_overflow_safety(key),
+            &encode_str_overflow_safety(value),
+        ]),
+    }
+}
+
+fn encode_semantic_safety(expr: &BoolExpr) -> Bool {
+    encode_bool_semantic_safety(expr)
+}
+
+pub fn encode_overflow_safety(expr: &BoolExpr) -> Bool {
+    encode_bool_overflow_safety(expr)
 }
 
 fn collect_string_vars_from_bool(expr: &BoolExpr) -> Vec<String> {
@@ -975,6 +1136,11 @@ fn collect_string_vars_from_bool(expr: &BoolExpr) -> Vec<String> {
 fn collect_string_vars_from_bool_inner(expr: &BoolExpr, vars: &mut Vec<String>) {
     match expr {
         BoolExpr::Const(_) => {}
+        BoolExpr::Overflow(exprs) => {
+            for e in exprs {
+                collect_string_vars_from_int(e, vars);
+            }
+        }
         BoolExpr::Not(expr) => collect_string_vars_from_bool_inner(expr, vars),
         BoolExpr::And(left, right) | BoolExpr::Or(left, right) => {
             collect_string_vars_from_bool_inner(left, vars);
@@ -1085,7 +1251,7 @@ fn collect_string_vars_from_str(expr: &StrExpr, vars: &mut Vec<String>) {
 /// might need to equal, preventing false "verified" results.
 fn max_string_const_len_bool(expr: &BoolExpr) -> i64 {
     match expr {
-        BoolExpr::Const(_) => 0,
+        BoolExpr::Const(_) | BoolExpr::Overflow(_) => 0,
         BoolExpr::Not(inner) => max_string_const_len_bool(inner),
         BoolExpr::And(left, right) | BoolExpr::Or(left, right) => {
             max_string_const_len_bool(left).max(max_string_const_len_bool(right))

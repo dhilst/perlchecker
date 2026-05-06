@@ -1807,3 +1807,94 @@ sub array_ref_lookup {
     assert!(stdout.contains("✔ ref_defined_assert: verified"));
     assert!(stdout.contains("✔ array_ref_lookup: verified"));
 }
+
+#[test]
+fn check_overflow_keyword_verified_when_no_overflow() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("overflow_safe.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (I64, I64) -> I64
+# pre: $x >= 0 && $x <= 100 && $y >= 0 && $y <= 100
+# post: $result >= 0
+sub safe_add {
+    my ($x, $y) = @_;
+    my $sum = $x + $y;
+    # assert: !$overflow
+    return $sum;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ safe_add: verified"));
+}
+
+#[test]
+fn check_overflow_keyword_rejects_when_overflow_possible() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("overflow_fail.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (I64, I64) -> I64
+# pre: $x >= 0 && $y >= 0
+# post: $result >= 0
+sub unbounded_add {
+    my ($x, $y) = @_;
+    my $sum = $x + $y;
+    # assert: !$overflow
+    return $sum;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("assertion failed"));
+}
+
+#[test]
+fn check_overflow_wraps_without_assertion() {
+    let tempdir = tempdir().unwrap();
+    let file = tempdir.path().join("overflow_wrap.pl");
+    fs::write(
+        &file,
+        r#"
+# sig: (I64) -> I64
+# pre: $x == 9223372036854775807
+# post: $result < 0
+sub wrapping_add {
+    my ($x) = @_;
+    return $x + 1;
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(cargo_bin("perlchecker"))
+        .arg("check")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✔ wrapping_add: verified"));
+}

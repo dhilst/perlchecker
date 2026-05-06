@@ -277,7 +277,7 @@ fn validate_variables(
     let allowed = params
         .iter()
         .map(String::as_str)
-        .chain(std::iter::once("result"))
+        .chain(["result", "overflow"])
         .collect::<BTreeSet<_>>();
 
     for variable in collect_variables(expr) {

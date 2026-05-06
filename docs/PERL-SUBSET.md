@@ -656,6 +656,26 @@ Specification-only variables for capturing intermediate state.
 # inv: condition
 ```
 
+## Special Variables
+
+### `$overflow`
+
+A boolean that evaluates to `true` if any arithmetic operation on the
+current execution path has overflowed the signed 64-bit integer range.
+
+```perl
+# assert: !$overflow
+```
+
+Without this assertion, arithmetic operations wrap as two's complement
+(BV64 semantics). With this assertion, the checker proves no overflow
+occurs or produces a counterexample showing inputs that cause overflow.
+
+Overflow is tracked for: `+`, `-`, `*`, `/`, `abs()`, unary negation.
+Bitwise operations and comparisons do not generate overflow.
+
+`$overflow` may be used in `# assert:`, `# pre:`, and `# post:` annotations.
+
 ---
 
 # 8. Regex (Limited)

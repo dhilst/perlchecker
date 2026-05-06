@@ -320,6 +320,9 @@ impl<'a> SsaBuilder<'a> {
             Expr::Int(value) => SsaExpr::Int(*value),
             Expr::Bool(value) => SsaExpr::Bool(*value),
             Expr::String(value) => SsaExpr::String(value.clone()),
+            Expr::Variable(name) if name == "overflow" => {
+                SsaExpr::Var("overflow".to_string())
+            }
             Expr::Variable(name) => {
                 SsaExpr::Var(env.get(name).cloned().ok_or_else(|| IrError::UnknownVariable {
                     function: self.function.to_string(),

@@ -102,6 +102,7 @@ pub enum BoolExpr {
     IntCmp(CmpOp, Box<IntExpr>, Box<IntExpr>),
     StrEq(Box<StrExpr>, Box<StrExpr>),
     StrCmp(CmpOp, Box<StrExpr>, Box<StrExpr>),
+    Overflow(Vec<IntExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,6 +194,16 @@ pub enum SymExecError {
     Ir(#[from] ir::IrError),
     #[error(transparent)]
     Smt(#[from] smt::SmtError),
+}
+
+pub fn contains_overflow(expr: &BoolExpr) -> bool {
+    match expr {
+        BoolExpr::Overflow(_) => true,
+        BoolExpr::Const(_) => false,
+        BoolExpr::Not(inner) => contains_overflow(inner),
+        BoolExpr::And(l, r) | BoolExpr::Or(l, r) => contains_overflow(l) || contains_overflow(r),
+        BoolExpr::IntCmp(_, _, _) | BoolExpr::StrEq(_, _) | BoolExpr::StrCmp(_, _, _) => false,
+    }
 }
 
 pub fn verify_extracted_function(
@@ -909,6 +920,13 @@ fn eval_ssa_expr(
         SsaExpr::Int(value) => SymValue::Int(IntExpr::Const(*value)),
         SsaExpr::Bool(value) => SymValue::Bool(BoolExpr::Const(*value)),
         SsaExpr::String(value) => SymValue::Str(StrExpr::Const(value.clone())),
+        SsaExpr::Var(name) if name == "overflow" => {
+            let int_exprs: Vec<IntExpr> = env.values().filter_map(|v| match v {
+                SymValue::Int(e) => Some(e.clone()),
+                _ => None,
+            }).collect();
+            SymValue::Bool(BoolExpr::Overflow(int_exprs))
+        }
         SsaExpr::Var(name) => {
             env.get(name)
                 .cloned()
@@ -1077,6 +1095,13 @@ fn eval_expr(
         Expr::Int(value) => SymValue::Int(IntExpr::Const(*value)),
         Expr::Bool(value) => SymValue::Bool(BoolExpr::Const(*value)),
         Expr::String(value) => SymValue::Str(StrExpr::Const(value.clone())),
+        Expr::Variable(name) if name == "overflow" => {
+            let int_exprs: Vec<IntExpr> = env.values().filter_map(|v| match v {
+                SymValue::Int(e) => Some(e.clone()),
+                _ => None,
+            }).collect();
+            return Ok(SymValue::Bool(BoolExpr::Overflow(int_exprs)));
+        }
         Expr::Variable(name) => {
             env.get(name)
                 .cloned()

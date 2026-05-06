@@ -1218,10 +1218,11 @@ fn cegis_layer4_references() {
 fn layer5_overflow_soundness() -> Vec<TestCase> {
     let mut t = Vec::new();
 
-    // Category A: Integer Overflow — BV wraps, Perl promotes to UV/NV
+    // Category A: Integer Overflow — uses # assert: !$overflow to detect
     t.push(tc("ov_mul", "(I64) -> I64",
         Some("$x == 4611686018427387904"), "$result < 0",
-        "test_ov_mul", &["x"], &ret("$x * 2"),
+        "test_ov_mul", &["x"],
+        "    my $r = $x * 2;\n    # assert: !$overflow\n    return $r;\n",
         vec![vec![Val::Int(4611686018427387904)]]));
 
     t.push(tc("ov_pow_2_63", "(I64) -> I64",
@@ -1236,17 +1237,20 @@ fn layer5_overflow_soundness() -> Vec<TestCase> {
 
     t.push(tc("ov_sub_min", "(I64) -> I64",
         Some(&format!("$x == {}", i64::MIN)), "$result > 0",
-        "test_ov_sub_min", &["x"], &ret("$x - 1"),
+        "test_ov_sub_min", &["x"],
+        "    my $r = $x - 1;\n    # assert: !$overflow\n    return $r;\n",
         vec![vec![Val::Int(i64::MIN)]]));
 
     t.push(tc("ov_neg_min", "(I64) -> I64",
         Some(&format!("$x == {}", i64::MIN)), "$result < 0",
-        "test_ov_neg_min", &["x"], &ret("-$x"),
+        "test_ov_neg_min", &["x"],
+        "    my $r = -$x;\n    # assert: !$overflow\n    return $r;\n",
         vec![vec![Val::Int(i64::MIN)]]));
 
     t.push(tc("ov_abs_min", "(I64) -> I64",
         Some(&format!("$x == {}", i64::MIN)), "$result < 0",
-        "test_ov_abs_min", &["x"], &ret("abs($x)"),
+        "test_ov_abs_min", &["x"],
+        "    my $r = abs($x);\n    # assert: !$overflow\n    return $r;\n",
         vec![vec![Val::Int(i64::MIN)]]));
 
     t.push(tc("ov_pow_large", "(I64) -> I64",
@@ -1256,7 +1260,8 @@ fn layer5_overflow_soundness() -> Vec<TestCase> {
 
     t.push(tc("ov_max_squared", "(I64) -> I64",
         Some(&format!("$x == {}", i64::MAX)), "$result == 1",
-        "test_ov_max_sq", &["x"], &ret("$x * $x"),
+        "test_ov_max_sq", &["x"],
+        "    my $r = $x * $x;\n    # assert: !$overflow\n    return $r;\n",
         vec![vec![Val::Int(i64::MAX)]]));
 
     // Category B: Shl UV promotion — Perl shifts convert negative to UV

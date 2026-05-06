@@ -183,6 +183,41 @@ participate in symbolic execution like any other variable, but they have no
 effect on the program's runtime behavior.
 
 
+``$overflow`` — Overflow Detection
+-----------------------------------
+
+The special variable ``$overflow`` is a boolean that evaluates to ``true`` if
+any arithmetic operation on the current execution path has overflowed the
+signed 64-bit integer range.
+
+.. code-block:: perl
+
+   # assert: !$overflow
+
+Without this assertion, arithmetic wraps silently as two's complement (BV64).
+With it, the checker proves no overflow occurs or provides a counterexample.
+
+Overflow is tracked for: ``+``, ``-``, ``*``, ``/``, ``abs()``, unary
+negation. Bitwise operations and comparisons do not generate overflow.
+
+``$overflow`` may be used in ``# assert:``, ``# pre:``, and ``# post:``
+annotations.
+
+Example:
+
+.. code-block:: perl
+
+   # sig: (I64, I64) -> I64
+   # pre: $x >= 0 && $x <= 100 && $y >= 0 && $y <= 100
+   # post: $result >= 0 && $result <= 200
+   sub safe_add {
+       my ($x, $y) = @_;
+       my $sum = $x + $y;
+       # assert: !$overflow
+       return $sum;
+   }
+
+
 Common Patterns
 ---------------
 
