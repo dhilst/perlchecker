@@ -469,3 +469,31 @@ String Literals
 .. code-block:: perl
 
    'hello'           # only \\ and \' are escape sequences
+
+
+Special Variables
+-----------------
+
+These variables have special meaning in annotation expressions and are not
+user-declarable.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Variable
+     - Description
+   * - ``$result``
+     - The function's return value (available in ``# post:`` annotations)
+   * - ``$overflow``
+     - Boolean: true if any arithmetic on the current path overflowed I64 range
+
+``$overflow`` is typically used in assertions to prove arithmetic safety:
+
+.. code-block:: perl
+
+   my $sum = $x + $y;
+   # assert: !$overflow
+
+Without the assertion, arithmetic wraps silently (two's complement BV64).
+This section may be extended with additional special variables in the future.

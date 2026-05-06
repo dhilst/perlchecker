@@ -839,6 +839,39 @@ a hash key that was never written returns an unconstrained symbolic value.</p>
 </pre></div>
 </div>
 </section>
+<section id="special-variables">
+<h2>Special Variables<a class="headerlink" href="#special-variables" title="Link to this heading">¶</a></h2>
+<p>These variables have special meaning in annotation expressions and are not
+user-declarable.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">$result</span></code></p></td>
+<td><p>The function’s return value (available in <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">post:</span></code> annotations)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">$overflow</span></code></p></td>
+<td><p>Boolean: true if any arithmetic on the current path overflowed I64 range</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">$overflow</span></code> is typically used in assertions to prove arithmetic safety:</p>
+<div class="highlight-perl notranslate"><div class="highlight"><pre><span></span><span class="k">my</span><span class="w"> </span><span class="nv">$sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">$y</span><span class="p">;</span>
+<span class="c1"># assert: !$overflow</span>
+</pre></div>
+</div>
+<p>Without the assertion, arithmetic wraps silently (two’s complement BV64).
+This section may be extended with additional special variables in the future.</p>
+</section>
 </section>
 
         </article>
@@ -931,6 +964,7 @@ a hash key that was never written returns an unconstrained symbolic value.</p>
 <li><a class="reference internal" href="#error-and-output-statements">Error and Output Statements</a></li>
 <li><a class="reference internal" href="#integer-literals">Integer Literals</a></li>
 <li><a class="reference internal" href="#string-literals">String Literals</a></li>
+<li><a class="reference internal" href="#special-variables">Special Variables</a></li>
 </ul>
 </li>
 </ul>
