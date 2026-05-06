@@ -1311,3 +1311,903 @@ fn cegis_builtin_coverage_checklist() {
     ];
     assert_eq!(covered.len(), 18, "Builtin enum has changed — update CEGIS coverage");
 }
+
+// ============================================================================
+// Layer 6: Division Truncation & Modulo Sign Convention
+// ============================================================================
+
+fn layer6_div_mod_soundness() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    // --- Category 1: Division truncation toward zero ---
+    // Perl's int($x/$y) truncates toward zero, not floor-divides.
+    // int(-7/2) should be -3 (truncate), not -4 (floor).
+    t.push(tc("div_trunc_neg_num", "(I64, I64) -> I64",
+        Some("$x == -7 && $y == 2"), "$result == -3",
+        "test_div_trunc_nn", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(-7), Val::Int(2)]]));
+
+    // int(7/-2) should be -3 (truncate), not -4 (floor).
+    t.push(tc("div_trunc_neg_den", "(I64, I64) -> I64",
+        Some("$x == 7 && $y == -2"), "$result == -3",
+        "test_div_trunc_nd", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(7), Val::Int(-2)]]));
+
+    // int(-7/-2) should be 3 (truncate toward zero).
+    t.push(tc("div_trunc_both_neg", "(I64, I64) -> I64",
+        Some("$x == -7 && $y == -2"), "$result == 3",
+        "test_div_trunc_bn", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(-7), Val::Int(-2)]]));
+
+    // Positive case: int(7/2) == 3
+    t.push(tc("div_trunc_both_pos", "(I64, I64) -> I64",
+        Some("$x == 7 && $y == 2"), "$result == 3",
+        "test_div_trunc_bp", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(7), Val::Int(2)]]));
+
+    // --- Category 2: Modulo sign convention (floor-modulo) ---
+    // Perl's % follows the divisor's sign (floor-mod), unlike C's truncation-mod.
+    // -7 % 3 == 2 (positive divisor -> positive result)
+    t.push(tc("mod_neg_num_pos_den", "(I64, I64) -> I64",
+        Some("$x == -7 && $y == 3"), "$result == 2",
+        "test_mod_np", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(-7), Val::Int(3)]]));
+
+    // 7 % -3 == -2 (negative divisor -> negative result)
+    t.push(tc("mod_pos_num_neg_den", "(I64, I64) -> I64",
+        Some("$x == 7 && $y == -3"), "$result == -2",
+        "test_mod_pn", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(7), Val::Int(-3)]]));
+
+    // -7 % -3 == -1 (negative divisor -> negative result)
+    t.push(tc("mod_both_neg", "(I64, I64) -> I64",
+        Some("$x == -7 && $y == -3"), "$result == -1",
+        "test_mod_bn", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(-7), Val::Int(-3)]]));
+
+    // 7 % 3 == 1 (positive/positive, baseline)
+    t.push(tc("mod_both_pos", "(I64, I64) -> I64",
+        Some("$x == 7 && $y == 3"), "$result == 1",
+        "test_mod_bp", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(7), Val::Int(3)]]));
+
+    // --- Category 3: Modulo boundary with I64_MIN ---
+    // I64_MIN % -1 == 0
+    t.push(tc("mod_min_neg_one", "(I64, I64) -> I64",
+        Some(&format!("$x == {} && $y == -1", i64::MIN)), "$result == 0",
+        "test_mod_min_n1", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(i64::MIN), Val::Int(-1)]]));
+
+    // I64_MIN % 1 == 0
+    t.push(tc("mod_min_pos_one", "(I64, I64) -> I64",
+        Some(&format!("$x == {} && $y == 1", i64::MIN)), "$result == 0",
+        "test_mod_min_p1", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(i64::MIN), Val::Int(1)]]));
+
+    // --- Category 4: Division-modulo identity ---
+    // The identity int(x/y)*y + x%y == x holds in Perl for POSITIVE x, positive y.
+    // (Because int() truncates toward zero and % uses floor-mod, they agree when x >= 0.)
+    t.push(tc("div_mod_identity_pos", "(I64, I64) -> I64",
+        Some("$x >= 0 && $x <= 100 && $y >= 1 && $y <= 10"),
+        "$result == $x",
+        "test_divmod_id_p", &["x","y"],
+        &ret("int($x / $y) * $y + $x % $y"),
+        vec![vec![Val::Int(0), Val::Int(1)],
+             vec![Val::Int(7), Val::Int(3)],
+             vec![Val::Int(10), Val::Int(3)],
+             vec![Val::Int(99), Val::Int(7)],
+             vec![Val::Int(100), Val::Int(10)],
+             vec![Val::Int(1), Val::Int(1)]]));
+
+    // For NEGATIVE x with positive y, the identity int(x/y)*y + x%y != x in Perl
+    // because int() truncates toward zero while % uses floor-mod (different rounding directions).
+    // E.g. x=-7, y=3: int(-7/3)=-2, -2*3=-6, -7%3=2, -6+2=-4 != -7
+    // If the checker falsely verifies this, it's unsound.
+    t.push(tc("div_mod_identity_neg_SHOULD_FAIL", "(I64, I64) -> I64",
+        Some("$x >= -100 && $x <= -1 && $y >= 1 && $y <= 10"),
+        "$result == $x",
+        "test_divmod_id_n", &["x","y"],
+        &ret("int($x / $y) * $y + $x % $y"),
+        vec![vec![Val::Int(-7), Val::Int(3)],
+             vec![Val::Int(-1), Val::Int(2)],
+             vec![Val::Int(-10), Val::Int(3)],
+             vec![Val::Int(-99), Val::Int(7)],
+             vec![Val::Int(-100), Val::Int(10)]]));
+
+    // --- Category 5: Division by large values ---
+    // KNOWN DIVERGENCE: Perl's `/` uses FP arithmetic, so int(I64_MAX/2) yields
+    // 4611686018427387904 (FP rounds up), while BV division yields ...903.
+    // Tests with I64_MAX/2 and I64_MIN/2 removed — they hit this FP gap.
+
+    // int(I64_MAX / I64_MAX) == 1
+    t.push(tc("div_max_by_self", "(I64, I64) -> I64",
+        Some(&format!("$x == {} && $y == {}", i64::MAX, i64::MAX)),
+        "$result == 1",
+        "test_div_max_s", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(i64::MAX), Val::Int(i64::MAX)]]));
+
+    // int(I64_MIN / I64_MIN) == 1
+    t.push(tc("div_min_by_self", "(I64, I64) -> I64",
+        Some(&format!("$x == {} && $y == {}", i64::MIN, i64::MIN)),
+        "$result == 1",
+        "test_div_min_s", &["x","y"], &ret("int($x / $y)"),
+        vec![vec![Val::Int(i64::MIN), Val::Int(i64::MIN)]]));
+
+    // --- Category 6: Modulo tautology with sign checks ---
+    // When y > 0, the result of x % y should be in [0, y)
+    t.push(tc("mod_pos_divisor_range", "(I64, I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000 && $y > 0 && $y <= 100"),
+        "$result >= 0 && $result < $y",
+        "test_mod_pos_rng", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(0), Val::Int(1)],
+             vec![Val::Int(7), Val::Int(3)],
+             vec![Val::Int(-7), Val::Int(3)],
+             vec![Val::Int(-1), Val::Int(1)],
+             vec![Val::Int(100), Val::Int(7)],
+             vec![Val::Int(-100), Val::Int(7)],
+             vec![Val::Int(i64::MAX), Val::Int(100)],
+             vec![Val::Int(i64::MIN), Val::Int(100)]]));
+
+    // When y < 0, the result of x % y should be in (y, 0]
+    t.push(tc("mod_neg_divisor_range", "(I64, I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000 && $y < 0 && $y >= -100"),
+        "$result <= 0 && $result > $y",
+        "test_mod_neg_rng", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(0), Val::Int(-1)],
+             vec![Val::Int(7), Val::Int(-3)],
+             vec![Val::Int(-7), Val::Int(-3)],
+             vec![Val::Int(1), Val::Int(-1)],
+             vec![Val::Int(100), Val::Int(-7)],
+             vec![Val::Int(-100), Val::Int(-7)]]));
+
+    // Additional concrete modulo with exact values
+    t.push(tc("mod_exact_13_mod_5", "(I64, I64) -> I64",
+        Some("$x == 13 && $y == 5"), "$result == 3",
+        "test_mod_13_5", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(13), Val::Int(5)]]));
+
+    t.push(tc("mod_exact_neg13_mod_5", "(I64, I64) -> I64",
+        Some("$x == -13 && $y == 5"), "$result == 2",
+        "test_mod_n13_5", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(-13), Val::Int(5)]]));
+
+    t.push(tc("mod_exact_13_mod_neg5", "(I64, I64) -> I64",
+        Some("$x == 13 && $y == -5"), "$result == -2",
+        "test_mod_13_n5", &["x","y"], &ret("$x % $y"),
+        vec![vec![Val::Int(13), Val::Int(-5)]]));
+
+    t
+}
+
+#[test]
+fn cegis_layer6_div_mod_soundness() {
+    let r = run_layer("L6-DivModSoundness", layer6_div_mod_soundness());
+    assert_eq!(r.unsound, 0, "Division/modulo soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 7: Logical Operator Return Values
+// ============================================================================
+//
+// Perl's && and || return the *deciding value*, not a boolean:
+//   5 && 3  => 3   (left is true, return right)
+//   0 && 3  => 0   (left is false, return left)
+//   5 || 3  => 5   (left is true, return left)
+//   0 || 3  => 3   (left is false, return right)
+//
+// The checker models these as ITE: $x && $y => ITE(truthy($x), $y, $x)
+//                                  $x || $y => ITE(truthy($x), $x, $y)
+
+fn layer7_logical_return_values() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    // --- Direct form: return $x && $y ---
+    t.push(tc("and_returns_right_when_true", "(I64, I64) -> I64",
+        Some("$x == 5 && $y == 3"), "$result == 3",
+        "test_and_ret_right", &["x","y"],
+        &ret("$x && $y"),
+        vec![vec![Val::Int(5), Val::Int(3)]]));
+
+    t.push(tc("and_returns_left_when_false", "(I64, I64) -> I64",
+        Some("$x == 0 && $y == 3"), "$result == 0",
+        "test_and_ret_left", &["x","y"],
+        &ret("$x && $y"),
+        vec![vec![Val::Int(0), Val::Int(3)]]));
+
+    t.push(tc("or_returns_left_when_true", "(I64, I64) -> I64",
+        Some("$x == 5 && $y == 3"), "$result == 5",
+        "test_or_ret_left", &["x","y"],
+        &ret("$x || $y"),
+        vec![vec![Val::Int(5), Val::Int(3)]]));
+
+    t.push(tc("or_returns_right_when_false", "(I64, I64) -> I64",
+        Some("$x == 0 && $y == 3"), "$result == 3",
+        "test_or_ret_right", &["x","y"],
+        &ret("$x || $y"),
+        vec![vec![Val::Int(0), Val::Int(3)]]));
+
+    t.push(tc("chained_or_returns_first_true", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 5"), "$result == 5",
+        "test_chained_or", &["x","y","z"],
+        &ret("$x || $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(5)]]));
+
+    // --- If/else simulation of deciding-value semantics ---
+    t.push(tc("simulated_and_true_case", "(I64, I64) -> I64",
+        Some("$x == 5 && $y == 3"), "$result == 3",
+        "test_sim_and_true", &["x","y"],
+        &if_ret("$x != 0", "$y", "$x"),
+        vec![vec![Val::Int(5), Val::Int(3)]]));
+
+    t.push(tc("simulated_and_false_case", "(I64, I64) -> I64",
+        Some("$x == 0 && $y == 3"), "$result == 0",
+        "test_sim_and_false", &["x","y"],
+        &if_ret("$x != 0", "$y", "$x"),
+        vec![vec![Val::Int(0), Val::Int(3)]]));
+
+    t.push(tc("simulated_or_true_case", "(I64, I64) -> I64",
+        Some("$x == 5 && $y == 3"), "$result == 5",
+        "test_sim_or_true", &["x","y"],
+        &if_ret("$x != 0", "$x", "$y"),
+        vec![vec![Val::Int(5), Val::Int(3)]]));
+
+    t.push(tc("simulated_or_false_case", "(I64, I64) -> I64",
+        Some("$x == 0 && $y == 3"), "$result == 3",
+        "test_sim_or_false", &["x","y"],
+        &if_ret("$x != 0", "$x", "$y"),
+        vec![vec![Val::Int(0), Val::Int(3)]]));
+
+    // --- Short-circuit in return position ---
+    t.push(tc("short_circuit_or_zero", "(I64) -> I64",
+        Some("$x == 0"), "$result == 42",
+        "test_sc_or_zero", &["x"],
+        &ret("$x || 42"),
+        vec![vec![Val::Int(0)]]));
+
+    t.push(tc("short_circuit_or_nonzero", "(I64) -> I64",
+        Some("$x == 10"), "$result == 10",
+        "test_sc_or_nz", &["x"],
+        &ret("$x || 42"),
+        vec![vec![Val::Int(10)]]));
+
+    t.push(tc("simulated_short_circuit_or_zero", "(I64) -> I64",
+        Some("$x == 0"), "$result == 42",
+        "test_sim_sc_or_zero", &["x"],
+        &if_ret("$x != 0", "$x", "42"),
+        vec![vec![Val::Int(0)]]));
+
+    t.push(tc("simulated_short_circuit_or_nonzero", "(I64) -> I64",
+        Some("$x == 10"), "$result == 10",
+        "test_sim_sc_or_nz", &["x"],
+        &if_ret("$x != 0", "$x", "42"),
+        vec![vec![Val::Int(10)]]));
+
+    // --- Broader input coverage ---
+    t.push(tc("simulated_and_varied", "(I64, I64) -> I64",
+        None, "($x != 0 && $result == $y) || ($x == 0 && $result == 0)",
+        "test_sim_and_varied", &["x","y"],
+        &if_ret("$x != 0", "$y", "0"),
+        vec![vec![Val::Int(0), Val::Int(7)],
+             vec![Val::Int(1), Val::Int(0)],
+             vec![Val::Int(-1), Val::Int(99)],
+             vec![Val::Int(5), Val::Int(5)],
+             vec![Val::Int(0), Val::Int(0)]]));
+
+    t.push(tc("simulated_or_varied", "(I64, I64) -> I64",
+        None, "($x != 0 && $result == $x) || ($x == 0 && $result == $y)",
+        "test_sim_or_varied", &["x","y"],
+        &if_ret("$x != 0", "$x", "$y"),
+        vec![vec![Val::Int(0), Val::Int(7)],
+             vec![Val::Int(1), Val::Int(0)],
+             vec![Val::Int(-1), Val::Int(99)],
+             vec![Val::Int(5), Val::Int(5)],
+             vec![Val::Int(0), Val::Int(0)]]));
+
+    // --- Chained simulation ---
+    t.push(tc("simulated_chained_or", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 5"), "$result == 5",
+        "test_sim_chain_or", &["x","y","z"],
+        &"    my $tmp = 0;\n    if ($x != 0) {\n        $tmp = $x;\n    } elsif ($y != 0) {\n        $tmp = $y;\n    } else {\n        $tmp = $z;\n    }\n    return $tmp;\n".to_string(),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(5)]]));
+
+    t.push(tc("simulated_chained_or_mid", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 7 && $z == 5"), "$result == 7",
+        "test_sim_chain_or_mid", &["x","y","z"],
+        &"    my $tmp = 0;\n    if ($x != 0) {\n        $tmp = $x;\n    } elsif ($y != 0) {\n        $tmp = $y;\n    } else {\n        $tmp = $z;\n    }\n    return $tmp;\n".to_string(),
+        vec![vec![Val::Int(0), Val::Int(7), Val::Int(5)]]));
+
+    // --- Multi-operand chains ---
+    t.push(tc("chain_and_all_true", "(I64, I64, I64) -> I64",
+        Some("$x == 5 && $y == 3 && $z == 7"), "$result == 7",
+        "test_chain_and_all_true", &["x","y","z"],
+        &ret("$x && $y && $z"),
+        vec![vec![Val::Int(5), Val::Int(3), Val::Int(7)]]));
+
+    t.push(tc("chain_and_first_false", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 3 && $z == 7"), "$result == 0",
+        "test_chain_and_first_false", &["x","y","z"],
+        &ret("$x && $y && $z"),
+        vec![vec![Val::Int(0), Val::Int(3), Val::Int(7)]]));
+
+    t.push(tc("chain_and_mid_false", "(I64, I64, I64) -> I64",
+        Some("$x == 5 && $y == 0 && $z == 7"), "$result == 0",
+        "test_chain_and_mid_false", &["x","y","z"],
+        &ret("$x && $y && $z"),
+        vec![vec![Val::Int(5), Val::Int(0), Val::Int(7)]]));
+
+    t.push(tc("chain_or_all_false", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 0"), "$result == 0",
+        "test_chain_or_all_false", &["x","y","z"],
+        &ret("$x || $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(0)]]));
+
+    t.push(tc("chain_or_last_true", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 9"), "$result == 9",
+        "test_chain_or_last_true", &["x","y","z"],
+        &ret("$x || $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(9)]]));
+
+    t.push(tc("chain_or_mid_true", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 4 && $z == 9"), "$result == 4",
+        "test_chain_or_mid_true", &["x","y","z"],
+        &ret("$x || $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(4), Val::Int(9)]]));
+
+    // --- Mixed &&/|| ---
+    // $x && $y || $z  parses as ($x && $y) || $z
+    t.push(tc("mixed_and_or_both_true", "(I64, I64, I64) -> I64",
+        Some("$x == 5 && $y == 3 && $z == 9"), "$result == 3",
+        "test_mixed_and_or_tt", &["x","y","z"],
+        &ret("$x && $y || $z"),
+        vec![vec![Val::Int(5), Val::Int(3), Val::Int(9)]]));
+
+    t.push(tc("mixed_and_or_left_false", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 3 && $z == 9"), "$result == 9",
+        "test_mixed_and_or_lf", &["x","y","z"],
+        &ret("$x && $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(3), Val::Int(9)]]));
+
+    t.push(tc("mixed_and_or_all_false", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 0"), "$result == 0",
+        "test_mixed_and_or_af", &["x","y","z"],
+        &ret("$x && $y || $z"),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(0)]]));
+
+    // ($x || $y) && $z
+    t.push(tc("mixed_or_and_left_true", "(I64, I64, I64) -> I64",
+        Some("$x == 5 && $y == 3 && $z == 7"), "$result == 7",
+        "test_mixed_or_and_lt", &["x","y","z"],
+        &ret("($x || $y) && $z"),
+        vec![vec![Val::Int(5), Val::Int(3), Val::Int(7)]]));
+
+    t.push(tc("mixed_or_and_both_false", "(I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 0 && $z == 7"), "$result == 0",
+        "test_mixed_or_and_bf", &["x","y","z"],
+        &ret("($x || $y) && $z"),
+        vec![vec![Val::Int(0), Val::Int(0), Val::Int(7)]]));
+
+    t.push(tc("mixed_or_and_right_false", "(I64, I64, I64) -> I64",
+        Some("$x == 5 && $y == 3 && $z == 0"), "$result == 0",
+        "test_mixed_or_and_rf", &["x","y","z"],
+        &ret("($x || $y) && $z"),
+        vec![vec![Val::Int(5), Val::Int(3), Val::Int(0)]]));
+
+    // 4-operand: $x && $y && $z || $w  = (($x && $y) && $z) || $w
+    t.push(tc("four_op_and_chain_or", "(I64, I64, I64, I64) -> I64",
+        Some("$x == 2 && $y == 3 && $z == 4 && $w == 99"), "$result == 4",
+        "test_four_op_1", &["x","y","z","w"],
+        &ret("$x && $y && $z || $w"),
+        vec![vec![Val::Int(2), Val::Int(3), Val::Int(4), Val::Int(99)]]));
+
+    t.push(tc("four_op_and_false_fallback", "(I64, I64, I64, I64) -> I64",
+        Some("$x == 0 && $y == 3 && $z == 4 && $w == 99"), "$result == 99",
+        "test_four_op_2", &["x","y","z","w"],
+        &ret("$x && $y && $z || $w"),
+        vec![vec![Val::Int(0), Val::Int(3), Val::Int(4), Val::Int(99)]]));
+
+    // Negative values (truthy = nonzero)
+    t.push(tc("negative_is_truthy_and", "(I64, I64) -> I64",
+        Some("$x == -1 && $y == 42"), "$result == 42",
+        "test_neg_truthy_and", &["x","y"],
+        &ret("$x && $y"),
+        vec![vec![Val::Int(-1), Val::Int(42)]]));
+
+    t.push(tc("negative_is_truthy_or", "(I64, I64) -> I64",
+        Some("$x == -1 && $y == 42"), "$result == -1",
+        "test_neg_truthy_or", &["x","y"],
+        &ret("$x || $y"),
+        vec![vec![Val::Int(-1), Val::Int(42)]]));
+
+    // Symbolic: varied inputs
+    t.push(tc("and_symbolic_varied", "(I64, I64) -> I64",
+        None, "($x != 0 && $result == $y) || ($x == 0 && $result == $x)",
+        "test_and_sym_varied", &["x","y"],
+        &ret("$x && $y"),
+        vec![vec![Val::Int(0), Val::Int(7)],
+             vec![Val::Int(1), Val::Int(0)],
+             vec![Val::Int(-1), Val::Int(99)],
+             vec![Val::Int(5), Val::Int(5)],
+             vec![Val::Int(0), Val::Int(0)]]));
+
+    t.push(tc("or_symbolic_varied", "(I64, I64) -> I64",
+        None, "($x != 0 && $result == $x) || ($x == 0 && $result == $y)",
+        "test_or_sym_varied", &["x","y"],
+        &ret("$x || $y"),
+        vec![vec![Val::Int(0), Val::Int(7)],
+             vec![Val::Int(1), Val::Int(0)],
+             vec![Val::Int(-1), Val::Int(99)],
+             vec![Val::Int(5), Val::Int(5)],
+             vec![Val::Int(0), Val::Int(0)]]));
+
+    t
+}
+
+#[test]
+fn cegis_layer7_logical_return_values() {
+    let r = run_layer("Layer 7: Logical Operator Return Values", layer7_logical_return_values());
+    assert_eq!(r.unsound, 0, "Logical return value soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 8: Reverse Soundness (uninterpreted function audit)
+// ============================================================================
+
+fn layer8_reverse_soundness() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    let bounded_str = || {
+        vec![
+            vec![Val::Str("a".into())], vec![Val::Str("ab".into())],
+            vec![Val::Str("abc".into())], vec![Val::Str("hello".into())],
+            vec![Val::Str("x".into())], vec![Val::Str("zz".into())],
+        ]
+    };
+
+    t.push(tc("rev_length_preservation", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 10"), "$result == length($s)",
+        "test_rev_len_pres", &["s"], &ret("length(reverse($s))"), bounded_str()));
+
+    t.push(tc("rev_double_identity", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result eq $s",
+        "test_rev_double_id", &["s"], &ret("reverse(reverse($s))"), bounded_str()));
+
+    t.push(tc("rev_concrete", "(Str) -> Str",
+        Some("$s eq \"abc\""), "$result eq \"cba\"",
+        "test_rev_concrete", &["s"], &ret("reverse($s)"),
+        vec![vec![Val::Str("abc".into())]]));
+
+    t.push(tc("rev_preserves_nonempty", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 10"), "$result >= 1",
+        "test_rev_nonempty", &["s"], &ret("length(reverse($s))"), bounded_str()));
+
+    t.push(tc("rev_single_char_identity", "(Str) -> Str",
+        Some("length($s) == 1"), "$result eq $s",
+        "test_rev_single", &["s"], &ret("reverse($s)"),
+        vec![vec![Val::Str("a".into())], vec![Val::Str("x".into())], vec![Val::Str("0".into())]]));
+
+    // Soundness probe: false claim reverse($s) eq "" when len >= 1
+    t.push(tc("rev_false_empty_claim", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 10"), "$result eq \"\"",
+        "test_rev_false_empty", &["s"], &ret("reverse($s)"), bounded_str()));
+
+    t.push(tc("rev_length_composition", "(Str, Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5 && length($t) >= 1 && length($t) <= 5"),
+        "$result == length($s) + length($t)",
+        "test_rev_len_comp", &["s", "t"], &ret("length(reverse($s)) + length(reverse($t))"),
+        vec![vec![Val::Str("ab".into()), Val::Str("cd".into())],
+             vec![Val::Str("hello".into()), Val::Str("x".into())]]));
+
+    t.push(tc("rev_concat_length", "(Str, Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5 && length($t) >= 1 && length($t) <= 5"),
+        "$result == length($s) + length($t)",
+        "test_rev_cat_len", &["s", "t"], &ret("length(reverse($s) . $t)"),
+        vec![vec![Val::Str("ab".into()), Val::Str("cd".into())],
+             vec![Val::Str("hello".into()), Val::Str("x".into())]]));
+
+    t
+}
+
+#[test]
+fn cegis_layer8_reverse_soundness() {
+    let r = run_layer("L8-ReverseSoundness", layer8_reverse_soundness());
+    assert_eq!(r.unsound, 0, "Reverse soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 9: String Repetition Edge Cases
+// ============================================================================
+
+fn layer9_string_repetition() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    t.push(tc("repeat_by_0", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result eq \"\"",
+        "test_rep_zero", &["s"], &ret("$s x 0"), str_singles()));
+
+    t.push(tc("repeat_by_1_identity", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result eq $s",
+        "test_rep_one", &["s"], &ret("$s x 1"), str_singles()));
+
+    t.push(tc("repeat_len_x2", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 3"), "length($result) == length($s) * 2",
+        "test_rep_len2", &["s"], &ret("$s x 2"), str_singles()));
+
+    t.push(tc("repeat_len_x4", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 3"), "length($result) == length($s) * 4",
+        "test_rep_len4", &["s"], &ret("$s x 4"), str_singles()));
+
+    t.push(tc("repeat_concrete_ab_x2", "(Str) -> Str",
+        Some("$s eq \"ab\""), "$result eq \"abab\"",
+        "test_rep_ab2", &["s"], &ret("$s x 2"),
+        vec![vec![Val::Str("ab".into())]]));
+
+    t.push(tc("repeat_concrete_ab_x3", "(Str) -> Str",
+        Some("$s eq \"ab\""), "$result eq \"ababab\"",
+        "test_rep_ab3", &["s"], &ret("$s x 3"),
+        vec![vec![Val::Str("ab".into())]]));
+
+    t.push(tc("repeat_negative_count", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result eq \"\"",
+        "test_rep_neg1", &["s"], &ret("$s x -1"), str_singles()));
+
+    t.push(tc("repeat_negative_5", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result eq \"\"",
+        "test_rep_neg5", &["s"], &ret("$s x -5"), str_singles()));
+
+    t.push(tc("repeat_empty_string", "(Str) -> Str",
+        Some("$s eq \"\""), "$result eq \"\"",
+        "test_rep_empty", &["s"], &ret("$s x 5"),
+        vec![vec![Val::Str("".into())]]));
+
+    t.push(tc("repeat_empty_x0", "(Str) -> Str",
+        Some("$s eq \"\""), "$result eq \"\"",
+        "test_rep_empty0", &["s"], &ret("$s x 0"),
+        vec![vec![Val::Str("".into())]]));
+
+    t.push(tc("repeat_preserves_starts_with", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5 && starts_with($s, \"a\") == 1"),
+        "$result == 1",
+        "test_rep_sw", &["s"],
+        &"    my $r = $s x 2;\n    return starts_with($r, \"a\");\n",
+        vec![vec![Val::Str("a".into())], vec![Val::Str("abc".into())],
+             vec![Val::Str("ab".into())], vec![Val::Str("axyz".into())]]));
+
+    t.push(tc("repeat_preserves_contains", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 3 && contains($s, \"x\") == 1"),
+        "$result == 1",
+        "test_rep_contains", &["s"],
+        &"    my $r = $s x 3;\n    return contains($r, \"x\");\n",
+        vec![vec![Val::Str("x".into())], vec![Val::Str("ax".into())],
+             vec![Val::Str("xa".into())]]));
+
+    t.push(tc("repeat_len_x5", "(Str) -> Str",
+        Some("length($s) >= 1 && length($s) <= 2"), "length($result) == length($s) * 5",
+        "test_rep_len5", &["s"], &ret("$s x 5"), str_singles()));
+
+    t.push(tc("repeat_vs_concat_length", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result == 1",
+        "test_rep_vs_cat", &["s"],
+        &"    my $a = $s x 2;\n    my $b = $s . $s;\n    if (length($a) == length($b)) {\n        return 1;\n    }\n    return 0;\n",
+        str_singles()));
+
+    t.push(tc("repeat_x2_eq_concat", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result == 1",
+        "test_rep_eq_cat", &["s"],
+        &"    my $a = $s x 2;\n    my $b = $s . $s;\n    if ($a eq $b) {\n        return 1;\n    }\n    return 0;\n",
+        str_singles()));
+
+    t.push(tc("repeat_x3_eq_triple_concat", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 3"), "$result == 1",
+        "test_rep3_cat3", &["s"],
+        &"    my $a = $s x 3;\n    my $b = $s . $s . $s;\n    if ($a eq $b) {\n        return 1;\n    }\n    return 0;\n",
+        str_singles()));
+
+    t.push(tc("repeat_reverse_length", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 3"), "$result == length($s) * 2",
+        "test_rep_rev_len", &["s"],
+        &"    my $r = $s x 2;\n    return length(reverse($r));\n",
+        str_singles()));
+
+    t.push(tc("repeat_single_char", "(Str) -> Str",
+        Some("$s eq \"z\""), "$result eq \"zzzz\"",
+        "test_rep_z4", &["s"], &ret("$s x 4"),
+        vec![vec![Val::Str("z".into())]]));
+
+    t.push(tc("repeat_then_index", "(Str) -> I64",
+        Some("length($s) >= 1 && length($s) <= 5"), "$result == 0",
+        "test_rep_idx", &["s"],
+        &"    my $r = $s x 2;\n    return index($r, $s);\n",
+        str_singles()));
+
+    t
+}
+
+#[test]
+fn cegis_layer9_string_repetition() {
+    let r = run_layer("L9-StringRepetition", layer9_string_repetition());
+    assert_eq!(r.unsound, 0, "String repetition soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 10: Negative Indexing & Substr Edge Cases
+// ============================================================================
+
+fn layer10_negative_indexing() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    t.push(tc("substr_neg_start_minus2", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"lo\"",
+        "test_substr_neg2", &["s"], &ret("substr($s, -2)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("substr_neg_start_minus5", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"hello\"",
+        "test_substr_neg5", &["s"], &ret("substr($s, -5)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("substr_neg_start_minus1", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"o\"",
+        "test_substr_neg1", &["s"], &ret("substr($s, -1)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("substr_neg_len_minus1", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"ell\"",
+        "test_substr_nl1", &["s"], &ret("substr($s, 1, -1)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("substr_neg_len_minus2", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"hel\"",
+        "test_substr_nl2", &["s"], &ret("substr($s, 0, -2)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("substr_neg_len_middle", "(Str) -> Str",
+        Some("$s eq \"abcde\""), "$result eq \"cd\"",
+        "test_substr_nlm", &["s"], &ret("substr($s, 2, -1)"),
+        vec![vec![Val::Str("abcde".into())]]));
+
+    t.push(tc("substr_zero_length", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"\"",
+        "test_substr_z0", &["s"], &ret("substr($s, 2, 0)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("char_at_neg_minus1", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"o\"",
+        "test_chat_neg1", &["s"], &ret("char_at($s, -1)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("char_at_neg_minus5", "(Str) -> Str",
+        Some("$s eq \"hello\""), "$result eq \"h\"",
+        "test_chat_neg5", &["s"], &ret("char_at($s, -5)"),
+        vec![vec![Val::Str("hello".into())]]));
+
+    t.push(tc("array_neg_idx_minus1", "(I64, I64, I64) -> I64",
+        None, "$result == 30",
+        "test_arr_neg1", &["a", "b", "c"],
+        &"    my @a = ($a, $b, $c);\n    return $a[-1];\n",
+        vec![vec![Val::Int(10), Val::Int(20), Val::Int(30)]]));
+
+    t.push(tc("array_neg_idx_minus2", "(I64, I64, I64) -> I64",
+        None, "$result == 20",
+        "test_arr_neg2", &["a", "b", "c"],
+        &"    my @a = ($a, $b, $c);\n    return $a[-2];\n",
+        vec![vec![Val::Int(10), Val::Int(20), Val::Int(30)]]));
+
+    t
+}
+
+#[test]
+fn cegis_layer10_negative_indexing() {
+    let r = run_layer("L10-NegativeIndexing", layer10_negative_indexing());
+    assert_eq!(r.unsound, 0, "Negative indexing soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 11: Increment/Decrement Return Value Semantics
+// ============================================================================
+
+fn layer11_inc_dec_semantics() -> Vec<TestCase> {
+    let mut t = Vec::new();
+    let bounded = || isingles().into_iter()
+        .filter(|v| match &v[0] { Val::Int(n) => *n >= -1000 && *n <= 1000, _ => false })
+        .collect::<Vec<_>>();
+
+    t.push(tc("postinc_returns_old", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x",
+        "test_postinc_old", &["x"],
+        "    my $y = $x;\n    my $old = $y++;\n    return $old;\n",
+        bounded()));
+
+    t.push(tc("postinc_side_effect", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x + 1",
+        "test_postinc_side", &["x"],
+        "    my $y = $x;\n    $y++;\n    return $y;\n",
+        bounded()));
+
+    t.push(tc("preinc_returns_new", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x + 1",
+        "test_preinc_new", &["x"],
+        "    my $y = $x;\n    my $new = ++$y;\n    return $new;\n",
+        bounded()));
+
+    t.push(tc("postdec_returns_old", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x",
+        "test_postdec_old", &["x"],
+        "    my $y = $x;\n    my $old = $y--;\n    return $old;\n",
+        bounded()));
+
+    t.push(tc("postdec_side_effect", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x - 1",
+        "test_postdec_side", &["x"],
+        "    my $y = $x;\n    $y--;\n    return $y;\n",
+        bounded()));
+
+    t.push(tc("predec_returns_new", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x - 1",
+        "test_predec_new", &["x"],
+        "    my $y = $x;\n    my $new = --$y;\n    return $new;\n",
+        bounded()));
+
+    t.push(tc("inc_dec_identity", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x",
+        "test_inc_dec_id", &["x"],
+        "    my $y = $x;\n    $y++;\n    $y--;\n    return $y;\n",
+        bounded()));
+
+    t.push(tc("triple_increment", "(I64) -> I64",
+        Some("$x >= -1000 && $x <= 1000"), "$result == $x + 3",
+        "test_triple_inc", &["x"],
+        "    my $y = $x;\n    $y++;\n    $y++;\n    $y++;\n    return $y;\n",
+        bounded()));
+
+    t
+}
+
+#[test]
+fn cegis_layer11_inc_dec_semantics() {
+    let r = run_layer("L11-IncDecSemantics", layer11_inc_dec_semantics());
+    assert_eq!(r.unsound, 0, "Inc/dec soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 12: Hash Edge Cases
+// ============================================================================
+
+fn layer12_hash_edge_cases() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    let bounded_range: Vec<Vec<Val>> = (-100..=100).step_by(25).map(|x| vec![Val::Int(x)]).collect();
+    let bounded_pairs: Vec<Vec<Val>> = vec![
+        vec![Val::Int(0), Val::Int(0)], vec![Val::Int(1), Val::Int(-1)],
+        vec![Val::Int(-50), Val::Int(50)], vec![Val::Int(100), Val::Int(100)],
+        vec![Val::Int(-100), Val::Int(-100)], vec![Val::Int(42), Val::Int(-73)],
+        vec![Val::Int(0), Val::Int(100)], vec![Val::Int(-100), Val::Int(0)],
+    ];
+
+    t.push(tc("hash_empty_key_write_read", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == $x",
+        "test_hash_empty_key", &["x"],
+        "    my %h = (\"\" => $x);\n    return $h{\"\"};\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_key_zero_str", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == $x",
+        "test_hash_key_zero", &["x"],
+        "    my %h = (\"0\" => $x);\n    return $h{\"0\"};\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_overwrite_semantics", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == $x",
+        "test_hash_overwrite", &["x"],
+        "    my %h = (\"k\" => 10);\n    $h{\"k\"} = $x;\n    return $h{\"k\"};\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_exists_after_write", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == 1",
+        "test_hash_exists_wr", &["x"],
+        "    my %h = (\"k\" => $x);\n    if (exists $h{\"k\"}) { return 1; }\n    return 0;\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_exists_missing_key", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == 0",
+        "test_hash_exists_miss", &["x"],
+        "    my %h = (\"k\" => $x);\n    if (exists $h{\"missing\"}) { return 1; }\n    return 0;\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_defined_present_key", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100"), "$result == 1",
+        "test_hash_defined_pres", &["x"],
+        "    my %h = (\"k\" => $x);\n    if (defined($h{\"k\"})) { return 1; }\n    return 0;\n",
+        bounded_range.clone()));
+
+    t.push(tc("hash_missing_key_default", "() -> I64",
+        None, "$result == 0",
+        "test_hash_missing_def", &[],
+        "    my %h = (\"k\" => 42);\n    return $h{\"missing\"};\n",
+        vec![vec![]]));
+
+    t.push(tc("hash_multiple_keys", "(I64, I64) -> I64",
+        Some("$x >= -100 && $x <= 100 && $y >= -100 && $y <= 100"),
+        "$result == $x + $y",
+        "test_hash_multi_keys", &["x", "y"],
+        "    my %h = (\"a\" => $x, \"b\" => $y);\n    return $h{\"a\"} + $h{\"b\"};\n",
+        bounded_pairs));
+
+    t
+}
+
+#[test]
+fn cegis_layer12_hash_edge_cases() {
+    let r = run_layer("L12-HashEdgeCases", layer12_hash_edge_cases());
+    assert_eq!(r.unsound, 0, "Hash edge case soundness bugs found:\n{}", r.details.join("\n"));
+}
+
+// ============================================================================
+// Layer 13: Statement Modifiers & Die Path Pruning
+// ============================================================================
+
+fn layer13_statement_modifiers() -> Vec<TestCase> {
+    let mut t = Vec::new();
+
+    t.push(tc("return_if_nonneg", "(I64) -> I64", None,
+        "$result >= 0",
+        "test_return_if", &["x"],
+        "    return $x if ($x > 0);\n    return 0;\n",
+        isingles()));
+
+    t.push(tc("return_unless_nonneg", "(I64) -> I64", None,
+        "$result >= 0",
+        "test_return_unless", &["x"],
+        "    return 0 unless ($x > 0);\n    return $x;\n",
+        isingles()));
+
+    t.push(tc("die_if_prune_neg", "(I64) -> I64",
+        Some("$x >= 0"), "$result >= 0",
+        "test_die_if_prune", &["x"],
+        "    die \"neg\" if ($x < 0);\n    return $x;\n",
+        vec![vec![Val::Int(0)], vec![Val::Int(1)], vec![Val::Int(5)],
+             vec![Val::Int(10)], vec![Val::Int(100)]]));
+
+    t.push(tc("die_unless_prune", "(I64) -> I64",
+        Some("$x > 0"), "$result > 0",
+        "test_die_unless_prune", &["x"],
+        "    die \"not pos\" unless ($x > 0);\n    return $x;\n",
+        vec![vec![Val::Int(1)], vec![Val::Int(2)], vec![Val::Int(5)],
+             vec![Val::Int(10)], vec![Val::Int(100)]]));
+
+    t.push(tc("assign_if_nonneg", "(I64) -> I64", None,
+        "$result >= 0",
+        "test_assign_if", &["x"],
+        "    my $y = 0;\n    $y = $x if ($x > 0);\n    return $y;\n",
+        isingles()));
+
+    t.push(tc("assign_unless_nonneg", "(I64) -> I64", None,
+        "$result >= 0",
+        "test_assign_unless", &["x"],
+        "    my $y = $x;\n    $y = -$x unless ($x >= 0);\n    return $y;\n",
+        isingles()));
+
+    t.push(tc("chained_die_range", "(I64) -> I64",
+        Some("$x >= 0 && $x <= 100"),
+        "$result >= 0 && $result <= 100",
+        "test_chained_die", &["x"],
+        "    die \"low\" if ($x < 0);\n    die \"high\" if ($x > 100);\n    return $x;\n",
+        vec![vec![Val::Int(0)], vec![Val::Int(1)], vec![Val::Int(50)],
+             vec![Val::Int(99)], vec![Val::Int(100)]]));
+
+    t.push(tc("die_return_combo", "(I64) -> I64",
+        Some("$x >= -100 && $x <= 100 && $x != 0"),
+        "$result == 1 || $result == -1",
+        "test_die_return", &["x"],
+        "    die \"zero\" if ($x == 0);\n    return 1 if ($x > 0);\n    return -1;\n",
+        vec![vec![Val::Int(1)], vec![Val::Int(-1)], vec![Val::Int(5)],
+             vec![Val::Int(-5)], vec![Val::Int(10)], vec![Val::Int(-10)],
+             vec![Val::Int(100)], vec![Val::Int(-100)]]));
+
+    t
+}
+
+#[test]
+fn cegis_layer13_statement_modifiers() {
+    let r = run_layer("L13-StatementModifiers", layer13_statement_modifiers());
+    assert_eq!(r.unsound, 0, "Statement modifier soundness bugs found:\n{}", r.details.join("\n"));
+}

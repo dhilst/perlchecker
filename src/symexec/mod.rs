@@ -1803,8 +1803,12 @@ fn expect_int(value: SymValue, function: &str) -> std::result::Result<IntExpr, S
 fn expect_bool(value: SymValue, function: &str) -> std::result::Result<BoolExpr, SymExecError> {
     match value {
         SymValue::Bool(value) => Ok(value),
-        SymValue::Int(_)
-        | SymValue::Str(_)
+        SymValue::Int(i) => Ok(BoolExpr::IntCmp(
+            CmpOp::Ne,
+            Box::new(i),
+            Box::new(IntExpr::Const(0)),
+        )),
+        SymValue::Str(_)
         | SymValue::ArrayInt(_)
         | SymValue::ArrayStr(_)
         | SymValue::HashInt(_)

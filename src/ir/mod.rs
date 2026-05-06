@@ -408,19 +408,17 @@ impl<'a> SsaBuilder<'a> {
                 }
             }
             Expr::Binary { left, op: BinaryOp::And, right } => {
-                // Desugar short-circuit: A && B => if A { B } else { false }
-                // This ensures calls in B are only executed when A is true.
-                // Only desugar when the RHS produces hoisted statements (function calls);
-                // otherwise keep as a plain Binary expr for efficiency.
+                // Desugar: A && B => ITE(A, B, A) — returns deciding value
                 let left_val = self.rewrite_expr(left, env, prefix)?;
+                let tmp = self.fresh_name("__and_lhs");
+                prefix.push(SsaStmt::Assign(tmp.clone(), left_val));
                 let mut rhs_prefix = Vec::new();
                 let right_val = self.rewrite_expr(right, env, &mut rhs_prefix)?;
                 if rhs_prefix.is_empty() {
-                    // No side effects in RHS — use plain And (semantically equivalent)
-                    SsaExpr::Binary {
-                        left: Box::new(left_val),
-                        op: BinaryOp::And,
-                        right: Box::new(right_val),
+                    SsaExpr::Ite {
+                        condition: Box::new(SsaExpr::Var(tmp.clone())),
+                        then_expr: Box::new(right_val),
+                        else_expr: Box::new(SsaExpr::Var(tmp)),
                     }
                 } else {
                     let then_name = self.fresh_name("__sc_and");
@@ -428,9 +426,9 @@ impl<'a> SsaBuilder<'a> {
                     let result_name = self.fresh_name("__sc_and");
                     let mut then_branch = rhs_prefix;
                     then_branch.push(SsaStmt::Assign(then_name.clone(), right_val));
-                    let else_branch = vec![SsaStmt::Assign(else_name.clone(), SsaExpr::Bool(false))];
+                    let else_branch = vec![SsaStmt::Assign(else_name.clone(), SsaExpr::Var(tmp.clone()))];
                     prefix.push(SsaStmt::If {
-                        condition: left_val,
+                        condition: SsaExpr::Var(tmp),
                         then_branch,
                         else_branch,
                         merges: vec![SsaMerge {
@@ -444,29 +442,27 @@ impl<'a> SsaBuilder<'a> {
                 }
             }
             Expr::Binary { left, op: BinaryOp::Or, right } => {
-                // Desugar short-circuit: A || B => if A { true } else { B }
-                // This ensures calls in B are only executed when A is false.
-                // Only desugar when the RHS produces hoisted statements (function calls);
-                // otherwise keep as a plain Binary expr for efficiency.
+                // Desugar: A || B => ITE(A, A, B) — returns deciding value
                 let left_val = self.rewrite_expr(left, env, prefix)?;
+                let tmp = self.fresh_name("__or_lhs");
+                prefix.push(SsaStmt::Assign(tmp.clone(), left_val));
                 let mut rhs_prefix = Vec::new();
                 let right_val = self.rewrite_expr(right, env, &mut rhs_prefix)?;
                 if rhs_prefix.is_empty() {
-                    // No side effects in RHS — use plain Or (semantically equivalent)
-                    SsaExpr::Binary {
-                        left: Box::new(left_val),
-                        op: BinaryOp::Or,
-                        right: Box::new(right_val),
+                    SsaExpr::Ite {
+                        condition: Box::new(SsaExpr::Var(tmp.clone())),
+                        then_expr: Box::new(SsaExpr::Var(tmp)),
+                        else_expr: Box::new(right_val),
                     }
                 } else {
                     let then_name = self.fresh_name("__sc_or");
                     let else_name = self.fresh_name("__sc_or");
                     let result_name = self.fresh_name("__sc_or");
-                    let then_branch = vec![SsaStmt::Assign(then_name.clone(), SsaExpr::Bool(true))];
+                    let then_branch = vec![SsaStmt::Assign(then_name.clone(), SsaExpr::Var(tmp.clone()))];
                     let mut else_branch = rhs_prefix;
                     else_branch.push(SsaStmt::Assign(else_name.clone(), right_val));
                     prefix.push(SsaStmt::If {
-                        condition: left_val,
+                        condition: SsaExpr::Var(tmp),
                         then_branch,
                         else_branch,
                         merges: vec![SsaMerge {
@@ -1162,8 +1158,8 @@ impl<'a> SsaBuilder<'a> {
                             right: Box::new(fresh_cond),
                         };
 
+                        lowered.extend(prefix2);
                         let mut preservation_body = Vec::new();
-                        preservation_body.extend(prefix2);
                         preservation_body.extend(body_ssa);
                         preservation_body.extend(prefix3);
                         let neg_post_inv = SsaExpr::Unary {

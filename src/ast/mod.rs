@@ -1220,27 +1220,22 @@ fn infer_expr_type(
                 Ok(ExprType::I64)
             }
             BinaryOp::And | BinaryOp::Or => {
-                expect_expr_type(
-                    function,
-                    "boolean operand",
-                    left,
-                    env,
-                    assumptions,
-                    ExprType::Bool,
-                    signatures,
-                    alias_map,
+                let left_ty = infer_expr_type(
+                    function, left, env, assumptions, signatures, alias_map,
                 )?;
-                expect_expr_type(
-                    function,
-                    "boolean operand",
-                    right,
-                    env,
-                    assumptions,
-                    ExprType::Bool,
-                    signatures,
-                    alias_map,
+                let right_ty = infer_expr_type(
+                    function, right, env, assumptions, signatures, alias_map,
                 )?;
-                Ok(ExprType::Bool)
+                match (left_ty, right_ty) {
+                    (ExprType::Bool, ExprType::Bool) => Ok(ExprType::Bool),
+                    (ExprType::I64, ExprType::I64) => Ok(ExprType::I64),
+                    _ => Err(TypeCheckError::TypeMismatch {
+                        function: function.to_string(),
+                        context: "logical operator requires matching I64 or Bool operands",
+                        expected: render_expr_type(left_ty),
+                        found: render_expr_type(right_ty),
+                    }),
+                }
             }
         },
         Expr::Access {
